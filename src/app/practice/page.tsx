@@ -1,14 +1,29 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ChatMessage, SessionFeedback } from "@/types";
 import { saveSession } from "@/lib/history";
+import VoiceInput from "@/components/VoiceInput";
+import VoiceOutput from "@/components/VoiceOutput";
+import VoiceControls from "@/components/VoiceControls";
+import MuteButton from "@/components/MuteButton";
 
-const INITIAL_QUESTION =
-  "Let's talk about your hometown. Where is your hometown?";
+const INITIAL_QUESTIONS: Record<string, string> = {
+  part1: "Let's talk about your hometown. Where is your hometown?",
+  part2: "I'm going to give you a topic to talk about for 1-2 minutes. You have 1 minute to prepare. You can make notes if you wish.\n\nDescribe your hometown. You should say:\n- where it is\n- what it is known for\n- what you like and dislike about it\n\nAnd explain why it is special to you.\n\nAlright, you can start speaking now. You have 1-2 minutes.",
+  part3: "Let's discuss some broader questions related to urbanization and city life. How do cities in your country differ from each other?",
+  full: "Good morning/afternoon. My name is [Examiner]. Can I have your full name, please?\n\nNow I'd like to ask you some questions about your hometown. Where is your hometown?",
+};
+
+const MAX_ANSWER_TIME = 60; // 最大回答时间（秒）
 
 export default function PracticePage() {
+  const searchParams = useSearchParams();
+  const practiceMode = searchParams.get("mode") || "part1";
+  const topicId = searchParams.get("topic") || undefined;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +31,7 @@ export default function PracticePage() {
   const [feedback, setFeedback] = useState<SessionFeedback | null>(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inputMode, setInputMode] = useState<"text" | "voice">("text");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,21 +39,23 @@ export default function PracticePage() {
   }, [messages, feedback]);
 
   useEffect(() => {
+    const initialQuestion = INITIAL_QUESTIONS[practiceMode] || INITIAL_QUESTIONS.part1;
     const firstQuestion: ChatMessage = {
       id: "1",
       role: "examiner",
-      content: INITIAL_QUESTION,
+      content: initialQuestion,
       createdAt: new Date().toISOString(),
     };
     setMessages([firstQuestion]);
-  }, []);
+  }, [practiceMode]);
 
   const fetchExaminerResponse = async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/examiner", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "ielts_part_1",
+        mode: practiceMode,
+        topic: topicId,
         messages: currentMessages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -155,6 +173,90 @@ export default function PracticePage() {
     }
   };
 
+  const handleVoiceResult = useCallback((text: string) => {
+    setInput((prev) => (prev ? prev + " " + text : text));
+  }, []);
+
+  const handleVoiceConversationResult = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading || isSessionEnded) return;
+
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: "user",
+        content: text.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const examinerResponse = await fetchExaminerResponse(newMessages);
+
+        const examinerMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "examiner",
+          content: examinerResponse,
+          createdAt: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, examinerMessage]);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to get response. Please try again."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, isSessionEnded, messages, fetchExaminerResponse]
+  );
+
+  // AI 超时打断处理
+  const handleTimeout = useCallback(async () => {
+    if (isLoading || isSessionEnded) return;
+
+    // 添加超时提示消息
+    const timeoutMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "examiner",
+      content: "Thank you. Let's move on to the next question.",
+      createdAt: new Date().toISOString(),
+    };
+
+    const newMessages = [...messages, timeoutMessage];
+    setMessages(newMessages);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 请求 AI 生成新问题（切题）
+      const examinerResponse = await fetchExaminerResponse(newMessages);
+
+      const examinerMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "examiner",
+        content: examinerResponse,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, examinerMessage]);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to get response. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, isSessionEnded, messages, fetchExaminerResponse]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header */}
@@ -176,7 +278,8 @@ export default function PracticePage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <MuteButton />
             <Link
               href="/history"
               className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
@@ -207,12 +310,13 @@ export default function PracticePage() {
             </div>
           )}
 
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <div
               key={message.id}
-              className={`flex ${
+              className={`flex animate-message-in ${
                 message.role === "user" ? "justify-end" : "justify-start"
               }`}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div
                 className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
@@ -222,9 +326,15 @@ export default function PracticePage() {
                 }`}
               >
                 {message.role === "examiner" && (
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Examiner
-                  </p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                      Examiner
+                    </p>
+                    <VoiceOutput
+                      text={message.content}
+                      autoPlay={message.id === messages[messages.length - 1]?.id}
+                    />
+                  </div>
                 )}
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">
                   {message.content}
@@ -234,24 +344,28 @@ export default function PracticePage() {
           ))}
 
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200 dark:border-gray-700 shadow-sm">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+            <div className="flex justify-start animate-message-in">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200 dark:border-gray-700 shadow-sm min-w-[200px]">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
                   Examiner
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <div className="h-3 w-3/4 rounded animate-shimmer" />
+                  <div className="h-3 w-1/2 rounded animate-shimmer" style={{ animationDelay: "0.1s" }} />
+                </div>
+                <div className="flex items-center gap-2 mt-3">
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
                     <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.1s" }}
                     />
                     <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.2s" }}
                     />
                   </div>
-                  <span className="text-xs text-gray-400">Thinking...</span>
+                  <span className="text-xs text-blue-500 dark:text-blue-400">Thinking...</span>
                 </div>
               </div>
             </div>
@@ -259,7 +373,7 @@ export default function PracticePage() {
 
           {/* Error Message */}
           {error && (
-            <div className="flex justify-center px-4">
+            <div className="flex justify-center px-4 animate-message-in">
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 max-w-md">
                 <div className="flex items-start gap-3">
                   <span className="text-red-500 mt-0.5">⚠</span>
@@ -284,24 +398,69 @@ export default function PracticePage() {
       <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
         <div className="max-w-3xl mx-auto">
           {!isSessionEnded ? (
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Type your answer..."
-                className="flex-1 px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow"
-                disabled={isLoading}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Send
-              </button>
-            </div>
+            <>
+              {/* Mode Toggle */}
+              <div className="flex justify-center mb-3">
+                <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800/50">
+                  <button
+                    onClick={() => setInputMode("text")}
+                    className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
+                      inputMode === "text"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Text Mode
+                  </button>
+                  <button
+                    onClick={() => setInputMode("voice")}
+                    className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
+                      inputMode === "voice"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Voice Mode
+                  </button>
+                </div>
+              </div>
+
+              {/* Input based on mode */}
+              {inputMode === "text" ? (
+                <div className="flex gap-2 sm:gap-3 items-center">
+                  <VoiceInput
+                    onResult={handleVoiceResult}
+                    disabled={isLoading}
+                  />
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Type or speak your answer..."
+                    className="flex-1 px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow"
+                    disabled={isLoading}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!input.trim() || isLoading}
+                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Send
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-center py-2">
+                  <VoiceControls
+                    onResult={handleVoiceConversationResult}
+                    isProcessing={isLoading}
+                    disabled={isLoading}
+                    maxAnswerTime={MAX_ANSWER_TIME}
+                    onTimeout={handleTimeout}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-2">
               {isFeedbackLoading ? (

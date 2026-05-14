@@ -10,6 +10,7 @@ export type SavedSession = {
 };
 
 const STORAGE_KEY = "echolingo_sessions";
+const MAX_SESSIONS = 50; // 最大保存会话数
 
 export function saveSession(
   messages: ChatMessage[],
@@ -26,7 +27,21 @@ export function saveSession(
 
   const sessions = getSessions();
   sessions.unshift(session);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+  // 限制保存数量，删除旧会话
+  if (sessions.length > MAX_SESSIONS) {
+    sessions.length = MAX_SESSIONS;
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  } catch (e) {
+    // 如果存储空间不足，删除一半旧会话后重试
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      sessions.length = Math.floor(sessions.length / 2);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+  }
 
   return session;
 }
@@ -45,4 +60,34 @@ export function getSessions(): SavedSession[] {
 export function getSessionById(id: string): SavedSession | null {
   const sessions = getSessions();
   return sessions.find((s) => s.id === id) || null;
+}
+
+export function deleteSession(id: string): boolean {
+  const sessions = getSessions();
+  const index = sessions.findIndex((s) => s.id === id);
+
+  if (index === -1) return false;
+
+  sessions.splice(index, 1);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  return true;
+}
+
+export function clearAllSessions(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+export function getStorageUsage(): { used: number; total: number } {
+  if (typeof window === "undefined") return { used: 0, total: 0 };
+
+  let used = 0;
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    used = data ? new Blob([data]).size : 0;
+  } catch {
+    // ignore
+  }
+
+  // localStorage 通常限制 5-10MB
+  return { used, total: 5 * 1024 * 1024 };
 }
