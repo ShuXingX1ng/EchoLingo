@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSessions, deleteSession, clearAllSessions } from "@/lib/history";
 import type { SavedSession } from "@/lib/history";
 import MuteButton from "@/components/MuteButton";
+import BackupModal from "@/components/BackupModal";
 
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<SavedSession[]>([]);
@@ -16,6 +17,7 @@ export default function HistoryPage() {
   const [sortBy, setSortBy] = useState<"date" | "band">("date");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -176,6 +178,12 @@ export default function HistoryPage() {
           <div className="flex items-center gap-3">
             <MuteButton />
             <Link
+              href="/stats"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Stats
+            </Link>
+            <Link
               href="/practice"
               className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
@@ -281,6 +289,14 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* 备份 */}
+                  <button
+                    onClick={() => setIsBackupModalOpen(true)}
+                    className="px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    Backup
+                  </button>
+
                   {/* 导出 */}
                   <div className="relative group">
                     <button className="px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -455,6 +471,14 @@ export default function HistoryPage() {
           </>
         )}
       </main>
+
+      <BackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        onImportComplete={() => {
+          setSessions(getSessions());
+        }}
+      />
     </div>
   );
 }

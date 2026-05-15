@@ -3,6 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import MuteButton from "@/components/MuteButton";
+import {
+  getGoals,
+  saveGoals,
+  clearGoals,
+  calculateGoalProgress,
+  type PracticeGoal,
+  type GoalProgress,
+} from "@/lib/goals";
 
 export default function SettingsPage() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -10,6 +18,11 @@ export default function SettingsPage() {
   const [rate, setRate] = useState(0.95);
   const [isMuted, setIsMuted] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  const [weeklyTarget, setWeeklyTarget] = useState(3);
+  const [targetBand, setTargetBand] = useState(6.5);
+  const [goalProgress, setGoalProgress] = useState<GoalProgress | null>(null);
+  const [isGoalSaved, setIsGoalSaved] = useState(false);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -19,7 +32,6 @@ export default function SettingsPage() {
       );
       setVoices(englishVoices);
 
-      // Load saved settings
       const savedVoice = localStorage.getItem("echolingo_voice_uri");
       const savedRate = localStorage.getItem("echolingo_voice_rate");
       const savedMuted = localStorage.getItem("echolingo_muted");
@@ -45,6 +57,14 @@ export default function SettingsPage() {
 
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    const goals = getGoals();
+    if (goals) {
+      setWeeklyTarget(goals.weeklyTarget);
+      setTargetBand(goals.targetBand);
+    }
+
+    setGoalProgress(calculateGoalProgress());
   }, []);
 
   const handleSave = () => {
@@ -69,9 +89,25 @@ export default function SettingsPage() {
     window.speechSynthesis.speak(utterance);
   };
 
+  const handleSaveGoals = () => {
+    const goal: PracticeGoal = {
+      weeklyTarget,
+      targetBand,
+      createdAt: new Date().toISOString(),
+    };
+    saveGoals(goal);
+    setGoalProgress(calculateGoalProgress());
+    setIsGoalSaved(true);
+    setTimeout(() => setIsGoalSaved(false), 2000);
+  };
+
+  const handleClearGoals = () => {
+    clearGoals();
+    setGoalProgress(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -85,18 +121,145 @@ export default function SettingsPage() {
               Settings
             </h1>
           </div>
-          <MuteButton />
+          <div className="flex items-center gap-3">
+            <Link
+              href="/stats"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Stats
+            </Link>
+            <MuteButton />
+          </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-2xl mx-auto p-4 sm:p-6">
+      <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Practice Goals */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Practice Goals
+          </h2>
+
+          {goalProgress && (
+            <div className="mb-6 space-y-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Weekly Practice
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {goalProgress.weeklyCompleted} / {goalProgress.weeklyTarget}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                  <div
+                    className={`h-2.5 rounded-full transition-all ${
+                      goalProgress.isWeeklyGoalMet
+                        ? "bg-green-500"
+                        : "bg-blue-500"
+                    }`}
+                    style={{ width: `${goalProgress.weeklyProgress}%` }}
+                  />
+                </div>
+                {goalProgress.isWeeklyGoalMet && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                    ✓ Weekly goal achieved!
+                  </p>
+                )}
+              </div>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Band Score
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {goalProgress.currentAverageBand} / {goalProgress.targetBand}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                  <div
+                    className={`h-2.5 rounded-full transition-all ${
+                      goalProgress.isBandGoalMet
+                        ? "bg-green-500"
+                        : "bg-blue-500"
+                    }`}
+                    style={{ width: `${goalProgress.bandProgress}%` }}
+                  />
+                </div>
+                {goalProgress.isBandGoalMet && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                    ✓ Band score goal achieved!
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Weekly Practice Target: {weeklyTarget} sessions
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="14"
+              step="1"
+              value={weeklyTarget}
+              onChange={(e) => setWeeklyTarget(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>1 session</span>
+              <span>7 sessions</span>
+              <span>14 sessions</span>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Target Band Score: {targetBand.toFixed(1)}
+            </label>
+            <input
+              type="range"
+              min="4"
+              max="9"
+              step="0.5"
+              value={targetBand}
+              onChange={(e) => setTargetBand(parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>4.0</span>
+              <span>6.5</span>
+              <span>9.0</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            {goalProgress && (
+              <button
+                onClick={handleClearGoals}
+                className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Clear Goals
+              </button>
+            )}
+            <button
+              onClick={handleSaveGoals}
+              className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              {isGoalSaved ? "✓ Saved!" : "Save Goals"}
+            </button>
+          </div>
+        </div>
+
+        {/* Voice Settings */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
             Voice Settings
           </h2>
 
-          {/* Mute Toggle */}
           <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -122,7 +285,6 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          {/* Voice Selection */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Examiner Voice
@@ -146,7 +308,6 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Speed Control */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Speech Speed: {rate.toFixed(2)}x
@@ -167,7 +328,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-3">
             <button
               onClick={handleTest}
@@ -185,15 +345,16 @@ export default function SettingsPage() {
         </div>
 
         {/* Info */}
-        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
           <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
-            About Voice Settings
+            About Settings
           </h3>
           <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+            <li>• Practice goals help you stay motivated and track progress</li>
             <li>• Voices are provided by your browser and operating system</li>
             <li>• Google Chrome typically has the best voice options</li>
             <li>• A slower speed (0.8-0.9x) is recommended for learning</li>
-            <li>• Settings are saved locally in your browser</li>
+            <li>• All settings are saved locally in your browser</li>
           </ul>
         </div>
       </main>

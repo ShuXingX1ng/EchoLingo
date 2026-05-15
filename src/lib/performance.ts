@@ -1,19 +1,22 @@
 // 性能监控工具
 
-export function measurePerformance(name: string, fn: () => Promise<unknown>) {
-  return async <T>(...args: unknown[]): Promise<T> => {
+export function measurePerformance<T extends (...args: unknown[]) => Promise<unknown>>(
+  name: string,
+  fn: T
+): T {
+  return (async (...args: Parameters<T>) => {
     const start = performance.now();
     try {
       const result = await fn(...args);
       const duration = performance.now() - start;
       logMetric(name, duration);
-      return result as T;
+      return result;
     } catch (error) {
       const duration = performance.now() - start;
       logMetric(`${name} (failed)`, duration);
       throw error;
     }
-  };
+  }) as T;
 }
 
 export function logMetric(name: string, duration: number) {

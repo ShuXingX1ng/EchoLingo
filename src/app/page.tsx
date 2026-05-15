@@ -25,6 +25,12 @@ export default function Home() {
               History
             </Link>
             <Link
+              href="/stats"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Stats
+            </Link>
+            <Link
               href="/settings"
               className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >

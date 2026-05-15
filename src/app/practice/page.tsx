@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage, SessionFeedback } from "@/types";
@@ -19,7 +19,25 @@ const INITIAL_QUESTIONS: Record<string, string> = {
 
 const MAX_ANSWER_TIME = 60; // 最大回答时间（秒）
 
-export default function PracticePage() {
+export default function PracticePageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex gap-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+          </div>
+        </div>
+      }
+    >
+      <PracticePage />
+    </Suspense>
+  );
+}
+
+function PracticePage() {
   const searchParams = useSearchParams();
   const practiceMode = searchParams.get("mode") || "part1";
   const topicId = searchParams.get("topic") || undefined;
@@ -285,6 +303,12 @@ export default function PracticePage() {
               className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               History
+            </Link>
+            <Link
+              href="/stats"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Stats
             </Link>
             {!isSessionEnded && (
               <button
