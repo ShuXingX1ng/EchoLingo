@@ -6,6 +6,8 @@ import { getSessions, deleteSession, clearAllSessions } from "@/lib/history";
 import type { SavedSession } from "@/lib/history";
 import MuteButton from "@/components/MuteButton";
 import BackupModal from "@/components/BackupModal";
+import RecordingsList from "@/components/RecordingsList";
+import PersonalizedSuggestions from "@/components/PersonalizedSuggestions";
 
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<SavedSession[]>([]);
@@ -231,6 +233,11 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
+            {/* Personalized Suggestions */}
+            <div className="mb-6 animate-fade-in">
+              <PersonalizedSuggestions />
+            </div>
+
             {/* 工具栏 */}
             <div className="mb-6 space-y-4 animate-fade-in">
               {/* 搜索框 */}
@@ -584,6 +591,8 @@ function SessionDetail({
 
         {/* Feedback */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl p-5 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+          {/* Recordings */}
+          <RecordingsList sessionId={session.id} />
           <h2 className="font-medium text-gray-900 dark:text-white mb-5">
             Feedback
           </h2>
