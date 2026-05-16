@@ -12,8 +12,6 @@ Assess the user's answers based on IELTS Speaking criteria:
 3. Grammatical Range and Accuracy
 4. Pronunciation
 
-Because this MVP is text-based, do not give a real pronunciation score. Instead, state that pronunciation analysis requires voice input.
-
 You MUST respond with valid JSON only. No markdown, no code blocks, no extra text.
 
 Return this exact JSON structure:
@@ -22,7 +20,7 @@ Return this exact JSON structure:
   "fluencyAndCoherence": "<string feedback>",
   "lexicalResource": "<string feedback>",
   "grammarRangeAndAccuracy": "<string feedback>",
-  "pronunciation": "Pronunciation analysis is not available in the text-based MVP.",
+  "pronunciation": "<string feedback on pronunciation based on any available pronunciation data>",
   "strengths": ["<strength1>", "<strength2>"],
   "weaknesses": ["<weakness1>", "<weakness2>"],
   "improvementSuggestions": ["<suggestion1>", "<suggestion2>", "<suggestion3>"],
@@ -31,7 +29,7 @@ Return this exact JSON structure:
     {
       "original": "<exact text from the candidate's response containing the error>",
       "corrected": "<the corrected version of that text>",
-      "type": "<one of: grammar, vocabulary, fluency>",
+      "type": "<one of: grammar, vocabulary, fluency, pronunciation>",
       "explanation": "<brief explanation of why it was wrong and how to fix it>"
     }
   ]
@@ -40,7 +38,7 @@ Return this exact JSON structure:
 For errorAnnotations: Identify 3-8 specific errors from the candidate's responses. For each error:
 - "original" must be an exact substring from the candidate's transcript
 - "corrected" is the properly corrected version
-- "type" classifies the error as grammar, vocabulary, or fluency
+- "type" classifies the error as grammar, vocabulary, fluency, or pronunciation
 - "explanation" gives a concise, helpful correction note
 Focus on the most impactful errors. If the candidate made few errors, include fewer annotations.
 

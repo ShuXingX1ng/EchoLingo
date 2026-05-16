@@ -8,6 +8,7 @@ import MuteButton from "@/components/MuteButton";
 import BackupModal from "@/components/BackupModal";
 import RecordingsList from "@/components/RecordingsList";
 import PersonalizedSuggestions from "@/components/PersonalizedSuggestions";
+import PronunciationFeedback from "@/components/PronunciationFeedback";
 
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<SavedSession[]>([]);
@@ -613,6 +614,10 @@ function SessionDetail({
               title="Pronunciation"
               content={session.feedback.pronunciation}
             />
+
+            {session.feedback.pronunciationAssessment && (
+              <PronunciationFeedback assessment={session.feedback.pronunciationAssessment} />
+            )}
 
             <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
               <h3 className="font-medium text-gray-900 dark:text-white mb-3">

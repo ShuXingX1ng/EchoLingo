@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { ChatMessage, SessionFeedback } from "@/types";
+import type { ChatMessage, SessionFeedback, PronunciationAssessmentResult } from "@/types";
 import { saveSession } from "@/lib/history";
 import { updateErrorPatterns } from "@/lib/error-patterns";
 import { recordProgress } from "@/lib/supabase-progress";
@@ -14,6 +14,7 @@ import VoiceOutput from "@/components/VoiceOutput";
 import VoiceControls from "@/components/VoiceControls";
 import MuteButton from "@/components/MuteButton";
 import ErrorAnnotations from "@/components/ErrorAnnotations";
+import PronunciationFeedback from "@/components/PronunciationFeedback";
 
 type ExamPhase = "part1" | "part2-prep" | "part2-speak" | "part3" | "ended";
 
@@ -55,6 +56,8 @@ function ExamPage() {
   const [prepTimeLeft, setPrepTimeLeft] = useState(PREP_TIME);
   const [speakTimeLeft, setSpeakTimeLeft] = useState(SPEAK_TIME);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastAudioBlobRef = useRef<Blob | null>(null);
+  const lastUserMessageRef = useRef<string>("");
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -181,6 +184,32 @@ function ExamPage() {
     return response.json() as Promise<SessionFeedback>;
   };
 
+  const fetchPronunciationAssessment = async (
+    audioBlob: Blob,
+    referenceText: string
+  ): Promise<PronunciationAssessmentResult | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+      formData.append("text", referenceText);
+
+      const response = await fetch("/api/pronunciation", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        console.error("Pronunciation assessment failed:", response.status);
+        return null;
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Pronunciation assessment error:", error);
+      return null;
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading || phase === "ended") return;
 
@@ -256,6 +285,9 @@ function ExamPage() {
     async (text: string) => {
       if (!text.trim() || isLoading || phase === "ended") return;
 
+      // Save last user message for pronunciation assessment
+      lastUserMessageRef.current = text.trim();
+
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         role: "user",
@@ -289,6 +321,10 @@ function ExamPage() {
     [isLoading, phase, messages, detectPhaseTransition]
   );
 
+  const handleAudioResult = useCallback((audioBlob: Blob) => {
+    lastAudioBlobRef.current = audioBlob;
+  }, []);
+
   const handleEndExam = async () => {
     setPhase("ended");
     setIsFeedbackLoading(true);
@@ -305,11 +341,38 @@ function ExamPage() {
 
     try {
       const feedbackData = await fetchFeedback(finalMessages);
+
+      // Perform pronunciation assessment if audio is available
+      if (lastAudioBlobRef.current && lastUserMessageRef.current) {
+        const pronunciationResult = await fetchPronunciationAssessment(
+          lastAudioBlobRef.current,
+          lastUserMessageRef.current
+        );
+
+        if (pronunciationResult) {
+          feedbackData.pronunciationAssessment = pronunciationResult;
+          feedbackData.pronunciation = pronunciationResult.summary;
+        }
+      }
+
       setFeedback(feedbackData);
       saveSession(finalMessages, feedbackData);
 
       if (user) {
-        updateErrorPatterns(user.id, feedbackData);
+        // Add pronunciation weaknesses if assessment is available
+        const feedbackForPatterns = { ...feedbackData };
+        if (feedbackData.pronunciationAssessment) {
+          const mispronounced = feedbackData.pronunciationAssessment.words.filter(
+            (w) => w.errorType === "Mispronunciation" && w.score < 70
+          );
+          if (mispronounced.length > 0) {
+            feedbackForPatterns.weaknesses = [
+              ...feedbackData.weaknesses,
+              `Pronunciation: ${mispronounced.map((w) => w.word).join(", ")}`,
+            ];
+          }
+        }
+        updateErrorPatterns(user.id, feedbackForPatterns);
         if (topicId && feedbackData.estimatedBand) {
           recordProgress(user.id, topicId, "part1", feedbackData.estimatedBand);
           recordProgress(user.id, topicId, "part2", feedbackData.estimatedBand);
@@ -608,6 +671,7 @@ function ExamPage() {
                 <div className="flex justify-center py-2">
                   <VoiceControls
                     onResult={handleVoiceConversationResult}
+                    onAudioResult={handleAudioResult}
                     isProcessing={isLoading}
                     disabled={isLoading}
                     maxAnswerTime={60}
@@ -680,6 +744,10 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
             <FeedbackSection title={t("feedback.vocabulary")} content={feedback.lexicalResource} />
             <FeedbackSection title={t("feedback.grammar")} content={feedback.grammarRangeAndAccuracy} />
             <FeedbackSection title={t("feedback.pronunciation")} content={feedback.pronunciation} />
+
+            {feedback.pronunciationAssessment && (
+              <PronunciationFeedback assessment={feedback.pronunciationAssessment} />
+            )}
 
             <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
               <h3 className="font-medium text-gray-900 dark:text-white mb-3">

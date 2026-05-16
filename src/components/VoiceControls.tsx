@@ -7,6 +7,7 @@ type VoiceState = "idle" | "listening" | "processing" | "speaking";
 
 interface VoiceControlsProps {
   onResult: (text: string) => void;
+  onAudioResult?: (audioBlob: Blob) => void; // 音频数据回调，用于发音评估
   isProcessing?: boolean;
   disabled?: boolean;
   maxAnswerTime?: number; // 最大回答时间（秒），默认 60
@@ -15,6 +16,7 @@ interface VoiceControlsProps {
 
 export default function VoiceControls({
   onResult,
+  onAudioResult,
   isProcessing = false,
   disabled = false,
   maxAnswerTime = 60,
@@ -28,6 +30,10 @@ export default function VoiceControls({
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const audioDataRef = useRef<Float32Array[]>([]);
 
   useEffect(() => {
     const SR =
@@ -63,6 +69,80 @@ export default function VoiceControls({
     setElapsedTime(0);
   }, []);
 
+  // Encode audio data to WAV format (defined before use)
+  const encodeWAV = useCallback((audioData: Float32Array[], sampleRate: number): Blob => {
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+
+    // Calculate total length
+    let totalLength = 0;
+    for (const buffer of audioData) {
+      totalLength += buffer.length;
+    }
+
+    // Create the buffer
+    const buffer = new ArrayBuffer(44 + totalLength * bytesPerSample);
+    const view = new DataView(buffer);
+
+    // Write WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + totalLength * bytesPerSample, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
+    view.setUint16(32, numChannels * bytesPerSample, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, "data");
+    view.setUint32(40, totalLength * bytesPerSample, true);
+
+    // Write audio data
+    let offset = 44;
+    for (const buffer of audioData) {
+      for (let i = 0; i < buffer.length; i++) {
+        const sample = Math.max(-1, Math.min(1, buffer[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+  }, []);
+
+  const stopAudioRecording = useCallback(() => {
+    // Stop audio recording and generate WAV
+    if (scriptProcessorRef.current) {
+      scriptProcessorRef.current.disconnect();
+      scriptProcessorRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    // Generate WAV file from recorded audio data
+    if (onAudioResult && audioDataRef.current.length > 0) {
+      const wavBlob = encodeWAV(audioDataRef.current, 16000);
+      console.log("WAV audio generated:", { size: wavBlob.size, type: wavBlob.type });
+      onAudioResult(wavBlob);
+      audioDataRef.current = [];
+    }
+  }, [onAudioResult, encodeWAV]);
+
   const startTimer = useCallback(() => {
     stopTimer();
     startTimeRef.current = Date.now();
@@ -84,8 +164,48 @@ export default function VoiceControls({
     }, 1000);
   }, [maxAnswerTime, onTimeout, stopTimer]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (!isSupported || disabled || isProcessing) return;
+
+    // Start audio recording if onAudioResult is provided
+    if (onAudioResult) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+
+        mediaStreamRef.current = stream;
+        audioDataRef.current = [];
+
+        // Create AudioContext for WAV recording
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+        audioContextRef.current = audioContext;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        scriptProcessorRef.current = processor;
+
+        processor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          // Copy the data
+          const data = new Float32Array(inputData.length);
+          data.set(inputData);
+          audioDataRef.current.push(data);
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        console.log("Audio recording started with AudioContext");
+      } catch (error) {
+        console.error("Failed to start audio recording:", error);
+      }
+    }
 
     const SR =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -120,10 +240,12 @@ export default function VoiceControls({
     recognition.onerror = () => {
       setInterimText("");
       setState("idle");
+      stopAudioRecording();
     };
 
     recognition.onend = () => {
       setInterimText("");
+      stopAudioRecording();
       // Only go to idle if we're still in listening state
       // If onResult was called, parent will set isProcessing=true
       setState((prev) => (prev === "listening" ? "idle" : prev));
@@ -134,17 +256,18 @@ export default function VoiceControls({
     setState("listening");
     setInterimText("");
     startTimer(); // 开始计时
-  }, [isSupported, disabled, isProcessing, onResult, startTimer]);
+  }, [isSupported, disabled, isProcessing, onResult, onAudioResult, startTimer, stopAudioRecording, startTimer]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+    stopAudioRecording();
     stopTimer(); // 停止计时
     setState("idle");
     setInterimText("");
-  }, [stopTimer]);
+  }, [stopTimer, stopAudioRecording]);
 
   const handleMainButton = () => {
     if (state === "listening") {

@@ -308,6 +308,7 @@
 - 国际化 (中英文切换)
 - 模拟考试模式 (Part 1→2→3 + 计时器)
 - 错误标注与纠正详情
+- 发音评估 (Azure Pronunciation Assessment)
 
 **待优化**:
 - 反馈页面语音化
@@ -462,6 +463,30 @@
 
 ---
 
+### Entry 13: 发音评估功能
+
+**完成内容**:
+- 集成 Azure Speech SDK Pronunciation Assessment API
+- 创建 `/api/pronunciation` 端点，支持音频上传和发音评估
+- 修改 VoiceControls 组件，支持录制原始音频数据
+- 创建 PronunciationFeedback 组件，展示详细发音评估结果
+- 集成到练习页面和考试页面
+- 支持整体分数、单词级评分、音素级分析
+- 添加中英文 i18n 翻译
+
+**关键文件**:
+- `src/app/api/pronunciation/route.ts` - 发音评估 API
+- `src/components/VoiceControls.tsx` - 修改支持音频录制
+- `src/components/PronunciationFeedback.tsx` - 发音评估展示组件
+- `src/app/practice/page.tsx` - 集成发音评估
+- `src/app/practice/exam/page.tsx` - 集成发音评估
+- `src/app/history/page.tsx` - 展示发音评估结果
+- `src/types/index.ts` - 添加发音评估类型
+- `src/locales/en.json` - 英文翻译
+- `src/locales/zh.json` - 中文翻译
+
+---
+
 ## 进度汇总
 
 | 日期 | 阶段 | 完成内容 |
@@ -477,3 +502,4 @@
 | 2026-05-16 | 平台化 Phase 3A-3E | 管理后台、学习路径推荐、国际化 |
 | 2026-05-16 | 模拟考试 | 完整考试流程、计时器、阶段指示 |
 | 2026-05-16 | 学习体验 | 错误标注、词汇/语法纠正详情 |
+| 2026-05-17 | 发音评估 | Azure Pronunciation Assessment 集成 |

@@ -17,8 +17,32 @@ export type SpeakingSession = {
 export type ErrorAnnotation = {
   original: string;
   corrected: string;
-  type: "grammar" | "vocabulary" | "fluency";
+  type: "grammar" | "vocabulary" | "fluency" | "pronunciation";
   explanation: string;
+};
+
+// 发音评估相关类型
+export type PhonemeAssessment = {
+  phoneme: string;
+  score: number;
+  accuracyScore: number;
+};
+
+export type WordAssessment = {
+  word: string;
+  score: number;
+  accuracyScore: number;
+  errorType?: string; // None, Omission, Insertion, Mispronunciation
+  phonemes?: PhonemeAssessment[];
+};
+
+export type PronunciationAssessmentResult = {
+  score: number; // 整体发音分数 0-100
+  accuracyScore: number;
+  fluencyScore: number;
+  completenessScore: number;
+  words: WordAssessment[];
+  summary: string; // 简要反馈
 };
 
 export type SessionFeedback = {
@@ -27,6 +51,7 @@ export type SessionFeedback = {
   lexicalResource: string;
   grammarRangeAndAccuracy: string;
   pronunciation: string;
+  pronunciationAssessment?: PronunciationAssessmentResult; // 详细发音评估
   strengths: string[];
   weaknesses: string[];
   improvementSuggestions: string[];
