@@ -5,7 +5,10 @@ import ErrorBoundary from "./ErrorBoundary";
 import NetworkStatus from "./NetworkStatus";
 import PWAInstallPrompt from "./PWAInstallPrompt";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
+import DataMigration from "./DataMigration";
 import { setupGlobalErrorHandlers } from "@/lib/error-logger";
+import { AuthProvider } from "@/lib/auth-context";
+import { I18nProvider } from "@/lib/i18n";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -18,11 +21,16 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   }, []);
 
   return (
-    <ErrorBoundary>
-      {children}
-      <NetworkStatus />
-      <PWAInstallPrompt />
-      <ServiceWorkerRegistration />
-    </ErrorBoundary>
+    <I18nProvider>
+      <AuthProvider>
+        <ErrorBoundary>
+          {children}
+          <NetworkStatus />
+          <PWAInstallPrompt />
+          <ServiceWorkerRegistration />
+          <DataMigration />
+        </ErrorBoundary>
+      </AuthProvider>
+    </I18nProvider>
   );
 }

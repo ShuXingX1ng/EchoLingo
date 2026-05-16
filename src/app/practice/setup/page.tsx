@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { TOPICS, getCategories } from "@/lib/topics";
+import { useTranslation } from "@/lib/i18n";
 
 type PracticeMode = "part1" | "part2" | "part3" | "full";
 
@@ -10,10 +11,15 @@ export default function PracticeSetupPage() {
   const [selectedMode, setSelectedMode] = useState<PracticeMode>("part1");
   const [selectedTopic, setSelectedTopic] = useState<string>("");
   const categories = getCategories();
+  const { t } = useTranslation();
 
   const practiceUrl = selectedTopic
     ? `/practice?mode=${selectedMode}&topic=${selectedTopic}`
     : `/practice?mode=${selectedMode}`;
+
+  const examUrl = selectedTopic
+    ? `/practice/exam?topic=${selectedTopic}`
+    : "/practice/exam";
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -24,47 +30,63 @@ export default function PracticeSetupPage() {
             href="/"
             className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
-            ← Home
+            ← {t("nav.home")}
           </Link>
           <h1 className="font-semibold text-gray-900 dark:text-white">
-            Practice Setup
+            {t("setup.title")}
           </h1>
         </div>
       </header>
 
       {/* Content */}
       <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-8">
+        {/* Mock Exam Banner */}
+        <Link
+          href={examUrl}
+          className="block p-6 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white hover:shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold mb-1">{t("setup.mockExam")}</h2>
+              <p className="text-sm text-purple-100">
+                Full Part 1 → 2 → 3 simulation with timers (11-14 min)
+              </p>
+            </div>
+            <span className="text-2xl">🎓</span>
+          </div>
+        </Link>
+
         {/* Mode Selection */}
         <section>
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Choose Practice Mode
+            {t("setup.chooseMode")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <ModeCard
               mode="part1"
-              title="Part 1: Introduction"
-              description="Short questions about familiar topics (4-5 minutes)"
+              title={t("setup.part1")}
+              description={t("setup.part1Desc")}
               selected={selectedMode === "part1"}
               onClick={() => setSelectedMode("part1")}
             />
             <ModeCard
               mode="part2"
-              title="Part 2: Long Turn"
-              description="Speak for 1-2 minutes on a given topic (3-4 minutes)"
+              title={t("setup.part2")}
+              description={t("setup.part2Desc")}
               selected={selectedMode === "part2"}
               onClick={() => setSelectedMode("part2")}
             />
             <ModeCard
               mode="part3"
-              title="Part 3: Discussion"
-              description="In-depth questions related to Part 2 topic (4-5 minutes)"
+              title={t("setup.part3")}
+              description={t("setup.part3Desc")}
               selected={selectedMode === "part3"}
               onClick={() => setSelectedMode("part3")}
             />
             <ModeCard
               mode="full"
-              title="Full Test"
-              description="Complete IELTS Speaking test simulation (11-14 minutes)"
+              title={t("setup.fullTest")}
+              description={t("setup.fullTestDesc")}
               selected={selectedMode === "full"}
               onClick={() => setSelectedMode("full")}
             />
@@ -74,10 +96,10 @@ export default function PracticeSetupPage() {
         {/* Topic Selection */}
         <section>
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Choose a Topic
+            {t("setup.chooseTopic")}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Optional: Select a topic or let the AI choose randomly
+            {t("setup.topicOptional")}
           </p>
 
           {categories.map((category) => (
@@ -108,19 +130,19 @@ export default function PracticeSetupPage() {
           ))}
         </section>
 
-        {/* Start Button */}
+        {/* Start Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 pb-8">
           <Link
             href={practiceUrl}
             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
           >
-            Start Practice
+            {t("setup.startPractice")}
           </Link>
           <Link
             href="/practice"
             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
           >
-            Quick Start (Random)
+            {t("setup.quickStart")}
           </Link>
         </div>
       </main>

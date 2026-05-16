@@ -14,6 +14,13 @@ export type SpeakingSession = {
   endedAt?: string;
 };
 
+export type ErrorAnnotation = {
+  original: string;
+  corrected: string;
+  type: "grammar" | "vocabulary" | "fluency";
+  explanation: string;
+};
+
 export type SessionFeedback = {
   estimatedBand: number;
   fluencyAndCoherence: string;
@@ -24,4 +31,5 @@ export type SessionFeedback = {
   weaknesses: string[];
   improvementSuggestions: string[];
   improvedSampleAnswer: string;
+  errorAnnotations?: ErrorAnnotation[];
 };

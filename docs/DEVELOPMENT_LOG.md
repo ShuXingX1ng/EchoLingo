@@ -229,6 +229,49 @@
 
 ---
 
+### Entry 8: 用户认证系统 (Supabase)
+
+**完成阶段**: 认证 Phase 1-4
+
+**完成内容**:
+
+**Phase 1 - Supabase 集成**:
+- 安装 @supabase/supabase-js 和 @supabase/ssr
+- 创建客户端和服务端 Supabase 配置
+- 创建 middleware 处理会话刷新
+
+**Phase 2 - 用户认证**:
+- 创建 AuthContext 和 useAuth hook
+- 创建登录页面 (邮箱 + Google OAuth)
+- 创建 OAuth 回调路由
+- 创建 UserMenu 用户菜单组件
+
+**Phase 3 - 云端同步**:
+- 创建 Supabase 数据库表结构 (sessions, goals)
+- 创建 supabase-history.ts 云端操作模块
+- 创建 unified-history.ts 统一历史管理器
+- 支持自动检测用户状态选择存储方式
+
+**Phase 4 - 数据迁移**:
+- 创建 DataMigration 迁移提示组件
+- 支持本地数据一键迁移到云端
+- 迁移完成后自动提示
+
+**关键文件**:
+- `src/lib/supabase.ts` - Supabase 客户端配置
+- `src/lib/supabase-server.ts` - Supabase 服务端配置
+- `src/lib/auth-context.tsx` - 认证上下文和 hook
+- `src/lib/supabase-history.ts` - 云端历史记录操作
+- `src/lib/unified-history.ts` - 统一历史管理器
+- `src/middleware.ts` - 会话中间件
+- `src/app/login/page.tsx` - 登录页面
+- `src/app/auth/callback/route.ts` - OAuth 回调
+- `src/components/UserMenu.tsx` - 用户菜单组件
+- `src/components/DataMigration.tsx` - 数据迁移组件
+- `supabase-schema.sql` - 数据库表结构
+
+---
+
 ## 进度汇总
 
 | 日期 | 阶段 | 完成内容 |
@@ -239,6 +282,7 @@
 | 2026-05-13 | MVP Phase 7 | 优化部署 |
 | 2026-05-14 | 语音 Phase 1-5 | 完整语音功能 |
 | 2026-05-14 | 优化 Phase 1-11 | 全面优化升级 |
+| 2026-05-16 | 认证 Phase 1-4 | 用户认证系统 (Supabase) |
 
 ---
 
@@ -257,9 +301,179 @@
 - PWA 支持
 - 无障碍访问
 - 错误处理和日志
+- 用户认证 (邮箱 + Google OAuth)
+- 云端数据同步
+- 管理后台 (话题管理、用户管理)
+- 学习路径推荐
+- 国际化 (中英文切换)
+- 模拟考试模式 (Part 1→2→3 + 计时器)
+- 错误标注与纠正详情
 
 **待优化**:
 - 反馈页面语音化
 - 触摸手势支持
 - 流式 TTS 取消
 - 服务端语音处理 (Whisper)
+
+---
+
+### Entry 9: 内容丰富
+
+**完成阶段**: 内容 Phase 1-3
+
+**完成内容**:
+
+**Phase 1 - 话题库扩充**:
+- 从 6 个话题扩充至 36 个话题
+- 覆盖 10 个类别: Place, Life, Leisure, Nature, Modern Life, Lifestyle, People, Events, Objects, Abstract
+- 每个话题包含 Part 1/2/3 完整问题
+
+**Phase 2 - 录音回放**:
+- 创建 IndexedDB 录音存储模块
+- 创建 AudioRecorder 录音组件
+- 创建 AudioPlayback 回放组件
+- 创建 RecordingsList 列表组件
+- 集成到历史记录详情页面
+
+**Phase 3 - AI 个性化记忆**:
+- 创建 error-patterns.ts 错误模式分析模块
+- 创建 PersonalizedSuggestions 组件
+- 练习完成后自动更新用户错误模式
+- 在历史记录页面显示个性化建议
+
+**关键文件**:
+- `src/lib/topics.ts` - 扩充的话题库
+- `src/lib/recordings.ts` - 录音存储模块
+- `src/lib/error-patterns.ts` - 错误模式分析
+- `src/components/AudioRecorder.tsx` - 录音组件
+- `src/components/AudioPlayback.tsx` - 回放组件
+- `src/components/RecordingsList.tsx` - 录音列表
+- `src/components/PersonalizedSuggestions.tsx` - 个性化建议
+- `src/app/history/page.tsx` - 集成录音回放和建议
+- `src/app/practice/page.tsx` - 集成错误模式更新
+
+### Entry 10: 平台化功能 (Phase 3)
+
+**完成阶段**: 平台化 Phase 3A-3E
+
+**完成内容**:
+
+**Phase 3A - 数据库基础**:
+- 创建 profiles 表 (用户角色系统)
+- 创建 topics 表 (话题数据库化)
+- 创建 learning_progress 表 (学习进度追踪)
+- 自动创建 profile 的触发器
+- RLS 安全策略和 is_admin() 函数
+
+**Phase 3B - 国际化 (i18n)**:
+- 创建 en.json / zh.json 翻译文件 (中英文)
+- 创建 I18nContext 和 useTranslation hook
+- 创建 LanguageSwitcher 语言切换组件
+- localStorage 持久化语言偏好
+
+**Phase 3C - 管理后台**:
+- 扩展 auth-context 添加 profile/role 信息
+- 扩展 middleware 添加 /admin/* 路由保护
+- 创建管理后台布局和首页
+- 创建话题管理页面 (CRUD 操作)
+- 创建用户管理页面 (角色切换)
+- 创建 TopicForm 话题表单组件
+
+**Phase 3D - 学习路径推荐**:
+- 创建 supabase-progress 学习进度追踪模块
+- 创建 recommendations 推荐引擎
+- 基于薄弱技能维度的智能推荐算法
+- 创建 LearningPath 推荐 UI 组件
+- 集成到首页和练习页面
+
+**Phase 3E - i18n 全面铺开**:
+- 替换首页所有硬编码文本
+- 替换登录页面所有硬编码文本
+- 替换练习页面所有硬编码文本
+- 替换反馈面板所有硬编码文本
+- 替换用户菜单所有硬编码文本
+
+**关键文件**:
+- `supabase-migration-001.sql` - 数据库迁移脚本
+- `src/lib/i18n.tsx` - i18n 上下文和 hook
+- `src/locales/en.json` - 英文翻译
+- `src/locales/zh.json` - 中文翻译
+- `src/components/LanguageSwitcher.tsx` - 语言切换组件
+- `src/lib/admin.ts` - 管理员工具函数
+- `src/lib/supabase-topics.ts` - 话题 CRUD
+- `src/lib/supabase-progress.ts` - 学习进度追踪
+- `src/lib/recommendations.ts` - 推荐引擎
+- `src/components/LearningPath.tsx` - 推荐 UI 组件
+- `src/app/admin/layout.tsx` - 管理后台布局
+- `src/app/admin/page.tsx` - 管理后台首页
+- `src/app/admin/topics/page.tsx` - 话题管理页面
+- `src/app/admin/users/page.tsx` - 用户管理页面
+- `src/components/admin/TopicForm.tsx` - 话题表单组件
+- `src/middleware.ts` - 扩展路由保护
+- `src/lib/auth-context.tsx` - 扩展角色信息
+- `src/components/UserMenu.tsx` - 扩展管理员链接
+- `src/components/ClientLayout.tsx` - 包裹 I18nProvider
+
+---
+
+### Entry 11: 模拟考试模式
+
+**完成阶段**: 模拟考试
+
+**完成内容**:
+- 创建 `/practice/exam` 独立考试页面
+- 实现 Part 1 → Part 2 → Part 3 完整考试流程
+- Part 2 准备阶段倒计时 (60 秒)
+- Part 2 答题阶段倒计时 (120 秒)
+- 阶段指示器 (步骤条 + 当前阶段状态)
+- 考官消息自动检测阶段转换
+- 超时自动推进到下一阶段
+- 考试结束后综合反馈
+- 设置页面添加模拟考试入口横幅
+- 首页添加模拟考试按钮
+- 添加考试相关 i18n 翻译
+
+**关键文件**:
+- `src/app/practice/exam/page.tsx` - 模拟考试页面
+- `src/app/practice/setup/page.tsx` - 更新添加考试入口
+- `src/app/page.tsx` - 首页添加考试按钮
+- `src/locales/en.json` - 英文翻译更新
+- `src/locales/zh.json` - 中文翻译更新
+
+---
+
+### Entry 12: 词汇/语法纠错详情
+
+**完成内容**:
+- 扩展 SessionFeedback 类型，新增 errorAnnotations 字段
+- 更新反馈 API prompt，要求 LLM 返回具体错误标注
+- 每个标注包含：原文、纠正后、错误类型、解释
+- 创建 ErrorAnnotations 组件，展示错误纠正卡片
+- 练习页面和考试页面 FeedbackPanel 均集成错误标注
+- 增加 max_tokens 至 3000 以容纳更多反馈数据
+- 添加相关 i18n 翻译
+
+**关键文件**:
+- `src/types/index.ts` - 新增 ErrorAnnotation 类型
+- `src/app/api/feedback/route.ts` - 更新 LLM prompt
+- `src/components/ErrorAnnotations.tsx` - 错误标注组件
+- `src/app/practice/page.tsx` - 集成错误标注
+- `src/app/practice/exam/page.tsx` - 集成错误标注
+
+---
+
+## 进度汇总
+
+| 日期 | 阶段 | 完成内容 |
+|------|------|----------|
+| 2026-05-13 | MVP Phase 1-3 | 项目初始化、落地页、练习 UI |
+| 2026-05-13 | MVP Phase 4-5 | LLM API 集成、反馈生成 |
+| 2026-05-13 | MVP Phase 6 | 本地历史记录 |
+| 2026-05-13 | MVP Phase 7 | 优化部署 |
+| 2026-05-14 | 语音 Phase 1-5 | 完整语音功能 |
+| 2026-05-14 | 优化 Phase 1-11 | 全面优化升级 |
+| 2026-05-16 | 认证 Phase 1-4 | 用户认证系统 (Supabase) |
+| 2026-05-16 | 内容 Phase 1-3 | 话题库扩充、录音回放、AI 个性化记忆 |
+| 2026-05-16 | 平台化 Phase 3A-3E | 管理后台、学习路径推荐、国际化 |
+| 2026-05-16 | 模拟考试 | 完整考试流程、计时器、阶段指示 |
+| 2026-05-16 | 学习体验 | 错误标注、词汇/语法纠正详情 |

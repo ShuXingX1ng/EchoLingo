@@ -15,16 +15,12 @@ import VoiceControls from "@/components/VoiceControls";
 import MuteButton from "@/components/MuteButton";
 import ErrorAnnotations from "@/components/ErrorAnnotations";
 
-const INITIAL_QUESTIONS: Record<string, string> = {
-  part1: "Let's talk about your hometown. Where is your hometown?",
-  part2: "I'm going to give you a topic to talk about for 1-2 minutes. You have 1 minute to prepare. You can make notes if you wish.\n\nDescribe your hometown. You should say:\n- where it is\n- what it is known for\n- what you like and dislike about it\n\nAnd explain why it is special to you.\n\nAlright, you can start speaking now. You have 1-2 minutes.",
-  part3: "Let's discuss some broader questions related to urbanization and city life. How do cities in your country differ from each other?",
-  full: "Good morning/afternoon. My name is [Examiner]. Can I have your full name, please?\n\nNow I'd like to ask you some questions about your hometown. Where is your hometown?",
-};
+type ExamPhase = "part1" | "part2-prep" | "part2-speak" | "part3" | "ended";
 
-const MAX_ANSWER_TIME = 60; // 最大回答时间（秒）
+const PREP_TIME = 60; // 1 minute prep
+const SPEAK_TIME = 120; // 2 minutes speaking
 
-export default function PracticePageWrapper() {
+export default function ExamPageWrapper() {
   return (
     <Suspense
       fallback={
@@ -37,14 +33,13 @@ export default function PracticePageWrapper() {
         </div>
       }
     >
-      <PracticePage />
+      <ExamPage />
     </Suspense>
   );
 }
 
-function PracticePage() {
+function ExamPage() {
   const searchParams = useSearchParams();
-  const practiceMode = searchParams.get("mode") || "part1";
   const topicId = searchParams.get("topic") || undefined;
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -52,34 +47,102 @@ function PracticePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSessionEnded, setIsSessionEnded] = useState(false);
+  const [phase, setPhase] = useState<ExamPhase>("part1");
   const [feedback, setFeedback] = useState<SessionFeedback | null>(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
+  const [prepTimeLeft, setPrepTimeLeft] = useState(PREP_TIME);
+  const [speakTimeLeft, setSpeakTimeLeft] = useState(SPEAK_TIME);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, feedback]);
 
+  // Start exam with Part 1 greeting
   useEffect(() => {
-    const initialQuestion = INITIAL_QUESTIONS[practiceMode] || INITIAL_QUESTIONS.part1;
-    const firstQuestion: ChatMessage = {
+    const greeting: ChatMessage = {
       id: "1",
       role: "examiner",
-      content: initialQuestion,
+      content:
+        "Good morning/afternoon. My name is Examiner. Can I have your full name, please?\n\nNow I'd like to ask you some questions about yourself. Where are you from?",
       createdAt: new Date().toISOString(),
     };
-    setMessages([firstQuestion]);
-  }, [practiceMode]);
+    setMessages([greeting]);
+  }, []);
+
+  // Prep timer countdown
+  useEffect(() => {
+    if (phase !== "part2-prep") return;
+    if (prepTimeLeft <= 0) {
+      setPhase("part2-speak");
+      return;
+    }
+    const timer = setInterval(() => {
+      setPrepTimeLeft((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase, prepTimeLeft]);
+
+  // Speak timer countdown
+  useEffect(() => {
+    if (phase !== "part2-speak") return;
+    if (speakTimeLeft <= 0) {
+      // Auto-advance: inject a transition message and request Part 3
+      handleSpeakTimeout();
+      return;
+    }
+    const timer = setInterval(() => {
+      setSpeakTimeLeft((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase, speakTimeLeft]);
+
+  // Detect phase transitions from examiner messages
+  const detectPhaseTransition = useCallback(
+    (examinerMessage: string) => {
+      const lower = examinerMessage.toLowerCase();
+
+      // Part 1 → Part 2: detect cue card / "give you a topic"
+      if (
+        phase === "part1" &&
+        (lower.includes("give you a topic") ||
+          lower.includes("cue card") ||
+          lower.includes("i'm going to give you"))
+      ) {
+        setPhase("part2-prep");
+        setPrepTimeLeft(PREP_TIME);
+      }
+
+      // Part 2 → Part 3: detect broader discussion transition
+      if (
+        (phase === "part2-prep" || phase === "part2-speak") &&
+        (lower.includes("broader questions") ||
+          lower.includes("discuss some") ||
+          lower.includes("let's discuss"))
+      ) {
+        setPhase("part3");
+      }
+
+      // End detection
+      if (
+        lower.includes("end of the speaking test") ||
+        lower.includes("that is the end")
+      ) {
+        setPhase("ended");
+      }
+    },
+    [phase]
+  );
 
   const fetchExaminerResponse = async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/examiner", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: practiceMode,
+        mode: "full",
         topic: topicId,
         messages: currentMessages.map((m) => ({
           role: m.role,
@@ -90,10 +153,7 @@ function PracticePage() {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(
-        data.error ||
-          "Failed to get examiner response. Please check your API configuration."
-      );
+      throw new Error(data.error || "Failed to get examiner response.");
     }
 
     const data = await response.json();
@@ -105,7 +165,7 @@ function PracticePage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "ielts_part_1",
+        mode: "full",
         messages: currentMessages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -115,17 +175,14 @@ function PracticePage() {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(
-        data.error ||
-          "Failed to generate feedback. Please check your API configuration."
-      );
+      throw new Error(data.error || "Failed to generate feedback.");
     }
 
     return response.json() as Promise<SessionFeedback>;
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading || isSessionEnded) return;
+    if (!input.trim() || isLoading || phase === "ended") return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -142,7 +199,6 @@ function PracticePage() {
 
     try {
       const examinerResponse = await fetchExaminerResponse(newMessages);
-
       const examinerMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "examiner",
@@ -151,62 +207,46 @@ function PracticePage() {
       };
 
       setMessages((prev) => [...prev, examinerMessage]);
+      detectPhaseTransition(examinerResponse);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to get response. Please try again."
+        err instanceof Error ? err.message : "Failed to get response."
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEndSession = async () => {
-    setIsSessionEnded(true);
-    setIsFeedbackLoading(true);
-    setError(null);
+  const handleSpeakTimeout = useCallback(async () => {
+    if (isLoading) return;
 
-    const endMessage: ChatMessage = {
-      id: (Date.now() + 2).toString(),
+    const timeoutMsg: ChatMessage = {
+      id: Date.now().toString(),
       role: "examiner",
-      content: "Thank you. That is the end of the speaking practice session.",
+      content: "Thank you. Let's move on to the next part of the test.",
       createdAt: new Date().toISOString(),
     };
-    const finalMessages = [...messages, endMessage];
-    setMessages(finalMessages);
+
+    const newMessages = [...messages, timeoutMsg];
+    setMessages(newMessages);
+    setIsLoading(true);
+    setPhase("part3");
 
     try {
-      const feedbackData = await fetchFeedback(finalMessages);
-      setFeedback(feedbackData);
-      saveSession(finalMessages, feedbackData);
-
-      // Update error patterns for personalized learning
-      if (user) {
-        updateErrorPatterns(user.id, feedbackData);
-
-        // Record learning progress
-        if (topicId && feedbackData.estimatedBand) {
-          recordProgress(user.id, topicId, practiceMode, feedbackData.estimatedBand);
-        }
-      }
+      const examinerResponse = await fetchExaminerResponse(newMessages);
+      const examinerMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "examiner",
+        content: examinerResponse,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, examinerMessage]);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to generate feedback. Please try again."
-      );
+      setError(err instanceof Error ? err.message : "Failed to get response.");
     } finally {
-      setIsFeedbackLoading(false);
+      setIsLoading(false);
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  }, [isLoading, messages]);
 
   const handleVoiceResult = useCallback((text: string) => {
     setInput((prev) => (prev ? prev + " " + text : text));
@@ -214,7 +254,7 @@ function PracticePage() {
 
   const handleVoiceConversationResult = useCallback(
     async (text: string) => {
-      if (!text.trim() || isLoading || isSessionEnded) return;
+      if (!text.trim() || isLoading || phase === "ended") return;
 
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -230,67 +270,91 @@ function PracticePage() {
 
       try {
         const examinerResponse = await fetchExaminerResponse(newMessages);
-
         const examinerMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: "examiner",
           content: examinerResponse,
           createdAt: new Date().toISOString(),
         };
-
         setMessages((prev) => [...prev, examinerMessage]);
+        detectPhaseTransition(examinerResponse);
       } catch (err) {
         setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to get response. Please try again."
+          err instanceof Error ? err.message : "Failed to get response."
         );
       } finally {
         setIsLoading(false);
       }
     },
-    [isLoading, isSessionEnded, messages, fetchExaminerResponse]
+    [isLoading, phase, messages, detectPhaseTransition]
   );
 
-  // AI 超时打断处理
-  const handleTimeout = useCallback(async () => {
-    if (isLoading || isSessionEnded) return;
-
-    // 添加超时提示消息
-    const timeoutMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "examiner",
-      content: "Thank you. Let's move on to the next question.",
-      createdAt: new Date().toISOString(),
-    };
-
-    const newMessages = [...messages, timeoutMessage];
-    setMessages(newMessages);
-    setIsLoading(true);
+  const handleEndExam = async () => {
+    setPhase("ended");
+    setIsFeedbackLoading(true);
     setError(null);
 
+    const endMessage: ChatMessage = {
+      id: (Date.now() + 2).toString(),
+      role: "examiner",
+      content: "That is the end of the speaking test. Thank you.",
+      createdAt: new Date().toISOString(),
+    };
+    const finalMessages = [...messages, endMessage];
+    setMessages(finalMessages);
+
     try {
-      // 请求 AI 生成新问题（切题）
-      const examinerResponse = await fetchExaminerResponse(newMessages);
+      const feedbackData = await fetchFeedback(finalMessages);
+      setFeedback(feedbackData);
+      saveSession(finalMessages, feedbackData);
 
-      const examinerMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "examiner",
-        content: examinerResponse,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, examinerMessage]);
+      if (user) {
+        updateErrorPatterns(user.id, feedbackData);
+        if (topicId && feedbackData.estimatedBand) {
+          recordProgress(user.id, topicId, "part1", feedbackData.estimatedBand);
+          recordProgress(user.id, topicId, "part2", feedbackData.estimatedBand);
+          recordProgress(user.id, topicId, "part3", feedbackData.estimatedBand);
+        }
+      }
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to get response. Please try again."
+        err instanceof Error ? err.message : "Failed to generate feedback."
       );
     } finally {
-      setIsLoading(false);
+      setIsFeedbackLoading(false);
     }
-  }, [isLoading, isSessionEnded, messages, fetchExaminerResponse]);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const phaseConfig = {
+    part1: { label: "Part 1", color: "bg-blue-500", desc: "Introduction" },
+    "part2-prep": {
+      label: "Part 2",
+      color: "bg-yellow-500",
+      desc: `Preparation — ${formatTime(prepTimeLeft)}`,
+    },
+    "part2-speak": {
+      label: "Part 2",
+      color: "bg-orange-500",
+      desc: `Speaking — ${formatTime(speakTimeLeft)}`,
+    },
+    part3: { label: "Part 3", color: "bg-purple-500", desc: "Discussion" },
+    ended: { label: "Ended", color: "bg-gray-500", desc: "Test complete" },
+  };
+
+  const currentPhase = phaseConfig[phase];
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950">
@@ -306,51 +370,112 @@ function PracticePage() {
             </Link>
             <div>
               <h1 className="font-semibold text-gray-900 dark:text-white">
-                {t("practice.title")}
+                {t("exam.title")}
               </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t("practice.part1")}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <MuteButton />
-            <Link
-              href="/history"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              {t("nav.history")}
-            </Link>
-            <Link
-              href="/stats"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              {t("nav.stats")}
-            </Link>
-            {!isSessionEnded && (
+            {phase !== "ended" && (
               <button
-                onClick={handleEndSession}
+                onClick={handleEndExam}
                 disabled={isLoading}
                 className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
               >
-                {t("practice.endSession")}
+                {t("exam.endExam")}
               </button>
             )}
           </div>
         </div>
       </header>
 
+      {/* Phase Indicator */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-2">
+            {(["part1", "part2-prep", "part3"] as ExamPhase[]).map(
+              (p, index) => {
+                const config = phaseConfig[p];
+                const isActive =
+                  phase === p ||
+                  (p === "part2-prep" &&
+                    (phase === "part2-prep" || phase === "part2-speak")) ||
+                  (p === "part1" &&
+                    !["part1"].includes(phase) &&
+                    phase !== "ended") ||
+                  (p === "part3" && phase === "ended");
+                const isPast =
+                  (p === "part1" && phase !== "part1") ||
+                  (p === "part2-prep" && phase === "part3") ||
+                  (p === "part2-prep" && phase === "ended");
+                const isCurrent =
+                  phase === p ||
+                  (p === "part2-prep" &&
+                    (phase === "part2-prep" || phase === "part2-speak"));
+
+                return (
+                  <div key={p} className="flex items-center gap-2 flex-1">
+                    {index > 0 && (
+                      <div
+                        className={`h-0.5 flex-1 rounded ${
+                          isPast ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                        }`}
+                      />
+                    )}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
+                          isCurrent
+                            ? "bg-blue-600 text-white"
+                            : isPast
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                      <span
+                        className={`text-xs font-medium hidden sm:inline ${
+                          isCurrent
+                            ? "text-blue-600 dark:text-blue-400"
+                            : "text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        {config.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+
+          {/* Timer / Status */}
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {currentPhase.desc}
+            </span>
+            {(phase === "part2-prep" || phase === "part2-speak") && (
+              <div
+                className={`text-sm font-mono font-bold ${
+                  (phase === "part2-prep" && prepTimeLeft <= 10) ||
+                  (phase === "part2-speak" && speakTimeLeft <= 30)
+                    ? "text-red-500"
+                    : "text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {phase === "part2-prep"
+                  ? formatTime(prepTimeLeft)
+                  : formatTime(speakTimeLeft)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-3xl mx-auto space-y-4">
-          {messages.length === 0 && !isLoading && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">
-                {t("practice.startingSession")}
-              </p>
-            </div>
-          )}
-
           {messages.map((message, index) => (
             <div
               key={message.id}
@@ -397,34 +522,24 @@ function PracticePage() {
                 <div className="flex items-center gap-2 mt-3">
                   <div className="flex gap-1">
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
-                    <div
-                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <div
-                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                   </div>
-                  <span className="text-xs text-blue-500 dark:text-blue-400">{t("practice.thinking")}</span>
+                  <span className="text-xs text-blue-500 dark:text-blue-400">
+                    {t("practice.thinking")}
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="flex justify-center px-4 animate-message-in">
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 max-w-md">
                 <div className="flex items-start gap-3">
                   <span className="text-red-500 mt-0.5">⚠</span>
                   <div>
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {error}
-                    </p>
-                    <p className="text-xs text-red-500 dark:text-red-500 mt-1">
-                      Make sure your .env.local file is configured correctly.
-                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                   </div>
                 </div>
               </div>
@@ -435,10 +550,10 @@ function PracticePage() {
         </div>
       </div>
 
-      {/* Input Area or Session End */}
+      {/* Input Area */}
       <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
         <div className="max-w-3xl mx-auto">
-          {!isSessionEnded ? (
+          {phase !== "ended" ? (
             <>
               {/* Mode Toggle */}
               <div className="flex justify-center mb-3">
@@ -466,7 +581,6 @@ function PracticePage() {
                 </div>
               </div>
 
-              {/* Input based on mode */}
               {inputMode === "text" ? (
                 <div className="flex gap-2 sm:gap-3 items-center">
                   <VoiceInput
@@ -496,8 +610,7 @@ function PracticePage() {
                     onResult={handleVoiceConversationResult}
                     isProcessing={isLoading}
                     disabled={isLoading}
-                    maxAnswerTime={MAX_ANSWER_TIME}
-                    onTimeout={handleTimeout}
+                    maxAnswerTime={60}
                   />
                 </div>
               )}
@@ -508,14 +621,8 @@ function PracticePage() {
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
-                    <div
-                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.15s" }}
-                    />
-                    <div
-                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.3s" }}
-                    />
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {t("practice.generating")}
@@ -523,10 +630,10 @@ function PracticePage() {
                 </div>
               ) : feedback ? (
                 <button
-                  onClick={() => (window.location.href = "/practice")}
+                  onClick={() => (window.location.href = "/practice/exam")}
                   className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
                 >
-                  {t("practice.newSession")}
+                  {t("exam.newExam")}
                 </button>
               ) : (
                 <div className="flex flex-col items-center gap-4">
@@ -534,7 +641,7 @@ function PracticePage() {
                     {error || t("practice.feedbackError")}
                   </p>
                   <button
-                    onClick={() => (window.location.href = "/practice")}
+                    onClick={() => (window.location.href = "/practice/exam")}
                     className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
                   >
                     {t("practice.tryAgain")}
@@ -561,7 +668,7 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
         <div className="p-6 sm:p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {t("feedback.title")}
+              {t("exam.resultTitle")}
             </h2>
             <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-4 py-1.5 rounded-full text-sm font-semibold">
               Band {feedback.estimatedBand}
@@ -569,22 +676,10 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
           </div>
 
           <div className="space-y-5">
-            <FeedbackSection
-              title={t("feedback.fluency")}
-              content={feedback.fluencyAndCoherence}
-            />
-            <FeedbackSection
-              title={t("feedback.vocabulary")}
-              content={feedback.lexicalResource}
-            />
-            <FeedbackSection
-              title={t("feedback.grammar")}
-              content={feedback.grammarRangeAndAccuracy}
-            />
-            <FeedbackSection
-              title={t("feedback.pronunciation")}
-              content={feedback.pronunciation}
-            />
+            <FeedbackSection title={t("feedback.fluency")} content={feedback.fluencyAndCoherence} />
+            <FeedbackSection title={t("feedback.vocabulary")} content={feedback.lexicalResource} />
+            <FeedbackSection title={t("feedback.grammar")} content={feedback.grammarRangeAndAccuracy} />
+            <FeedbackSection title={t("feedback.pronunciation")} content={feedback.pronunciation} />
 
             <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
               <h3 className="font-medium text-gray-900 dark:text-white mb-3">
@@ -592,10 +687,7 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
               </h3>
               <ul className="space-y-2">
                 {feedback.strengths.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
                     <span className="text-green-500 mt-0.5">✓</span>
                     {item}
                   </li>
@@ -609,10 +701,7 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
               </h3>
               <ul className="space-y-2">
                 {feedback.weaknesses.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
                     <span className="text-orange-500 mt-0.5">→</span>
                     {item}
                   </li>
@@ -626,10 +715,7 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
               </h3>
               <ol className="space-y-2">
                 {feedback.improvementSuggestions.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
                     <span className="font-medium text-blue-500">{i + 1}.</span>
                     {item}
                   </li>
@@ -655,10 +741,10 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
-              onClick={() => (window.location.href = "/practice")}
+              onClick={() => (window.location.href = "/practice/exam")}
               className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
             >
-              {t("practice.newSession")}
+              {t("exam.newExam")}
             </button>
             <button
               onClick={() => (window.location.href = "/history")}
@@ -673,21 +759,11 @@ function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
   );
 }
 
-function FeedbackSection({
-  title,
-  content,
-}: {
-  title: string;
-  content: string;
-}) {
+function FeedbackSection({ title, content }: { title: string; content: string }) {
   return (
     <div>
-      <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-        {title}
-      </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-        {content}
-      </p>
+      <h3 className="font-medium text-gray-900 dark:text-white mb-2">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{content}</p>
     </div>
   );
 }

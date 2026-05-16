@@ -26,8 +26,23 @@ Return this exact JSON structure:
   "strengths": ["<strength1>", "<strength2>"],
   "weaknesses": ["<weakness1>", "<weakness2>"],
   "improvementSuggestions": ["<suggestion1>", "<suggestion2>", "<suggestion3>"],
-  "improvedSampleAnswer": "<improved version of one of the user's answers>"
+  "improvedSampleAnswer": "<improved version of one of the user's answers>",
+  "errorAnnotations": [
+    {
+      "original": "<exact text from the candidate's response containing the error>",
+      "corrected": "<the corrected version of that text>",
+      "type": "<one of: grammar, vocabulary, fluency>",
+      "explanation": "<brief explanation of why it was wrong and how to fix it>"
+    }
+  ]
 }
+
+For errorAnnotations: Identify 3-8 specific errors from the candidate's responses. For each error:
+- "original" must be an exact substring from the candidate's transcript
+- "corrected" is the properly corrected version
+- "type" classifies the error as grammar, vocabulary, or fluency
+- "explanation" gives a concise, helpful correction note
+Focus on the most impactful errors. If the candidate made few errors, include fewer annotations.
 
 Be helpful, specific, and realistic. Do not be too harsh, but do not overestimate the user's score.`;
 
@@ -92,7 +107,7 @@ export async function POST(request: Request) {
       model,
       messages: openaiMessages,
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: 3000,
     };
 
     // Only add json_object format for providers that support it
