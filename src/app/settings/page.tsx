@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import MuteButton from "@/components/MuteButton";
+import { AZURE_VOICES } from "@/components/VoiceOutput";
+import { useTranslation } from "@/lib/i18n";
 import {
   getGoals,
   saveGoals,
@@ -11,52 +13,54 @@ import {
   type PracticeGoal,
   type GoalProgress,
 } from "@/lib/goals";
+import {
+  getReminderSettings,
+  saveReminderSettings,
+  clearReminderSettings,
+  getDaysUntilExam,
+  hasPracticedToday,
+  getStreakDays,
+  type ReminderSettings,
+} from "@/lib/reminders";
 
 export default function SettingsPage() {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>("");
+  const { t } = useTranslation();
+  const [selectedVoice, setSelectedVoice] = useState<string>("en-US-AriaNeural");
   const [rate, setRate] = useState(0.95);
   const [isMuted, setIsMuted] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isTestPlaying, setIsTestPlaying] = useState(false);
 
   const [weeklyTarget, setWeeklyTarget] = useState(3);
   const [targetBand, setTargetBand] = useState(6.5);
   const [goalProgress, setGoalProgress] = useState<GoalProgress | null>(null);
   const [isGoalSaved, setIsGoalSaved] = useState(false);
 
+  // Reminder state
+  const [examDate, setExamDate] = useState("");
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("09:00");
+  const [isReminderSaved, setIsReminderSaved] = useState(false);
+  const [daysUntilExam, setDaysUntilExam] = useState<number | null>(null);
+  const [practicedToday, setPracticedToday] = useState(false);
+  const [streakDays, setStreakDays] = useState(0);
+
   useEffect(() => {
-    const loadVoices = () => {
-      const availableVoices = window.speechSynthesis.getVoices();
-      const englishVoices = availableVoices.filter((v) =>
-        v.lang.startsWith("en")
-      );
-      setVoices(englishVoices);
+    const savedVoice = localStorage.getItem("echolingo_azure_voice");
+    const savedRate = localStorage.getItem("echolingo_voice_rate");
+    const savedMuted = localStorage.getItem("echolingo_muted");
 
-      const savedVoice = localStorage.getItem("echolingo_voice_uri");
-      const savedRate = localStorage.getItem("echolingo_voice_rate");
-      const savedMuted = localStorage.getItem("echolingo_muted");
+    if (savedVoice) {
+      setSelectedVoice(savedVoice);
+    }
 
-      if (savedVoice && englishVoices.find((v) => v.voiceURI === savedVoice)) {
-        setSelectedVoiceURI(savedVoice);
-      } else if (englishVoices.length > 0) {
-        const preferred =
-          englishVoices.find((v) => v.name.includes("Google") && v.lang === "en-US") ||
-          englishVoices.find((v) => v.lang === "en-US") ||
-          englishVoices[0];
-        setSelectedVoiceURI(preferred.voiceURI);
-      }
+    if (savedRate) {
+      setRate(parseFloat(savedRate));
+    }
 
-      if (savedRate) {
-        setRate(parseFloat(savedRate));
-      }
-
-      if (savedMuted === "true") {
-        setIsMuted(true);
-      }
-    };
-
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    if (savedMuted === "true") {
+      setIsMuted(true);
+    }
 
     const goals = getGoals();
     if (goals) {
@@ -65,28 +69,61 @@ export default function SettingsPage() {
     }
 
     setGoalProgress(calculateGoalProgress());
+
+    // Load reminder settings
+    const reminders = getReminderSettings();
+    if (reminders) {
+      setExamDate(reminders.examDate || "");
+      setDailyReminderEnabled(reminders.dailyReminderEnabled);
+      setReminderTime(reminders.reminderTime);
+    }
+
+    setDaysUntilExam(getDaysUntilExam());
+    setPracticedToday(hasPracticedToday());
+    setStreakDays(getStreakDays());
   }, []);
 
   const handleSave = () => {
-    localStorage.setItem("echolingo_voice_uri", selectedVoiceURI);
+    localStorage.setItem("echolingo_azure_voice", selectedVoice);
     localStorage.setItem("echolingo_voice_rate", rate.toString());
     localStorage.setItem("echolingo_muted", isMuted.toString());
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
 
-  const handleTest = () => {
-    const voice = voices.find((v) => v.voiceURI === selectedVoiceURI);
-    window.speechSynthesis.cancel();
+  const handleTest = async () => {
+    setIsTestPlaying(true);
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: "Hello, I am your IELTS speaking examiner. Let's begin the practice session.",
+          voice: selectedVoice,
+          rate,
+        }),
+      });
 
-    const utterance = new SpeechSynthesisUtterance(
-      "Hello, I am your IELTS speaking examiner. Let's begin the practice session."
-    );
-    utterance.lang = "en-US";
-    utterance.rate = rate;
-    if (voice) utterance.voice = voice;
+      if (!response.ok) throw new Error("TTS failed");
 
-    window.speechSynthesis.speak(utterance);
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        setIsTestPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onerror = () => {
+        setIsTestPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error("Test voice error:", err);
+      setIsTestPlaying(false);
+    }
   };
 
   const handleSaveGoals = () => {
@@ -106,6 +143,25 @@ export default function SettingsPage() {
     setGoalProgress(null);
   };
 
+  const handleSaveReminders = () => {
+    saveReminderSettings({
+      examDate: examDate || null,
+      dailyReminderEnabled,
+      reminderTime,
+    });
+    setDaysUntilExam(getDaysUntilExam());
+    setIsReminderSaved(true);
+    setTimeout(() => setIsReminderSaved(false), 2000);
+  };
+
+  const handleClearReminders = () => {
+    clearReminderSettings();
+    setExamDate("");
+    setDailyReminderEnabled(false);
+    setReminderTime("09:00");
+    setDaysUntilExam(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
@@ -115,7 +171,7 @@ export default function SettingsPage() {
               href="/"
               className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
-              ← Home
+              Home
             </Link>
             <h1 className="font-semibold text-gray-900 dark:text-white">
               Settings
@@ -163,7 +219,7 @@ export default function SettingsPage() {
                 </div>
                 {goalProgress.isWeeklyGoalMet && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                    ✓ Weekly goal achieved!
+                    Weekly goal achieved!
                   </p>
                 )}
               </div>
@@ -189,7 +245,7 @@ export default function SettingsPage() {
                 </div>
                 {goalProgress.isBandGoalMet && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                    ✓ Band score goal achieved!
+                    Band score goal achieved!
                   </p>
                 )}
               </div>
@@ -249,7 +305,151 @@ export default function SettingsPage() {
               onClick={handleSaveGoals}
               className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
             >
-              {isGoalSaved ? "✓ Saved!" : "Save Goals"}
+              {isGoalSaved ? "Saved!" : "Save Goals"}
+            </button>
+          </div>
+        </div>
+
+        {/* Learning Reminders */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            {t("reminder.title")}
+          </h2>
+
+          {/* Current Status */}
+          <div className="mb-6 space-y-3">
+            {daysUntilExam !== null && (
+              <div className={`p-4 rounded-xl ${
+                daysUntilExam <= 7
+                  ? "bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800"
+                  : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-2xl font-bold ${
+                      daysUntilExam <= 7
+                        ? "text-orange-600 dark:text-orange-400"
+                        : "text-blue-600 dark:text-blue-400"
+                    }`}>
+                      {daysUntilExam}
+                    </p>
+                    <p className={`text-sm ${
+                      daysUntilExam <= 7
+                        ? "text-orange-600 dark:text-orange-400"
+                        : "text-blue-600 dark:text-blue-400"
+                    }`}>
+                      {t("reminder.daysUntilExam")}
+                    </p>
+                  </div>
+                  <div className={`text-3xl ${
+                    daysUntilExam <= 7 ? "animate-pulse" : ""
+                  }`}>
+                    {daysUntilExam <= 7 ? "🔥" : "📚"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t("reminder.todayPractice")}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${
+                    practicedToday
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}>
+                    {practicedToday ? t("reminder.practiced") : t("reminder.notPracticed")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {streakDays > 0 && (
+                    <span className="text-xs text-orange-500 dark:text-orange-400 font-medium">
+                      {streakDays} {t("reminder.streak")}
+                    </span>
+                  )}
+                  <div className={`text-2xl ${practicedToday ? "" : "opacity-30"}`}>
+                    {practicedToday ? "✅" : "⭕"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Exam Date */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t("reminder.examDate")}
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {t("reminder.examDateDesc")}
+            </p>
+            <input
+              type="date"
+              value={examDate}
+              onChange={(e) => setExamDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              className="w-full px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Daily Reminder Toggle */}
+          <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t("reminder.dailyReminder")}
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("reminder.dailyReminderDesc")}
+              </p>
+            </div>
+            <button
+              onClick={() => setDailyReminderEnabled(!dailyReminderEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                dailyReminderEnabled
+                  ? "bg-blue-600"
+                  : "bg-gray-300 dark:bg-gray-600"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  dailyReminderEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Reminder Time */}
+          {dailyReminderEnabled && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t("reminder.reminderTime")}
+              </label>
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+                className="w-full px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            {(examDate || dailyReminderEnabled) && (
+              <button
+                onClick={handleClearReminders}
+                className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                {t("reminder.clear")}
+              </button>
+            )}
+            <button
+              onClick={handleSaveReminders}
+              className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              {isReminderSaved ? t("reminder.saved") : t("reminder.save")}
             </button>
           </div>
         </div>
@@ -290,21 +490,18 @@ export default function SettingsPage() {
               Examiner Voice
             </label>
             <select
-              value={selectedVoiceURI}
-              onChange={(e) => setSelectedVoiceURI(e.target.value)}
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
               className="w-full px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {voices.length === 0 && (
-                <option value="">Loading voices...</option>
-              )}
-              {voices.map((voice) => (
-                <option key={voice.voiceURI} value={voice.voiceURI}>
-                  {voice.name} ({voice.lang})
+              {AZURE_VOICES.map((voice) => (
+                <option key={voice.id} value={voice.id}>
+                  {voice.name} ({voice.gender})
                 </option>
               ))}
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Choose the voice for the AI examiner
+              Powered by Azure Neural TTS
             </p>
           </div>
 
@@ -331,15 +528,16 @@ export default function SettingsPage() {
           <div className="flex gap-3">
             <button
               onClick={handleTest}
-              className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              disabled={isTestPlaying}
+              className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              Test Voice
+              {isTestPlaying ? "Playing..." : "Test Voice"}
             </button>
             <button
               onClick={handleSave}
               className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
             >
-              {isSaved ? "✓ Saved!" : "Save Settings"}
+              {isSaved ? "Saved!" : "Save Settings"}
             </button>
           </div>
         </div>
@@ -350,11 +548,10 @@ export default function SettingsPage() {
             About Settings
           </h3>
           <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-            <li>• Practice goals help you stay motivated and track progress</li>
-            <li>• Voices are provided by your browser and operating system</li>
-            <li>• Google Chrome typically has the best voice options</li>
-            <li>• A slower speed (0.8-0.9x) is recommended for learning</li>
-            <li>• All settings are saved locally in your browser</li>
+            <li>Practice goals help you stay motivated and track progress</li>
+            <li>Voices are powered by Azure Neural TTS for natural sound</li>
+            <li>A slower speed (0.8-0.9x) is recommended for learning</li>
+            <li>All settings are saved locally in your browser</li>
           </ul>
         </div>
       </main>

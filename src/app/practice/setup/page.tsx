@@ -56,6 +56,22 @@ export default function PracticeSetupPage() {
           </div>
         </Link>
 
+        {/* Shadowing Practice Banner */}
+        <Link
+          href={selectedTopic ? `/practice/shadowing?mode=${selectedMode}&topic=${selectedTopic}` : `/practice/shadowing?mode=${selectedMode}`}
+          className="block p-6 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white hover:shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold mb-1">{t("home.shadowing")}</h2>
+              <p className="text-sm text-green-100">
+                {t("shadowing.setup.description")}
+              </p>
+            </div>
+            <span className="text-2xl">🎤</span>
+          </div>
+        </Link>
+
         {/* Mode Selection */}
         <section>
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">

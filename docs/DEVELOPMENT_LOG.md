@@ -503,3 +503,58 @@
 | 2026-05-16 | 模拟考试 | 完整考试流程、计时器、阶段指示 |
 | 2026-05-16 | 学习体验 | 错误标注、词汇/语法纠正详情 |
 | 2026-05-17 | 发音评估 | Azure Pronunciation Assessment 集成 |
+| 2026-05-17 | 跟读练习 | 听标准发音模仿跟读 + 发音评估反馈 |
+| 2026-05-17 | 学习提醒 | 考试倒计时、每日练习提醒、连续练习天数 |
+
+---
+
+### Entry 14: 跟读/模仿练习功能
+
+**完成阶段**: 跟读练习
+
+**完成内容**:
+- 从 VoiceControls 提取 WAV 编码逻辑到 `audio-utils.ts` 共享模块
+- 创建 `useShadowingPractice` hook 管理练习状态和流程
+- 创建 ShadowingProgress 进度指示组件
+- 创建 ShadowingSentenceCard 练习卡片组件（集成 TTS、录音、评估）
+- 创建 ShadowingSummary 练习总结组件
+- 创建 `/practice/shadowing` 主页面（设置 + 练习流程）
+- 支持 Part 1/2/3 三种练习模式
+- 支持话题选择或随机话题
+- 集成 Azure 发音评估 API 进行逐句评分
+- 首页和设置页面添加跟读练习入口
+- 添加中英文 i18n 翻译
+
+**关键文件**:
+- `src/lib/audio-utils.ts` - 音频录制和 WAV 编码工具
+- `src/hooks/useShadowingPractice.ts` - 跟读练习状态管理 hook
+- `src/components/ShadowingProgress.tsx` - 进度指示组件
+- `src/components/ShadowingSentenceCard.tsx` - 练习卡片组件
+- `src/components/ShadowingSummary.tsx` - 练习总结组件
+- `src/app/practice/shadowing/page.tsx` - 跟读练习主页面
+- `src/app/page.tsx` - 首页添加跟读入口
+- `src/app/practice/setup/page.tsx` - 设置页添加跟读入口
+- `src/locales/en.json` - 英文翻译更新
+- `src/locales/zh.json` - 中文翻译更新
+
+---
+
+### Entry 15: 学习提醒功能
+
+**完成阶段**: 学习提醒
+
+**完成内容**:
+- 创建 `reminders.ts` 数据管理模块，支持考试日期、每日提醒设置
+- 实现考试倒计时计算和今日练习状态检测
+- 实现连续练习天数统计功能
+- 设置页面添加学习提醒设置区域（考试日期选择器、每日提醒开关、提醒时间选择）
+- 首页添加提醒卡片展示（考试倒计时卡片、每日练习状态卡片）
+- 添加中英文 i18n 翻译支持
+- 支持条件渲染，未设置时不显示提醒卡片
+
+**关键文件**:
+- `src/lib/reminders.ts` - 提醒数据管理模块
+- `src/app/settings/page.tsx` - 设置页面添加提醒设置
+- `src/app/page.tsx` - 首页添加提醒卡片
+- `src/locales/en.json` - 英文翻译更新
+- `src/locales/zh.json` - 中文翻译更新

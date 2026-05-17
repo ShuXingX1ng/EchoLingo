@@ -2,6 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+// Azure Neural voice options
+export const AZURE_VOICES = [
+  { name: "Aria", id: "en-US-AriaNeural", gender: "Female" },
+  { name: "Jenny", id: "en-US-JennyNeural", gender: "Female" },
+  { name: "Guy", id: "en-US-GuyNeural", gender: "Male" },
+  { name: "Davis", id: "en-US-DavisNeural", gender: "Male" },
+  { name: "Amber", id: "en-US-AmberNeural", gender: "Female" },
+  { name: "Brandon", id: "en-US-BrandonNeural", gender: "Male" },
+  { name: "Christopher", id: "en-US-ChristopherNeural", gender: "Male" },
+  { name: "Cora", id: "en-US-CoraNeural", gender: "Female" },
+  { name: "Elizabeth", id: "en-US-ElizabethNeural", gender: "Female" },
+  { name: "Eric", id: "en-US-EricNeural", gender: "Male" },
+  { name: "Michelle", id: "en-US-MichelleNeural", gender: "Female" },
+];
+
 interface VoiceOutputProps {
   text: string;
   autoPlay?: boolean;
@@ -9,98 +24,112 @@ interface VoiceOutputProps {
 
 export default function VoiceOutput({ text, autoPlay = false }: VoiceOutputProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
-  const [rate, setRate] = useState(0.95);
   const [isMuted, setIsMuted] = useState(false);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    setIsSupported("speechSynthesis" in window);
-
-    const loadVoices = () => {
-      const availableVoices = window.speechSynthesis.getVoices();
-      const englishVoices = availableVoices.filter((v) =>
-        v.lang.startsWith("en")
-      );
-      setVoices(englishVoices);
-
-      // Load saved settings
-      const savedVoiceURI = localStorage.getItem("echolingo_voice_uri");
-      const savedRate = localStorage.getItem("echolingo_voice_rate");
-      const savedMuted = localStorage.getItem("echolingo_muted");
-
-      if (savedRate) {
-        setRate(parseFloat(savedRate));
-      }
-
-      if (savedMuted === "true") {
-        setIsMuted(true);
-      }
-
-      let voice: SpeechSynthesisVoice | null = null;
-      if (savedVoiceURI) {
-        voice = englishVoices.find((v) => v.voiceURI === savedVoiceURI) || null;
-      }
-
-      if (!voice) {
-        voice =
-          englishVoices.find((v) => v.name.includes("Google") && v.lang === "en-US") ||
-          englishVoices.find((v) => v.lang === "en-US") ||
-          englishVoices.find((v) => v.lang === "en-GB") ||
-          englishVoices[0] ||
-          null;
-      }
-
-      setSelectedVoice(voice);
-    };
-
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-
-    return () => {
-      window.speechSynthesis.cancel();
-    };
+    const savedMuted = localStorage.getItem("echolingo_muted");
+    if (savedMuted === "true") {
+      setIsMuted(true);
+    }
   }, []);
 
-  const speak = useCallback(() => {
-    if (!isSupported || !text) return;
+  const getVoice = useCallback(() => {
+    return localStorage.getItem("echolingo_azure_voice") || "en-US-AriaNeural";
+  }, []);
 
-    window.speechSynthesis.cancel();
+  const getRate = useCallback(() => {
+    const savedRate = localStorage.getItem("echolingo_voice_rate");
+    return savedRate ? parseFloat(savedRate) : 0.95;
+  }, []);
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = rate;
-    utterance.pitch = 1;
+  const speak = useCallback(async () => {
+    if (!text) return;
 
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    // Stop any current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (abortRef.current) {
+      abortRef.current.abort();
     }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  }, [isSupported, text, selectedVoice, rate]);
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voice: getVoice(),
+          rate: getRate(),
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("TTS request failed");
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+
+      await audio.play();
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        console.error("TTS playback error:", err);
+      }
+      setIsSpeaking(false);
+    }
+  }, [text, getVoice, getRate]);
 
   const stop = useCallback(() => {
-    window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
     setIsSpeaking(false);
   }, []);
 
   useEffect(() => {
-    if (autoPlay && text && selectedVoice && !isMuted) {
-      const timer = setTimeout(speak, 100);
+    if (autoPlay && text && !isMuted) {
+      const timer = setTimeout(speak, 200);
       return () => clearTimeout(timer);
     }
-  }, [autoPlay, text, selectedVoice, speak, isMuted]);
+  }, [autoPlay, text, speak, isMuted]);
 
-  if (!isSupported) {
-    return null;
-  }
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <button
