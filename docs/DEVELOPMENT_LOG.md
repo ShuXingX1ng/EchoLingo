@@ -1026,3 +1026,44 @@
 - practice/page.tsx 减少约 40 行
 - exam/page.tsx 减少约 50 行
 - 消除重复的 fetchFeedback、fetchPronunciationAssessment 和反馈保存逻辑
+
+---
+
+### Entry 31: 代码结构收敛 — 语音录音边界抽取与 UI 状态收敛 (Phase F)
+
+**完成阶段**: Phase F 代码结构收敛
+
+**完成内容**:
+
+**语音录音边界抽取**:
+- 创建 `src/hooks/useAudioRecorder` hook，统一管理音频录制生命周期
+- 重构 `VoiceControls` 组件，移除内联 AudioContext/ScriptProcessor 逻辑，改用 `useAudioRecorder`
+- 重构 `useShadowingPractice` hook，移除 `startAudioCapture`/`stopAudioCapture` 直接调用，改用 `useAudioRecorder` + `fetchPronunciationAssessment`
+
+**重复 UI 状态收敛**:
+- 创建 `src/components/ChatUIStates.tsx` 共享组件模块
+- 抽取 `ChatLoadingIndicator` — 统一聊页"AI 思考中"骨架 + 跳动圆点
+- 抽取 `ChatErrorBanner` — 统一聊页错误提示横幅
+- 抽取 `SuspenseFallback` — 统一 Suspense 加载占位
+- 抽取 `FeedbackLoadingIndicator` — 统一反馈生成中状态
+- 重构 `practice/page.tsx` 使用 4 个共享组件
+- 重构 `exam/page.tsx` 使用 4 个共享组件
+
+**关键文件**:
+- `src/hooks/useAudioRecorder.ts` - 音频录制 hook（新建）
+- `src/components/ChatUIStates.tsx` - 共享 UI 状态组件（新建）
+- `src/components/VoiceControls.tsx` - 重构使用 useAudioRecorder
+- `src/hooks/useShadowingPractice.ts` - 重构使用共享模块
+- `src/app/practice/page.tsx` - 使用共享 UI 组件
+- `src/app/practice/exam/page.tsx` - 使用共享 UI 组件
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，6 个测试文件 / 23 个测试
+
+**代码减少**:
+- VoiceControls.tsx 移除约 40 行内联录音逻辑
+- useShadowingPractice.ts 移除约 30 行重复录音/API 调用
+- practice/page.tsx 移除约 30 行重复 UI 模板
+- exam/page.tsx 移除约 30 行重复 UI 模板

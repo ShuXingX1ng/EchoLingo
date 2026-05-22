@@ -349,10 +349,12 @@ src/
 │   ├── MuteButton.tsx        # 静音按钮
 │   ├── Chart.tsx             # 图表组件
 │   ├── BackupModal.tsx       # 备份弹窗
+│   ├── ChatUIStates.tsx      # 聊页共享 UI 状态（Loading/Error/Suspense）
 │   └── ...
 ├── hooks/
 │   ├── useVoiceConversation.ts # 语音对话 hook
 │   ├── useShadowingPractice.ts # 跟读练习 hook
+│   ├── useAudioRecorder.ts   # 音频录制 hook（统一录音边界）
 │   ├── useMobile.ts          # 移动端检测
 │   ├── useNetworkStatus.ts   # 网络状态
 │   └── useCleanup.ts         # 清理 hook
@@ -418,14 +420,19 @@ src/
 
 ### ❌ 待补齐内容
 
-**下一阶段优化**:
+> **当前策略**：优先做好网页端体验，移动端优化暂缓。
+
+**下一阶段优化（网页端优先）**:
 - ~~学习闭环统一：反馈建议联动下一次练习，发音队列联动跟读~~ ✅
 - ~~历史与统计页学习化：历史页已升级，统计页已改为学习进度页~~ ✅
 - ~~桌面端网页统一：共享导航、颜色/宽度/i18n 统一~~ ✅
-- 移动端核心流程打磨：练习输入区、setup CTA、首页首屏密度
+- ~~代码结构收敛：反馈保存逻辑抽取、语音录音边界抽取、重复 UI 收敛~~ ✅
 - 测试与 CI：组件测试扩展、CI 质量门、E2E mock 规划
 - 数据与云端同步稳定性：审查 localStorage、Supabase、IndexedDB 职责边界
-- 代码结构收敛：减少普通练习/模拟考试/反馈保存逻辑重复
+- 网页端交互打磨：练习流程、反馈展示、历史回看的桌面端体验优化
+
+**暂缓（移动端优化）**:
+- 移动端核心流程打磨：练习输入区、setup CTA、首页首屏密度（待网页端完成后处理）
 
 **平台化功能** (低优先级):
 - 支付系统 / 订阅 / 商业化运营：future/backlog，当前不实施

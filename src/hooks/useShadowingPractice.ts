@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { PronunciationAssessmentResult } from "@/types";
 import { getTopicById, getRandomTopic } from "@/lib/topics";
-import { startAudioCapture, stopAudioCapture, type AudioCapture } from "@/lib/audio-utils";
+import { fetchPronunciationAssessment } from "@/lib/feedback-actions";
+import { useAudioRecorder } from "./useAudioRecorder";
 
 export type ShadowingPhase = "setup" | "listening" | "recording" | "evaluating" | "result" | "summary";
 export type ShadowingMode = "part1" | "part2" | "part3";
@@ -23,7 +24,8 @@ export function useShadowingPractice() {
   const [allResults, setAllResults] = useState<ShadowingResult[]>([]);
   const [topicName, setTopicName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const audioCaptureRef = useRef<AudioCapture | null>(null);
+
+  const { startRecording: startAudioRecording, stopRecording: stopAudioRecording } = useAudioRecorder();
 
   const generateSentences = useCallback((mode: ShadowingMode, topicId?: string): string[] => {
     const topic = topicId ? getTopicById(topicId) : getRandomTopic();
@@ -64,24 +66,16 @@ export function useShadowingPractice() {
   const startRecording = useCallback(async () => {
     try {
       setError(null);
-      const capture = await startAudioCapture();
-      audioCaptureRef.current = capture;
+      await startAudioRecording();
       setPhase("recording");
     } catch (err) {
       setError("Failed to access microphone. Please check permissions.");
       console.error("Audio capture error:", err);
     }
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    if (!audioCaptureRef.current) return;
-    const blob = stopAudioCapture(audioCaptureRef.current);
-    audioCaptureRef.current = null;
-    return blob;
-  }, []);
+  }, [startAudioRecording]);
 
   const evaluatePronunciation = useCallback(async () => {
-    const audioBlob = stopRecording();
+    const audioBlob = stopAudioRecording();
     if (!audioBlob) {
       setError("No audio recorded. Please try again.");
       setPhase("listening");
@@ -93,32 +87,20 @@ export function useShadowingPractice() {
 
     setPhase("evaluating");
 
-    try {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("text", currentSentence);
-
-      const response = await fetch("/api/pronunciation", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Pronunciation assessment failed.");
-      }
-
-      const result: PronunciationAssessmentResult = await response.json();
-      setAssessmentResult(result);
-      setAllResults((prev) => [
-        ...prev,
-        { sentence: currentSentence, score: result.score, assessment: result },
-      ]);
-      setPhase("result");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Assessment failed.");
+    const result = await fetchPronunciationAssessment(audioBlob, currentSentence);
+    if (!result) {
+      setError("Assessment failed.");
       setPhase("listening");
+      return;
     }
-  }, [stopRecording, sentences, currentSentenceIndex]);
+
+    setAssessmentResult(result);
+    setAllResults((prev) => [
+      ...prev,
+      { sentence: currentSentence, score: result.score, assessment: result },
+    ]);
+    setPhase("result");
+  }, [stopAudioRecording, sentences, currentSentenceIndex]);
 
   const nextSentence = useCallback(() => {
     if (currentSentenceIndex < sentences.length - 1) {
@@ -161,7 +143,6 @@ export function useShadowingPractice() {
     // Actions
     startPractice,
     startRecording,
-    stopRecording,
     evaluatePronunciation,
     nextSentence,
     tryAgain,

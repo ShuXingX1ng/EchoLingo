@@ -2,199 +2,639 @@
 
 ## 新窗口接手方式
 
-新窗口建议先阅读：
+新窗口必须先阅读：
 
 1. `AGENTS.md`
 2. `docs/PROJECT_CONTEXT.md`
 3. `docs/TASKS.md`
 4. `docs/DEVELOPMENT_LOG.md`
 5. `docs/NEXT_OPTIMIZATION_PLAN.md`
-6. `git diff`
+6. 当前 `git diff`
 
-当前项目已经完成核心练习、模拟考试、跟读、发音评估、学习复盘、桌面端统一（DesktopNav 共享组件、颜色/宽度/i18n 统一）、D2 组件测试扩展、B1 历史页复盘升级、lint 清零、Next 16 配置清理。商业化、支付、订阅和社交能力暂不实施，继续保留在 future/backlog。
+接手后先确认当前工作区是否已有未提交改动，不要覆盖用户或上一位 agent 的修改。涉及 Next.js 代码前，按 `AGENTS.md` 要求阅读 `node_modules/next/dist/docs/` 中与本次改动相关的文档。
 
-## 优化目标
+## 当前项目状态
 
-下一阶段不做大范围新功能，重点把 EchoLingo 从"功能齐全"推进到"学习体验更连续、产品结构更稳定、验证体系更可靠"。
+EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下一阶段重点不是继续堆新功能，而是让现有学习路径、数据路径和工程质量更稳定。
 
-**当前优先级说明**：移动端暂不作为重点，优先把网页端（桌面端）体验打磨到位。移动端相关任务推迟到网页端核心体验完善后再考虑。
+已确认完成的核心能力：
 
-优先顺序：
+- [x] 核心练习流程：IELTS Part 1/2/3、多模式练习、AI 考官对话、会话反馈、预估分数。
+- [x] 模拟考试：Part 1 -> Part 2 -> Part 3 完整流程、阶段指示、Part 2 计时、综合反馈。
+- [x] 跟读练习：标准发音播放、模仿录音、Azure 发音评估、逐句评分和总结。
+- [x] 发音评估：Azure Pronunciation Assessment，支持单词级和音素级评分。
+- [x] 学习复盘：`FeedbackPanel` / `FeedbackReview` 统一普通练习、模拟考试和历史详情的复盘 UI。
+- [x] 历史页复盘升级：历史列表展示 Band、Top weakness、下一步建议和练习模式，历史详情复用学习复盘。
+- [x] 统计页学习化：统计页从图表集合调整为目标进度、趋势、薄弱项和推荐行动。
+- [x] 桌面端统一：`DesktopNav` 共享组件，Home/Practice/Exam/Shadowing/Setup/Stats/History/Settings/Admin 统一桌面导航。
+- [x] 视觉与文案一致性：gray -> slate，主按钮、Band 标签、页面宽度和 i18n key 统一。
+- [x] 组件测试扩展：`FeedbackPanel`、`MobileNav`、`practice/setup` 核心分支已有测试。
+- [x] lint 清零：文档记录 `npm run lint` 为 0 warning / 0 error。
+- [x] Next 16 配置清理：`turbopack.root` 固定项目根目录，`src/proxy.ts` 替代 deprecated `middleware.ts`。
+- [x] CI 基础质量门：`.github/workflows/ci.yml` 已存在，运行 lint、typecheck、unit test、build。
+- [x] 数据层第一轮 review：已记录 `history.ts`、`supabase-history.ts`、`unified-history.ts` 职责边界和登录/未登录保存策略。
+- [x] 代码结构第一轮收敛：反馈生成/保存逻辑、语音录音边界、聊天 loading/error/suspense UI 已抽取共享模块。
 
-1. ~~学习闭环统一~~ ✅
-2. ~~历史与统计页学习化~~ ✅
-3. ~~桌面端网页统一~~ ✅
-4. 测试与 CI
-5. 数据与云端同步稳定性
-6. 代码结构收敛
-7. 移动端核心流程打磨（推迟）
+当前工作区 diff 还显示 Phase F 相关改动和文档记录：`VoiceControls`、`useShadowingPractice`、`practice/page.tsx`、`practice/exam/page.tsx` 已进一步使用共享录音和 UI 状态模块。后续 agent 接手前应先确认这些改动是否已经验证并提交。
 
-## Phase A: 学习闭环统一
+## 下一阶段总目标
+
+下一阶段目标：把 EchoLingo 从“功能齐全”推进到“体验连续、路径清晰、数据稳定、工程可接手”的状态。
+
+产品侧目标：
+
+- 用户完成一次练习后，能自然进入复盘、历史回看、统计理解和下一次练习。
+- 桌面端网页体验先稳定，不急于开展移动端专项打磨。
+- 学习建议要尽量来自真实反馈、错误模式和进度，而不是泛化文案。
+
+工程侧目标：
+
+- 质量门稳定可重复：本地和 CI 都能跑 lint、typecheck、unit test、build。
+- 数据保存路径清楚：localStorage、Supabase、IndexedDB 的职责边界明确。
+- 外部服务可 mock：LLM、Azure、Supabase、audio recording 不阻塞自动化测试设计。
+- 每次重构只抽一个明确边界，避免大范围改名、搬文件或跨页面重写。
+
+## 当前优先级
+
+当前推荐顺序：
+
+1. **Phase D3：E2E mock 规划**，先定义路径和 mock 策略，不急着安装 Playwright。
+2. **Phase E：数据与云端同步稳定性深化**，先 review，再做小步、单边界重构。
+3. **Phase F：代码结构收敛补强**，每次只抽一个仍然重复或职责不清的边界。
+4. **Phase C：移动端核心流程打磨（推迟）**，除非发现严重阻塞问题。
+
+明确策略：
+
+- 移动端不是当前最高优先级。
+- 商业化、支付、订阅、排行榜、学习小组、分享/社交不进入当前阶段。
+- 不做依赖真实 LLM、Azure、Supabase 或外部付费 API 的 E2E。
+- 当前先把桌面端网页体验、工程质量、数据路径和后续接手安全性打磨稳定。
+
+## Phase A: 学习闭环统一 ✅
 
 目标：让用户每次练习后都知道下一步做什么。
 
+背景：反馈页已经从单纯评分升级为学习复盘入口，需要和下一次练习、跟读练习、历史回看保持一致。
+
 ### A1. 复盘结果联动下一次练习 ✅
 
-- 将 `FeedbackPanel` 的 Top 3 建议转化为可携带的练习参数。
-- 点击“专项练习”时，把建议或薄弱项带到 `/practice/setup`。
-- 在 setup 页面显示“本轮训练目标”，例如 fluency、grammar、pronunciation。
-- 保持后端反馈 JSON 结构不变，优先用前端状态或 query 参数串联。
+具体任务：
 
-验收：
-- 用户从反馈页点击后能进入带目标提示的练习设置页。
-- 不真实调用 LLM 的情况下也能通过组件/页面测试覆盖主要 UI。
+- [x] 将 `FeedbackPanel` 的 Top 3 建议转化为可携带的练习参数。
+- [x] 点击“专项练习”时，把建议或薄弱项带到 `/practice/setup`。
+- [x] 在 setup 页面显示“本轮训练目标”，例如 fluency、grammar、pronunciation。
+- [x] 保持后端反馈 JSON 结构不变，优先用前端状态或 query 参数串联。
+
+涉及文件：
+
+- `src/components/FeedbackPanel.tsx`
+- `src/app/practice/setup/page.tsx`
+- `src/app/practice/page.tsx`
+- `src/app/practice/exam/page.tsx`
+
+验收标准：
+
+- [x] 用户从反馈页点击后能进入带目标提示的练习设置页。
+- [x] 不真实调用 LLM 的情况下也能通过组件/页面测试覆盖主要 UI。
+
+不做：
+
+- 不修改 LLM feedback schema。
+- 不新增后端推荐服务。
 
 ### A2. 跟读练习衔接发音队列 ✅
 
-- 将误读词汇从 `FeedbackPanel` 带到 `/practice/shadowing`。
-- 跟读 setup 中展示“本次优先练习词”。
-- 如果没有发音评估结果，保持当前默认跟读流程。
+具体任务：
 
-验收：
-- 有误读词时，跟读页能呈现优先词汇。
-- 无误读词时，不影响现有 shadowing 流程。
+- [x] 将误读词汇从 `FeedbackPanel` 带到 `/practice/shadowing`。
+- [x] 跟读 setup 中展示“本次优先练习词”。
+- [x] 如果没有发音评估结果，保持当前默认跟读流程。
 
-## Phase B: 历史与统计页学习化
+涉及文件：
+
+- `src/components/FeedbackPanel.tsx`
+- `src/app/practice/shadowing/page.tsx`
+- `src/hooks/useShadowingPractice.ts`
+
+验收标准：
+
+- [x] 有误读词时，跟读页能呈现优先词汇。
+- [x] 无误读词时，不影响现有 shadowing 流程。
+
+不做：
+
+- 不强制所有练习都生成发音队列。
+- 不依赖真实 Azure key 做自动化测试。
+
+## Phase B: 历史与统计页学习化 ✅
 
 目标：历史页和统计页不只是记录，而是帮助用户决定下一步。
 
+背景：EchoLingo 已有历史、统计、目标和推荐能力，Phase B 的重点是把这些信息组织成学习闭环。
+
 ### B1. 历史页复盘升级 ✅
 
-- 已完成：历史列表优先展示 Band、Top weakness、下一步建议和练习模式。
-- 已完成：详情页复用从 `FeedbackPanel` 抽出的 `FeedbackReview`，避免两套反馈 UI 分叉。
-- 已完成：保留原有 transcript、导出、删除、备份、搜索、排序、批量选择和录音回放能力。
+具体任务：
 
-验收：
-- 历史详情里的反馈视觉和当前复盘面板保持一致。
-- 历史页搜索/筛选/导出不回归。
+- [x] 历史列表优先展示 Band、Top weakness、下一步建议和练习模式。
+- [x] 详情页复用从 `FeedbackPanel` 抽出的 `FeedbackReview`，避免两套反馈 UI 分叉。
+- [x] 保留 transcript、导出、删除、备份、搜索、排序、批量选择和录音回放能力。
+
+涉及文件：
+
+- `src/app/history/page.tsx`
+- `src/components/FeedbackPanel.tsx`
+- `src/lib/history.ts`
+- `src/lib/unified-history.ts`
+
+验收标准：
+
+- [x] 历史详情里的反馈视觉和当前复盘面板保持一致。
+- [x] 历史页搜索/筛选/导出不回归。
+
+不做：
+
+- 不重写历史页数据层。
+- 不删除已有导出、备份和录音回放能力。
 
 ### B2. 统计页改成学习进度页 ✅
 
-- 将统计页从图表集合调整为“目标进度 + 最近趋势 + 薄弱项 + 推荐行动”。
-- 首屏避免过多卡片堆叠，保持学习软件风格。
-- 强化移动端扫描体验。
+具体任务：
 
-验收：
-- 用户在统计页首屏能看到当前目标、趋势、下一步建议。
-- 图表在手机端不横向溢出。
+- [x] 将统计页从图表集合调整为“目标进度 + 最近趋势 + 薄弱项 + 推荐行动”。
+- [x] 首屏避免过多卡片堆叠，保持学习软件风格。
+- [x] 检查统计图表小屏无横向溢出。
+
+涉及文件：
+
+- `src/app/stats/page.tsx`
+- `src/lib/stats.ts`
+- `src/lib/recommendations.ts`
+- `src/lib/supabase-progress.ts`
+
+验收标准：
+
+- [x] 用户在统计页首屏能看到当前目标、趋势、下一步建议。
+- [x] 图表在手机端不横向溢出。
+
+不做：
+
+- 不新增商业化分析面板。
+- 不把统计页改成运营后台。
 
 ## Phase C: 移动端核心流程打磨（推迟）
 
-目标：手机端能顺畅完成"开始练习 -> 回答 -> 结束 -> 复盘 -> 下一步"。
+目标：手机端能顺畅完成“开始练习 -> 回答 -> 结束 -> 复盘 -> 下一步”。
 
-> **注意**：此阶段暂时推迟，优先完成桌面端体验和测试/CI 建设。移动端在网页端核心体验完善后再处理。
+背景：项目已有响应式布局、PWA 和 `MobileNav`，但当前策略是优先稳定桌面端网页体验和工程质量。移动端只在发现严重阻塞问题时临时处理。
 
-### C1. 移动端练习页输入区
+当前状态：**推迟**。
 
-- 检查 `/practice` 和 `/practice/exam` 在小屏下的 header、context strip、输入区高度。
-- 必要时折叠次要信息，保留模式、话题、结束按钮、输入控件。
-- 避免键盘弹出后内容被遮挡。
+### C1. `/practice` 与 `/practice/exam` 小屏练习流程（推迟）
 
-验收：
-- 390px 宽度下输入框、发送按钮、语音按钮不重叠。
-- 练习页仍不显示底部移动导航。
+具体任务：
 
-### C2. 设置页和首页移动端密度
+- [ ] 检查小屏下 header、context strip、聊天区域、输入区高度。
+- [ ] 确认输入框、发送按钮、语音按钮不重叠。
+- [ ] 确认键盘弹出后主要输入控件不被遮挡。
+- [ ] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区。
 
-- 检查 `/practice/setup` 的 sticky CTA 和 topic chip 在手机端的可点区域。
-- 首页首屏确保主 CTA 在手机端不被推到过深位置。
+候选文件：
 
-验收：
-- 手机端无需横向滚动。
-- 主要 CTA 在首屏或接近首屏位置。
+- `src/app/practice/page.tsx`
+- `src/app/practice/exam/page.tsx`
+- `src/components/MobileNav.tsx`
+- `src/components/VoiceControls.tsx`
+
+风险点：
+
+- 移动端键盘行为在浏览器间差异较大。
+- 练习页包含语音、输入、状态条和反馈弹窗，局部 CSS 改动容易影响桌面端。
+
+验收标准：
+
+- [ ] 390px 宽度下输入区、发送按钮、语音按钮不重叠。
+- [ ] 练习中、loading、error、feedback 状态均无横向滚动。
+- [ ] 桌面端布局不回归。
+
+不做：
+
+- 当前不做移动端专项视觉重写。
+- 当前不引入新的手势系统。
+
+### C2. `/practice/setup`、首页、history/stats 小屏体验（推迟）
+
+具体任务：
+
+- [ ] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
+- [ ] 检查首页手机端主 CTA 是否在首屏或接近首屏。
+- [ ] 检查 `/history` 和 `/stats` 小屏扫描体验，优先避免横向溢出。
+
+候选文件：
+
+- `src/app/practice/setup/page.tsx`
+- `src/app/page.tsx`
+- `src/app/history/page.tsx`
+- `src/app/stats/page.tsx`
+
+风险点：
+
+- 首页和 setup 页面已经经过桌面端统一，移动端调整要避免重新引入不一致颜色和宽度。
+- history/stats 信息密度高，过度压缩会损失学习复盘价值。
+
+验收标准：
+
+- [ ] 手机端无需横向滚动。
+- [ ] 主要 CTA 可见且可点击。
+- [ ] history/stats 关键学习信息仍可快速扫描。
+
+不做：
+
+- 不把移动端作为当前最高优先级。
+- 不为了移动端改动重写桌面端页面结构。
 
 ## Phase D: 测试与 CI
 
-目标：把目前手动验证变成稳定质量门。
+目标：把当前手动验证沉淀成稳定质量门，并为后续 E2E 做 mock-first 设计。
 
-### D1. CI 工作流
+背景：组件测试和 CI 基础工作已经完成。下一步不是重复创建 CI，而是补齐 E2E 的规划边界，确保未来自动化测试不依赖真实外部服务。
 
-- 新增 GitHub Actions 或等价 CI，运行：
-  - `npm ci`
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run test:unit:run`
-  - `npm run build`
+### D1. CI 工作流 ✅
 
-验收：
-- CI 文件存在并通过本地语法检查。
-- README 或 docs 记录本地质量门。
+当前状态：已完成。`.github/workflows/ci.yml` 已存在，`package.json` 已包含所需 scripts。
+
+已确认 scripts：
+
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test:unit:run`
+- [x] `npm run build`
+
+已确认 CI 配置：
+
+- [x] `npm ci`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test:unit:run`
+- [x] `npm run build`
+- [x] push 触发。
+- [x] pull_request 触发。
+- [x] 使用 Node.js 20，与当前依赖和 `@types/node` 主版本匹配。
+- [x] 不使用真实 secret。
+- [x] 不依赖真实 LLM、Azure、Supabase 或外部付费 API。
+
+涉及文件：
+
+- `.github/workflows/ci.yml`
+- `package.json`
+- `docs/PROJECT_CONTEXT.md`
+- `docs/TASKS.md`
+- `docs/DEVELOPMENT_LOG.md`
+
+验收标准：
+
+- [x] CI 文件存在。
+- [x] YAML 结构清楚，包含 checkout、setup-node、npm ci、lint、typecheck、unit test、build。
+- [x] 本地质量门命令已记录：`npm run lint && npm run typecheck && npm run test:unit:run && npm run build`。
+- [x] 如果未来某个命令失败，需要在 `docs/DEVELOPMENT_LOG.md` 记录原因、影响范围和后续处理。
+
+不做：
+
+- 不在 CI 中配置真实 API key。
+- 不在 CI 中跑依赖真实 LLM、Azure、Supabase 的测试。
+- 不把 Playwright 安装混入 D1。
 
 ### D2. 组件测试扩展 ✅
 
 已完成：
-- `MobileNav` 路由隐藏/显示逻辑
-- `FeedbackPanel` 发音队列/无发音队列状态
-- `Practice setup` 的训练类型和 start URL
 
-验收：
-- 单元/组件测试覆盖关键分支。
-- `npm run test:unit:run` 稳定通过。
+- [x] `MobileNav` 路由隐藏/显示逻辑。
+- [x] `FeedbackPanel` 发音队列/无发音队列状态。
+- [x] `practice/setup` 的训练类型和 start URL。
 
-### D3. E2E 规划
+涉及文件：
 
-暂不急着大规模安装 Playwright。若要做：
-- 先覆盖静态路径加载：`/`、`/practice/setup`、`/stats`、`/history`
-- 对 LLM/Azure 调用做 mock，避免真实外部请求
+- `src/components/FeedbackPanel.test.tsx`
+- `src/components/MobileNav.test.tsx`
+- `src/app/practice/setup/page.test.tsx`
 
-验收：
-- E2E 不依赖真实 API key。
+验收标准：
+
+- [x] 单元/组件测试覆盖关键分支。
+- [x] `npm run test:unit:run` 稳定通过。
+
+不做：
+
+- 不追求覆盖率数字本身。
+- 不为稳定 UI 快照引入脆弱的大量 snapshot。
+
+### D3. E2E 规划（下一项推荐）
+
+目标：先定义最值得覆盖的路径、mock 边界和验收标准，暂时不急着安装 Playwright。
+
+背景：EchoLingo 的核心路径依赖 LLM、Azure pronunciation、Supabase auth/history 和浏览器录音。直接做真实 API E2E 会慢、不稳定、需要 secret，也不适合默认 CI。
+
+具体任务：
+
+- [ ] 盘点最值得覆盖的页面路径：
+  - `/`
+  - `/practice/setup`
+  - `/practice`
+  - `/practice/exam`
+  - `/history`
+  - `/stats`
+- [ ] 为每条路径定义“无外部 API”的 smoke 验收：
+  - 页面能加载。
+  - 关键导航和 CTA 可见。
+  - 关键空状态/loading/error 不崩溃。
+  - 不出现 console error。
+- [ ] 标记必须 mock 的流程：
+  - LLM feedback / examiner response。
+  - Azure pronunciation。
+  - Supabase auth/history。
+  - audio recording / microphone permission。
+- [ ] 决定测试层级：
+  - 组件测试覆盖纯 UI 和参数拼接。
+  - E2E 只覆盖跨页面路径和关键回归。
+- [ ] 写入 README 或 docs，说明未来安装 Playwright 前需要满足的前置条件。
+
+候选文件：
+
+- `docs/NEXT_OPTIMIZATION_PLAN.md`
+- `README.md`
+- `src/app/practice/page.tsx`
+- `src/app/practice/exam/page.tsx`
+- `src/app/practice/setup/page.tsx`
+- `src/app/history/page.tsx`
+- `src/app/stats/page.tsx`
+- `src/lib/feedback-actions.ts`
+- `src/lib/unified-history.ts`
+
+风险点：
+
+- 如果未先设计 mock，E2E 容易误触真实外部服务。
+- audio recording 和 microphone permission 在 CI 环境中天然不稳定。
+- 过早安装 Playwright 会增加维护负担，但不一定立即提升质量。
+
+验收标准：
+
+- [ ] 文档中列出每条候选 E2E 路径、mock 点和不依赖 secret 的验收标准。
+- [ ] 明确暂不做真实 API key E2E。
+- [ ] 明确是否需要安装 Playwright，以及安装前的判断标准。
+- [ ] 未修改业务代码。
+
+不做：
+
+- 不安装 Playwright，除非后续任务明确要求。
+- 不接入真实 LLM/Azure/Supabase。
+- 不把 E2E 作为发布阻塞项，直到 mock 策略稳定。
 
 ## Phase E: 数据与云端同步稳定性
 
-目标：减少 localStorage、Supabase、IndexedDB 多源数据的割裂感。
+目标：让 localStorage、Supabase、IndexedDB、progress、error patterns 和 recommendations 的数据路径更清楚，避免重复保存、覆盖、丢失或不同步。
 
-### E1. 历史数据统一
+背景：项目已经有本地历史、云端历史、统一历史入口、错误模式、推荐引擎、学习进度、录音回放等多个数据源。Entry 29 已完成第一轮职责边界 review，下一步应在不大改数据层的前提下深化数据流说明，并只对最小边界做重构。
 
-- 审查 `history.ts`、`supabase-history.ts`、`unified-history.ts` 的职责边界。
-- 明确未登录/已登录/离线时的保存策略。
-- 写入文档，必要时补测试。
+### E1. 数据流 review 深化
 
-验收：
-- 新窗口先做 code review，再决定是否重构。
-- 不直接大改数据层。
+具体任务：
 
-### E2. 错误模式和学习路径联动
+- [ ] 输出当前数据流说明：
+  - 未登录：会话、反馈、错误模式、进度、录音如何保存。
+  - 已登录：云端保存、本地备份、读取优先级如何工作。
+  - 离线或 API 失败：是否降级到本地，用户是否可恢复。
+- [ ] 梳理每个文件职责：
+  - `src/lib/history.ts`
+  - `src/lib/supabase-history.ts`
+  - `src/lib/unified-history.ts`
+  - `src/lib/error-patterns.ts`
+  - `src/lib/recommendations.ts`
+  - `src/lib/supabase-progress.ts`
+  - `src/lib/feedback-actions.ts`
+  - `src/lib/audio-storage.ts` 或当前录音 IndexedDB 相关文件（先用 `rg` 确认实际文件名）。
+- [ ] 检查是否存在重复保存、覆盖、丢失、不同步：
+  - `saveSession` 是否同时触发本地和云端写入。
+  - `saveSessionAndUpdateLearning` 是否清楚区分保存会话、更新错误模式、记录 progress。
+  - 历史页、统计页、复盘页是否读取同一份最终结果。
+  - 录音文件是否和 session id 稳定关联。
+- [ ] 给出最小可行重构建议：
+  - 每条建议只包含一个明确边界。
+  - 先写 review 结论，再决定是否改代码。
+- [ ] 判断需要补充哪些测试。
 
-- 检查 `error-patterns.ts` 与 `recommendations.ts` 是否能消费最新复盘结果。
-- 让推荐理由更贴近反馈中的 weakness/suggestions。
+候选文件：
 
-验收：
-- 推荐不再像泛化提示，而是能关联最近几次练习。
+- `src/lib/history.ts`
+- `src/lib/supabase-history.ts`
+- `src/lib/unified-history.ts`
+- `src/lib/error-patterns.ts`
+- `src/lib/recommendations.ts`
+- `src/lib/supabase-progress.ts`
+- `src/lib/feedback-actions.ts`
+- `src/lib/audio-utils.ts`
+- `src/hooks/useAudioRecorder.ts`
+- `src/hooks/useShadowingPractice.ts`
+- `src/app/history/page.tsx`
+- `src/app/stats/page.tsx`
+
+风险点：
+
+- 数据层牵涉历史页、统计页、练习复盘和登录状态，直接重构容易引入回归。
+- Supabase、localStorage 和 IndexedDB 的异步/同步 API 不一致。
+- 离线、未登录、已登录三条路径容易在测试中只覆盖其中一条。
+
+验收标准：
+
+- [ ] 先产出 review 结论，记录在 `docs/DEVELOPMENT_LOG.md` 或当前任务指定文档中。
+- [ ] 不直接大改数据层。
+- [ ] 如果重构，只做一个明确边界，例如只调整保存入口或只补一类测试。
+- [ ] 不破坏历史页、统计页、复盘页。
+- [ ] 质量门至少跑：`npm run lint && npm run typecheck && npm run test:unit:run`；涉及 build 风险时再跑 `npm run build`。
+
+不做：
+
+- 不迁移数据库 schema，除非另开明确任务。
+- 不引入新的云存储服务。
+- 不删除本地备份路径。
+- 不实现商业化、订阅、配额或运营统计。
+
+### E2. 错误模式与推荐联动补强
+
+具体任务：
+
+- [ ] 检查 `error-patterns.ts` 是否只消费 `feedback.weaknesses`。
+- [ ] 评估是否应消费 `errorAnnotations` 和 `improvementSuggestions`。
+- [ ] 检查 `recommendations.ts` 的推荐理由是否能关联最近几次练习的具体错误。
+- [ ] 设计最小数据结构调整，优先兼容旧历史数据。
+- [ ] 能补测试就补测试，尤其是旧数据缺字段时的降级。
+
+候选文件：
+
+- `src/lib/error-patterns.ts`
+- `src/lib/recommendations.ts`
+- `src/lib/supabase-progress.ts`
+- `src/lib/feedback-actions.ts`
+- `src/types/index.ts`
+
+风险点：
+
+- 旧历史记录可能没有 `errorAnnotations`。
+- 推荐理由如果过度依赖 LLM 文案，可能出现空值或泛化内容。
+- 数据结构变更需要兼容 localStorage 旧数据。
+
+验收标准：
+
+- [ ] 推荐理由比泛化提示更贴近最近反馈。
+- [ ] 旧数据缺少新字段时不崩溃。
+- [ ] 相关测试覆盖有字段/无字段两种路径。
+
+不做：
+
+- 不新增真实 LLM 调用来生成推荐理由。
+- 不让推荐系统依赖在线状态。
 
 ## Phase F: 代码结构收敛
 
-目标：减少重复页面逻辑，为后续优化留出空间。
+目标：减少重复页面逻辑，为后续优化留出空间，但保持有限范围、可测试、每次只抽一个边界。
 
-优先候选：
+背景：Entry 30 和 Entry 31 已经抽取了 `feedback-actions.ts`、`useAudioRecorder` 和 `ChatUIStates.tsx`。后续 Phase F 不应继续大面积搬文件，而是针对仍然重复或职责不清的点做小步收敛。
 
-- 普通练习与模拟考试的反馈生成逻辑
-- 语音录音/发音评估调用逻辑
-- 练习结束后的 saveSession、updateErrorPatterns、recordProgress
-- 重复的 loading / empty / error UI
+已完成：
 
-验收：
-- 每次只抽一个明确边界。
-- 抽象必须有测试或至少通过现有质量门。
+- [x] 普通练习和模拟考试的反馈生成/保存共用逻辑。
+- [x] `saveSession`、`updateErrorPatterns`、`recordProgress` 的组合入口初步收敛到 `saveSessionAndUpdateLearning`。
+- [x] 语音录音边界抽取到 `useAudioRecorder`。
+- [x] 跟读练习改用共享录音和发音评估调用。
+- [x] 聊天 loading / error / suspense / feedback loading UI 抽到 `ChatUIStates.tsx`。
+
+### F1. 练习结束保存流程边界复查
+
+具体任务：
+
+- [ ] Review `saveSessionAndUpdateLearning` 是否职责过宽。
+- [ ] 明确 `saveSession`、`updateErrorPatterns`、`recordProgress` 的成功/失败处理边界。
+- [ ] 检查普通练习和模拟考试是否对保存失败给出一致反馈。
+- [ ] 若要改，只调整一个边界，例如统一错误返回结构。
+
+候选文件：
+
+- `src/lib/feedback-actions.ts`
+- `src/app/practice/page.tsx`
+- `src/app/practice/exam/page.tsx`
+- `src/lib/unified-history.ts`
+- `src/lib/error-patterns.ts`
+- `src/lib/supabase-progress.ts`
+
+风险点：
+
+- 保存流程失败可能影响历史、统计、推荐三个区域。
+- 把太多职责塞进一个 helper 会让后续调试困难。
+
+验收标准：
+
+- [ ] 职责边界有明确结论。
+- [ ] 如果改代码，普通练习和模拟考试均能结束并保存。
+- [ ] 至少通过 lint、typecheck、unit test。
+
+不做：
+
+- 不一次性重写数据层。
+- 不大规模重命名保存相关文件。
+
+### F2. setup 页面重复 UI 逻辑收敛
+
+具体任务：
+
+- [ ] Review `/practice/setup` 中 CTA、mode card、topic selector 是否存在重复结构。
+- [ ] 如确有重复，只抽一个小组件或 helper。
+- [ ] 保持页面文案、i18n key 和 URL 参数行为不变。
+- [ ] 补充或更新 setup 页面测试。
+
+候选文件：
+
+- `src/app/practice/setup/page.tsx`
+- `src/app/practice/setup/page.test.tsx`
+- `src/lib/i18n.tsx`
+- `src/locales/en.json`
+- `src/locales/zh.json`
+
+风险点：
+
+- setup 页面承载普通练习、跟读、专项目标等入口，抽象过度会降低可读性。
+- URL 参数拼接一旦回归，会打断学习闭环。
+
+验收标准：
+
+- [ ] URL 参数行为不变。
+- [ ] setup 页面测试通过。
+- [ ] 不引入新的视觉风格。
+
+不做：
+
+- 不为了抽象而抽象。
+- 不把 setup 页面重写成全新流程。
+
+### F3. UI 状态组件使用范围复查
+
+具体任务：
+
+- [ ] 检查 `ChatUIStates.tsx` 是否只服务聊天/反馈场景。
+- [ ] 判断 history/stats/settings 是否存在类似 loading/empty/error，但不要强行复用聊天组件。
+- [ ] 若需要共享，另开更通用的边界，例如 `EmptyState`，且只改一个页面。
+
+候选文件：
+
+- `src/components/ChatUIStates.tsx`
+- `src/app/history/page.tsx`
+- `src/app/stats/page.tsx`
+- `src/app/settings/page.tsx`
+
+风险点：
+
+- 聊天状态组件和列表/统计空状态语义不同，盲目复用会让 UI 变怪。
+- 通用组件太早抽象会增加 props 复杂度。
+
+验收标准：
+
+- [ ] 明确是否继续复用或停止扩散。
+- [ ] 如果抽象新组件，只覆盖一个实际重复场景。
+- [ ] 现有页面视觉不回归。
+
+不做：
+
+- 不一次性重构多个页面。
+- 不创建过度通用的“万能状态组件”。
 
 ## 明确不做
 
 下一阶段默认不做：
 
-- 支付、订阅、商业化运营配置
-- 排行榜、学习小组、分享等社交功能
-- 大规模视觉重写
-- 未 mock 的真实 LLM/Azure E2E 测试
-- 移动端专项优化（推迟到网页端核心体验完善后）
+- 支付。
+- 订阅。
+- 商业化运营配置。
+- 排行榜。
+- 学习小组。
+- 分享/社交。
+- 大规模视觉重写。
+- 未 mock 的真实 LLM/Azure/Supabase E2E。
+- 依赖真实 API key 的 CI。
+- 移动端专项优化，除非桌面端核心质量门已稳定或发现严重阻塞问题。
+- Python 重写或大规模技术栈迁移，除非另开明确迁移任务。
 
-## 推荐下一步
+## 推荐下一项开发任务
 
-下一项建议做：
-
-**Phase D1: CI 工作流。**
+**Phase D3: E2E mock 规划。**
 
 原因：
 
-- Phase A（学习闭环统一）、B（历史与统计页学习化）、桌面端统一均已完成。
-- 移动端暂不优先，下一步应建立自动化质量门，确保后续改动不会引入回归。
-- CI 建立后，再考虑 Phase E（数据同步稳定性）和 Phase F（代码结构收敛）。
+- Phase A、B、D1、D2 和桌面端统一已经完成。
+- CI 已存在，不应重复实现。
+- Phase E/F 后续改动会继续触碰核心路径，先规划 E2E mock 能降低后续回归风险。
+- 该任务只需要文档和少量代码阅读，不需要安装 Playwright，不会引入新的依赖或外部 API 风险。
+
+建议交付物：
+
+- 更新 `docs/NEXT_OPTIMIZATION_PLAN.md` 或 README 中的 E2E 规划章节。
+- 列出 `/`、`/practice/setup`、`/practice`、`/practice/exam`、`/history`、`/stats` 的 smoke path。
+- 明确 LLM、Azure pronunciation、Supabase auth/history、audio recording 的 mock 方案。
+- 明确是否安装 Playwright 的判断条件。

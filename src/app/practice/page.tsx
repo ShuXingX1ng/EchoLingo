@@ -11,6 +11,7 @@ import VoiceOutput from "@/components/VoiceOutput";
 import VoiceControls from "@/components/VoiceControls";
 import DesktopNav from "@/components/DesktopNav";
 import FeedbackPanel from "@/components/FeedbackPanel";
+import { ChatLoadingIndicator, ChatErrorBanner, SuspenseFallback, FeedbackLoadingIndicator } from "@/components/ChatUIStates";
 
 const INITIAL_QUESTIONS: Record<string, string> = {
   part1: "Let's talk about your hometown. Where is your hometown?",
@@ -32,17 +33,7 @@ function createInitialQuestion(mode: string): ChatMessage {
 
 export default function PracticePageWrapper() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<SuspenseFallback />}>
       <PracticePage />
     </Suspense>
   );
@@ -366,52 +357,10 @@ function PracticePage() {
             </div>
           ))}
 
-          {isLoading && (
-            <div className="flex justify-start animate-message-in">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200 dark:border-gray-700 shadow-sm min-w-[200px]">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
-                  {t("practice.examiner")}
-                </p>
-                <div className="space-y-2">
-                  <div className="h-3 w-3/4 rounded animate-shimmer" />
-                  <div className="h-3 w-1/2 rounded animate-shimmer" style={{ animationDelay: "0.1s" }} />
-                </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
-                    <div
-                      className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <div
-                      className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                  </div>
-                  <span className="text-xs text-emerald-500 dark:text-emerald-400">{t("practice.thinking")}</span>
-                </div>
-              </div>
-            </div>
-          )}
+          {isLoading && <ChatLoadingIndicator />}
 
           {/* Error Message */}
-          {error && (
-            <div className="flex justify-center px-4 animate-message-in">
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 max-w-md">
-                <div className="flex items-start gap-3">
-                  <span className="text-red-500 mt-0.5">⚠</span>
-                  <div>
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {error}
-                    </p>
-                    <p className="text-xs text-red-500 dark:text-red-500 mt-1">
-                      Make sure your .env.local file is configured correctly.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {error && <ChatErrorBanner error={error} />}
 
           <div ref={messagesEndRef} />
         </div>
@@ -488,22 +437,7 @@ function PracticePage() {
           ) : (
             <div className="text-center py-2">
               {isFeedbackLoading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
-                    <div
-                      className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.15s" }}
-                    />
-                    <div
-                      className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.3s" }}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t("practice.generating")}
-                  </p>
-                </div>
+                <FeedbackLoadingIndicator />
               ) : feedback ? (
                 <button
                   onClick={() => (window.location.href = "/practice")}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import VoiceVisualizer from "./VoiceVisualizer";
-import { encodeWAV } from "@/lib/audio-utils";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 
 type VoiceState = "idle" | "listening" | "processing" | "speaking";
 
@@ -35,10 +35,8 @@ export default function VoiceControls({
   const recognitionRef = useRef<RecognitionInstance | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
-  const audioDataRef = useRef<Float32Array[]>([]);
+
+  const { startRecording, stopRecording } = useAudioRecorder();
 
   useEffect(() => {
     const SR =
@@ -74,30 +72,6 @@ export default function VoiceControls({
     setElapsedTime(0);
   }, []);
 
-  const stopAudioRecording = useCallback(() => {
-    // Stop audio recording and generate WAV
-    if (scriptProcessorRef.current) {
-      scriptProcessorRef.current.disconnect();
-      scriptProcessorRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    // Generate WAV file from recorded audio data
-    if (onAudioResult && audioDataRef.current.length > 0) {
-      const wavBlob = encodeWAV(audioDataRef.current, 16000);
-      console.log("WAV audio generated:", { size: wavBlob.size, type: wavBlob.type });
-      onAudioResult(wavBlob);
-      audioDataRef.current = [];
-    }
-  }, [onAudioResult]);
-
   const startTimer = useCallback(() => {
     stopTimer();
     startTimeRef.current = Date.now();
@@ -125,42 +99,7 @@ export default function VoiceControls({
     // Start audio recording if onAudioResult is provided
     if (onAudioResult) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            sampleRate: 16000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        });
-
-        mediaStreamRef.current = stream;
-        audioDataRef.current = [];
-
-        // Create AudioContext for WAV recording
-        const audioContext = new AudioContext({ sampleRate: 16000 });
-        audioContextRef.current = audioContext;
-
-        const source = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        scriptProcessorRef.current = processor;
-
-        const MAX_AUDIO_CHUNKS = 1000; // 限制最大音频块数量 (~60秒@16kHz)
-        processor.onaudioprocess = (e) => {
-          const inputData = e.inputBuffer.getChannelData(0);
-          // Copy the data
-          const data = new Float32Array(inputData.length);
-          data.set(inputData);
-          // 限制内存使用，防止无限增长
-          if (audioDataRef.current.length < MAX_AUDIO_CHUNKS) {
-            audioDataRef.current.push(data);
-          }
-        };
-
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-
-        console.log("Audio recording started with AudioContext");
+        await startRecording();
       } catch (error) {
         console.error("Failed to start audio recording:", error);
       }
@@ -199,12 +138,18 @@ export default function VoiceControls({
     recognition.onerror = () => {
       setInterimText("");
       setState("idle");
-      stopAudioRecording();
+      if (onAudioResult) {
+        const blob = stopRecording();
+        if (blob) onAudioResult(blob);
+      }
     };
 
     recognition.onend = () => {
       setInterimText("");
-      stopAudioRecording();
+      if (onAudioResult) {
+        const blob = stopRecording();
+        if (blob) onAudioResult(blob);
+      }
       // Only go to idle if we're still in listening state
       // If onResult was called, parent will set isProcessing=true
       setState((prev) => (prev === "listening" ? "idle" : prev));
@@ -215,18 +160,21 @@ export default function VoiceControls({
     setState("listening");
     setInterimText("");
     startTimer(); // 开始计时
-  }, [isSupported, disabled, isProcessing, onResult, onAudioResult, startTimer, stopAudioRecording]);
+  }, [isSupported, disabled, isProcessing, onResult, onAudioResult, startTimer, startRecording, stopRecording]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
-    stopAudioRecording();
+    if (onAudioResult) {
+      const blob = stopRecording();
+      if (blob) onAudioResult(blob);
+    }
     stopTimer(); // 停止计时
     setState("idle");
     setInterimText("");
-  }, [stopTimer, stopAudioRecording]);
+  }, [stopTimer, stopRecording, onAudioResult]);
 
   const handleMainButton = () => {
     if (state === "listening") {
