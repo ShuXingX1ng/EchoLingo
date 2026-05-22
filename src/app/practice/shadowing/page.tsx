@@ -6,23 +6,14 @@ import { useTranslation } from "@/lib/i18n";
 import { useShadowingPractice, type ShadowingMode } from "@/hooks/useShadowingPractice";
 import { TOPICS, getCategories } from "@/lib/topics";
 import DesktopNav from "@/components/DesktopNav";
+import { SuspenseFallback } from "@/components/ChatUIStates";
 import ShadowingProgress from "@/components/ShadowingProgress";
 import ShadowingSentenceCard from "@/components/ShadowingSentenceCard";
 import ShadowingSummary from "@/components/ShadowingSummary";
 
 export default function ShadowingPageWrapper() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<SuspenseFallback />}>
       <ShadowingPage />
     </Suspense>
   );

@@ -227,6 +227,9 @@
 - [x] 抽取普通练习与模拟考试的反馈生成/保存共用逻辑
 - [x] 抽取语音录音与发音评估调用边界
 - [x] 收敛重复 loading / empty / error UI
+- [x] F1: 练习结束保存流程边界复查 — 职责边界合理，无需重构
+- [x] F2: setup/shadowing 页面 Suspense fallback 统一使用共享组件
+- [x] F3: UI 状态组件使用范围复查 — ChatUIStates 范围合理，不做强行抽象
 
 ### Future / Backlog
 

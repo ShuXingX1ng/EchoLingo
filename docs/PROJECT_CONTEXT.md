@@ -428,7 +428,7 @@ src/
 - ~~桌面端网页统一：共享导航、颜色/宽度/i18n 统一~~ ✅
 - ~~代码结构收敛：反馈保存逻辑抽取、语音录音边界抽取、重复 UI 收敛~~ ✅
 - ~~测试与 CI：组件测试扩展、CI 质量门、E2E mock 规划~~ ✅
-- 数据与云端同步稳定性：已修复反馈保存、历史页读取、统计页读取的 P0 unified-history 路径，统一本地 Session ID 生成与本地 mode 保存，并补齐 error-patterns 备份/恢复；后续可继续推进更深的云端 error-patterns 同步或移动端流程打磨
+- ~~数据与云端同步稳定性：feedback-actions/history/stats 改用 unified-history，Session ID 统一，备份 error-patterns~~ ✅
 - 网页端交互打磨：练习流程、反馈展示、历史回看的桌面端体验优化
 
 **暂缓（移动端优化）**:

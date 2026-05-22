@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { TOPICS, getCategories } from "@/lib/topics";
 import { useTranslation } from "@/lib/i18n";
 import DesktopNav from "@/components/DesktopNav";
+import { SuspenseFallback } from "@/components/ChatUIStates";
 
 type PracticeMode = "part1" | "part2" | "part3" | "full";
 type TrainingType = "drill" | "exam" | "shadowing";
@@ -38,17 +39,7 @@ const trainingTypes: Array<{
 
 export default function PracticeSetupPageWrapper() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<SuspenseFallback />}>
       <PracticeSetupPage />
     </Suspense>
   );

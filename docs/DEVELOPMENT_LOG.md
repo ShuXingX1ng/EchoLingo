@@ -1398,3 +1398,38 @@ import type { SavedSession } from "@/lib/history";
 - `npm run lint` 通过。
 - `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试。
 - `npm run build` 通过。
+
+---
+
+### Entry 39: Phase F 代码结构收敛完成
+
+**完成阶段**: Phase F 代码结构收敛
+
+**完成内容**:
+
+**F1. 练习结束保存流程边界复查**:
+- 审查 `saveSessionAndUpdateLearning` 职责：发音评估、会话保存、错误模式更新、进度记录
+- 各子操作委托给专用模块（unified-history、error-patterns、supabase-progress）
+- practice 和 exam 页面错误处理一致（try-catch + 错误消息展示）
+- 结论：函数职责边界合理，无需重构
+
+**F2. setup 页面重复 UI 逻辑收敛**:
+- `practice/setup/page.tsx` 内联 Suspense fallback 改用共享 `SuspenseFallback` 组件
+- `practice/shadowing/page.tsx` 同步修复，统一使用 `SuspenseFallback`
+- 与 `practice/page.tsx` 和 `practice/exam/page.tsx` 保持一致
+
+**F3. UI 状态组件使用范围复查**:
+- `ChatUIStates` 组件仅用于聊天/反馈场景（practice、exam、shadowing、setup），范围合理
+- History/Stats 的 loading/empty 状态语义不同于聊天场景（页面级数据加载 vs AI 思考）
+- 各页面空状态内容独特（不同图标、文案、CTA），不适合强行抽象
+- 结论：当前分离适当，无需创建通用 EmptyState 组件
+
+**关键文件**:
+- `src/app/practice/setup/page.tsx` — Suspense fallback 统一
+- `src/app/practice/shadowing/page.tsx` — Suspense fallback 统一
+- `src/components/ChatUIStates.tsx` — 共享 UI 状态组件（已存在）
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试
