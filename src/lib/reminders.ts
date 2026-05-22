@@ -90,7 +90,7 @@ export function getStreakDays(): number {
 
   // Check if practiced today; if not, start checking from yesterday
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  let checkDate = new Date(today);
+  const checkDate = new Date(today);
 
   if (!practiceDates.has(todayStr)) {
     checkDate.setDate(checkDate.getDate() - 1);

@@ -11,7 +11,7 @@ const translations: Record<Locale, Record<string, string>> = { en, zh };
 interface I18nContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -22,10 +22,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
-    if (stored && (stored === "en" || stored === "zh")) {
-      setLocaleState(stored);
-    }
+    const id = window.setTimeout(() => {
+      const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
+      if (stored && (stored === "en" || stored === "zh")) {
+        setLocaleState(stored);
+        document.documentElement.lang = stored;
+      }
+    }, 0);
+
+    return () => window.clearTimeout(id);
   }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
@@ -35,8 +40,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string): string => {
-      return translations[locale][key] || key;
+    (key: string, params?: Record<string, string | number>): string => {
+      let value = translations[locale][key] || key;
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          value = value.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+        });
+      }
+      return value;
     },
     [locale]
   );

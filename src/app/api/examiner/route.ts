@@ -3,6 +3,22 @@ import { getTopicById } from "@/lib/topics";
 
 const API_TIMEOUT = 60000; // 60 秒超时
 
+type LlmContentBlock = {
+  text?: string;
+};
+
+type LlmResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string;
+      reasoning_content?: string;
+    };
+  }>;
+  content?: LlmContentBlock[];
+  response?: string;
+  message?: string;
+};
+
 function getSystemPrompt(mode: string, topicId?: string): string {
   const topic = topicId ? getTopicById(topicId) : undefined;
 
@@ -79,27 +95,6 @@ Part 1 Rules:
 - Ask 1-2 follow-up questions per topic before moving to a new topic.
 ${topic ? `\nTopic: ${topic.name}\nSample questions:\n${topic.part1Questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}` : ""}`;
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractMessage(data: any): string {
-  // OpenAI / DeepSeek format
-  if (data.choices && data.choices.length > 0) {
-    return data.choices[0]?.message?.content || "";
-  }
-  // Some providers return content as array
-  if (data.content && Array.isArray(data.content)) {
-    return data.content.map((c: any) => c.text || "").join("");
-  }
-  // Some providers use 'response' field
-  if (data.response) {
-    return data.response;
-  }
-  // Some providers use 'message' field
-  if (data.message && typeof data.message === "string") {
-    return data.message;
-  }
-  return "";
 }
 
 export async function POST(request: Request) {
@@ -189,7 +184,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as LlmResponse;
     console.log("LLM response:", JSON.stringify(data).substring(0, 500));
 
     // Handle different response formats
@@ -205,7 +200,7 @@ export async function POST(request: Request) {
       }
     } else if (data.content && Array.isArray(data.content)) {
       // Some providers return content as array
-      message = data.content.map((c: any) => c.text || "").join("");
+      message = data.content.map((c) => c.text || "").join("");
     } else if (data.response) {
       // Some providers use 'response' field
       message = data.response;

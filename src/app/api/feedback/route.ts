@@ -2,6 +2,21 @@ import { NextResponse } from "next/server";
 
 const API_TIMEOUT = 120000; // 120 秒超时（反馈生成需要更长时间）
 
+type LlmContentBlock = {
+  text?: string;
+};
+
+type LlmResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  content?: LlmContentBlock[];
+  response?: string;
+  message?: string;
+};
+
 const EVALUATOR_SYSTEM_PROMPT = `You are an IELTS Speaking evaluator.
 
 Your task is to evaluate the user's speaking practice transcript.
@@ -44,14 +59,13 @@ Focus on the most impactful errors. If the candidate made few errors, include fe
 
 Be helpful, specific, and realistic. Do not be too harsh, but do not overestimate the user's score.`;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractMessage(data: any): string {
+function extractMessage(data: LlmResponse): string {
   if (data.choices && data.choices.length > 0) {
     const choice = data.choices[0]?.message;
     return choice?.content || "";
   }
   if (data.content && Array.isArray(data.content)) {
-    return data.content.map((c: any) => c.text || "").join("");
+    return data.content.map((c) => c.text || "").join("");
   }
   if (data.response) {
     return data.response;
@@ -154,7 +168,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as LlmResponse;
     console.log("Feedback LLM response:", JSON.stringify(data).substring(0, 500));
 
     const content = extractMessage(data);
@@ -171,7 +185,7 @@ export async function POST(request: Request) {
     try {
       const feedback = JSON.parse(content);
       return NextResponse.json(feedback);
-    } catch (parseError) {
+    } catch {
       console.error("Failed to parse LLM response as JSON:", content);
       // Try to extract JSON from the response if it has extra text
       const jsonMatch = content.match(/\{[\s\S]*\}/);

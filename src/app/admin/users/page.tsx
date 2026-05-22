@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { fetchAllProfiles, updateUserRole, type Profile } from "@/lib/admin";
 
@@ -10,16 +10,16 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    loadProfiles();
-  }, []);
-
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     setLoading(true);
     const data = await fetchAllProfiles();
     setProfiles(data);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
 
   const handleRoleChange = async (userId: string, newRole: "user" | "admin") => {
     const success = await updateUserRole(userId, newRole);
@@ -95,10 +95,11 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {profile.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt={profile.full_name}
-                          className="w-8 h-8 rounded-full"
+                        <span
+                          role="img"
+                          aria-label={profile.full_name || profile.email || "User avatar"}
+                          className="h-8 w-8 rounded-full bg-cover bg-center"
+                          style={{ backgroundImage: `url(${profile.avatar_url})` }}
                         />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">

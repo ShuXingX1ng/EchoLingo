@@ -33,15 +33,15 @@ export default function ShadowingProgress({
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
                 isCurrent
-                  ? "bg-blue-600 text-white ring-2 ring-blue-300 dark:ring-blue-700"
+                  ? "bg-slate-950 text-white ring-2 ring-slate-300 dark:bg-white dark:text-slate-950 dark:ring-slate-700"
                   : isCompleted
                   ? `${getScoreColor(score)} text-white`
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
               }`}
             >
               {isCompleted ? score : i + 1}
             </div>
-            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">
               {t("shadowing.progress.sentence")} {i + 1}
             </span>
           </div>

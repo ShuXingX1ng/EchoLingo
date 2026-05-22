@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage, SessionFeedback, PronunciationAssessmentResult } from "@/types";
 import { saveSession } from "@/lib/history";
@@ -12,9 +11,8 @@ import { useTranslation } from "@/lib/i18n";
 import VoiceInput from "@/components/VoiceInput";
 import VoiceOutput from "@/components/VoiceOutput";
 import VoiceControls from "@/components/VoiceControls";
-import MuteButton from "@/components/MuteButton";
-import ErrorAnnotations from "@/components/ErrorAnnotations";
-import PronunciationFeedback from "@/components/PronunciationFeedback";
+import DesktopNav from "@/components/DesktopNav";
+import FeedbackPanel from "@/components/FeedbackPanel";
 
 const INITIAL_QUESTIONS: Record<string, string> = {
   part1: "Let's talk about your hometown. Where is your hometown?",
@@ -25,15 +23,24 @@ const INITIAL_QUESTIONS: Record<string, string> = {
 
 const MAX_ANSWER_TIME = 60; // 最大回答时间（秒）
 
+function createInitialQuestion(mode: string): ChatMessage {
+  return {
+    id: "1",
+    role: "examiner",
+    content: INITIAL_QUESTIONS[mode] || INITIAL_QUESTIONS.part1,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export default function PracticePageWrapper() {
   return (
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-screen">
           <div className="flex gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
           </div>
         </div>
       }
@@ -50,7 +57,9 @@ function PracticePage() {
   const { user } = useAuth();
   const { t } = useTranslation();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    createInitialQuestion(practiceMode),
+  ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSessionEnded, setIsSessionEnded] = useState(false);
@@ -59,7 +68,6 @@ function PracticePage() {
   const [error, setError] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const lastAudioBlobRef = useRef<Blob | null>(null);
   const lastUserMessageRef = useRef<string>("");
 
@@ -67,18 +75,7 @@ function PracticePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, feedback]);
 
-  useEffect(() => {
-    const initialQuestion = INITIAL_QUESTIONS[practiceMode] || INITIAL_QUESTIONS.part1;
-    const firstQuestion: ChatMessage = {
-      id: "1",
-      role: "examiner",
-      content: initialQuestion,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages([firstQuestion]);
-  }, [practiceMode]);
-
-  const fetchExaminerResponse = async (currentMessages: ChatMessage[]) => {
+  const fetchExaminerResponse = useCallback(async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/examiner", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -102,9 +99,9 @@ function PracticePage() {
 
     const data = await response.json();
     return data.message as string;
-  };
+  }, [practiceMode, topicId]);
 
-  const fetchFeedback = async (currentMessages: ChatMessage[]) => {
+  const fetchFeedback = useCallback(async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -126,7 +123,7 @@ function PracticePage() {
     }
 
     return response.json() as Promise<SessionFeedback>;
-  };
+  }, []);
 
   const fetchPronunciationAssessment = async (
     audioBlob: Blob,
@@ -358,56 +355,56 @@ function PracticePage() {
   }, [isLoading, isSessionEnded, messages, fetchExaminerResponse]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen flex-col bg-slate-50 dark:bg-slate-950">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+      <DesktopNav
+        active="practice"
+        maxWidth="4xl"
+        rightContent={
+          !isSessionEnded ? (
+            <button
+              onClick={handleEndSession}
+              disabled={isLoading}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
             >
-              ← {t("nav.home")}
-            </Link>
-            <div>
-              <h1 className="font-semibold text-gray-900 dark:text-white">
-                {t("practice.title")}
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t("practice.part1")}
-              </p>
-            </div>
+              {t("practice.endSession")}
+            </button>
+          ) : undefined
+        }
+      />
+
+      <div className="border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
+        <div className="mx-auto grid max-w-4xl gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Session goal
+            </p>
+            <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
+              Give clear, extended answers
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <MuteButton />
-            <Link
-              href="/history"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              {t("nav.history")}
-            </Link>
-            <Link
-              href="/stats"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              {t("nav.stats")}
-            </Link>
-            {!isSessionEnded && (
-              <button
-                onClick={handleEndSession}
-                disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {t("practice.endSession")}
-              </button>
-            )}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Evidence collected
+            </p>
+            <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
+              {messages.filter((message) => message.role === "user").length} candidate answers
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              {t("practice.input")}
+            </p>
+            <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
+              {inputMode === "voice" ? t("practice.voiceConversation") : t("practice.textOrDictated")}
+            </p>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="mx-auto max-w-4xl space-y-4">
           {messages.length === 0 && !isLoading && (
             <div className="text-center py-12">
               <p className="text-gray-500 dark:text-gray-400">
@@ -427,7 +424,7 @@ function PracticePage() {
               <div
                 className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-blue-600 text-white rounded-br-md"
+                    ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md"
                     : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm"
                 }`}
               >
@@ -461,17 +458,17 @@ function PracticePage() {
                 </div>
                 <div className="flex items-center gap-2 mt-3">
                   <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
                     <div
-                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.1s" }}
                     />
                     <div
-                      className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.2s" }}
                     />
                   </div>
-                  <span className="text-xs text-blue-500 dark:text-blue-400">{t("practice.thinking")}</span>
+                  <span className="text-xs text-emerald-500 dark:text-emerald-400">{t("practice.thinking")}</span>
                 </div>
               </div>
             </div>
@@ -501,8 +498,8 @@ function PracticePage() {
       </div>
 
       {/* Input Area or Session End */}
-      <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
-        <div className="max-w-3xl mx-auto">
+      <div className="border-t border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+        <div className="mx-auto max-w-4xl">
           {!isSessionEnded ? (
             <>
               {/* Mode Toggle */}
@@ -544,13 +541,13 @@ function PracticePage() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder={t("practice.inputPlaceholder")}
-                    className="flex-1 px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow"
+                    className="flex-1 px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 transition-shadow"
                     disabled={isLoading}
                   />
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading}
-                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {t("practice.send")}
                   </button>
@@ -573,13 +570,13 @@ function PracticePage() {
               {isFeedbackLoading ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
                     <div
-                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.15s" }}
                     />
                     <div
-                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce"
                       style={{ animationDelay: "0.3s" }}
                     />
                   </div>
@@ -590,7 +587,7 @@ function PracticePage() {
               ) : feedback ? (
                 <button
                   onClick={() => (window.location.href = "/practice")}
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
                 >
                   {t("practice.newSession")}
                 </button>
@@ -601,7 +598,7 @@ function PracticePage() {
                   </p>
                   <button
                     onClick={() => (window.location.href = "/practice")}
-                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
                   >
                     {t("practice.tryAgain")}
                   </button>
@@ -613,151 +610,13 @@ function PracticePage() {
       </div>
 
       {/* Feedback Panel */}
-      {feedback && <FeedbackPanel feedback={feedback} />}
-    </div>
-  );
-}
-
-function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {t("feedback.title")}
-            </h2>
-            <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-4 py-1.5 rounded-full text-sm font-semibold">
-              Band {feedback.estimatedBand}
-            </div>
-          </div>
-
-          <div className="space-y-5">
-            <FeedbackSection
-              title={t("feedback.fluency")}
-              content={feedback.fluencyAndCoherence}
-            />
-            <FeedbackSection
-              title={t("feedback.vocabulary")}
-              content={feedback.lexicalResource}
-            />
-            <FeedbackSection
-              title={t("feedback.grammar")}
-              content={feedback.grammarRangeAndAccuracy}
-            />
-            <FeedbackSection
-              title={t("feedback.pronunciation")}
-              content={feedback.pronunciation}
-            />
-
-            {feedback.pronunciationAssessment && (
-              <PronunciationFeedback assessment={feedback.pronunciationAssessment} />
-            )}
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.strengths")}
-              </h3>
-              <ul className="space-y-2">
-                {feedback.strengths.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.weaknesses")}
-              </h3>
-              <ul className="space-y-2">
-                {feedback.weaknesses.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="text-orange-500 mt-0.5">→</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.suggestions")}
-              </h3>
-              <ol className="space-y-2">
-                {feedback.improvementSuggestions.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="font-medium text-blue-500">{i + 1}.</span>
-                    {item}
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.sampleAnswer")}
-              </h3>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {feedback.improvedSampleAnswer}
-                </p>
-              </div>
-            </div>
-
-            {feedback.errorAnnotations && (
-              <ErrorAnnotations annotations={feedback.errorAnnotations} />
-            )}
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={() => (window.location.href = "/practice")}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              {t("practice.newSession")}
-            </button>
-            <button
-              onClick={() => (window.location.href = "/history")}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              {t("nav.history")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeedbackSection({
-  title,
-  content,
-}: {
-  title: string;
-  content: string;
-}) {
-  return (
-    <div>
-      <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-        {title}
-      </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-        {content}
-      </p>
+      {feedback && (
+        <FeedbackPanel
+          feedback={feedback}
+          primaryActionHref="/practice/setup"
+          primaryActionLabel={t("practice.newSession")}
+        />
+      )}
     </div>
   );
 }

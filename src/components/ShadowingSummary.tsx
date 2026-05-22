@@ -46,14 +46,14 @@ export default function ShadowingSummary({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="p-6 sm:p-8">
           {/* Header */}
           <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
               {t("shadowing.summary.title")}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {topicName}
             </p>
           </div>
@@ -66,7 +66,7 @@ export default function ShadowingSummary({
               <span className={`text-3xl font-bold ${getScoreColor(averageScore)}`}>
                 {averageScore}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {getScoreLabel(averageScore)}
               </span>
             </div>
@@ -74,20 +74,20 @@ export default function ShadowingSummary({
 
           {/* Sentence-by-sentence results */}
           <div className="space-y-3 mb-6">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
               {t("shadowing.summary.details")}
             </h3>
             {results.map((result, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl"
               >
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${getScoreBgColor(result.score)} ${getScoreColor(result.score)}`}
                 >
                   {result.score}
                 </div>
-                <p className="flex-1 text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                <p className="flex-1 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">
                   {result.sentence}
                 </p>
               </div>
@@ -98,13 +98,13 @@ export default function ShadowingSummary({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={onRestart}
-              className="flex-1 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+              className="flex-1 px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
             >
               {t("shadowing.summary.restart")}
             </button>
             <button
               onClick={onHome}
-              className="flex-1 px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex-1 px-6 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               {t("shadowing.summary.backHome")}
             </button>

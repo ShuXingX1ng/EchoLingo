@@ -1,66 +1,71 @@
 # EchoLingo
 
-AI-powered IELTS Speaking practice app that helps learners practice with an AI examiner, receive structured feedback, and improve their speaking confidence.
+AI-powered IELTS Speaking practice app for text, voice, mock-exam, and shadowing practice.
 
 ## Features
 
-- **AI Examiner**: Practice IELTS Speaking Part 1 with an AI that asks questions and follows up based on your answers
-- **Band Score Estimate**: Get an estimated IELTS Speaking band score after each session
-- **Detailed Feedback**: Receive feedback on fluency, vocabulary, grammar, and pronunciation
-- **Practice History**: Review past sessions with full transcripts and feedback
-- **Responsive Design**: Works on desktop and mobile devices
+- **AI examiner**: Practice IELTS Speaking Part 1, Part 2, and Part 3 with an OpenAI-compatible LLM examiner.
+- **Full mock exam**: Run a Part 1 -> Part 2 -> Part 3 flow with stage indicators and Part 2 preparation/speaking timers.
+- **Structured feedback**: Receive estimated IELTS band scores, skill-dimension feedback, strengths, weaknesses, improved sample answers, and grammar/vocabulary/fluency/pronunciation error annotations.
+- **Voice practice**: Use browser STT for speech input and Azure Neural TTS for examiner speech output.
+- **Pronunciation assessment**: Use Azure Pronunciation Assessment for overall, accuracy, fluency, completeness, word-level, and phoneme-level feedback.
+- **Shadowing practice**: Listen to standard pronunciation, record a repeat, and review a pronunciation summary plus sentence-level results.
+- **Practice history**: Store sessions locally, sync authenticated sessions with Supabase, search/filter history, export/import data, and replay saved recordings.
+- **Progress tools**: Track statistics, goals, streaks, exam countdown, daily reminders, and personalized learning recommendations.
+- **Platform features**: Supabase email/Google auth, admin topic/user management, dark mode, PWA support, and English/Chinese UI.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16, React, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
 - **Backend**: Next.js API Routes
 - **AI**: OpenAI-compatible Chat Completions API
-- **Storage**: Browser localStorage for session history
+- **Speech**: Azure Speech SDK for Neural TTS and Pronunciation Assessment, Web Speech API for STT
+- **Storage**: Supabase PostgreSQL/Auth plus browser localStorage and IndexedDB
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
+- npm
 - An API key from an OpenAI-compatible provider
+- Azure Speech Services key and region for TTS/pronunciation features
+- Supabase project URL and anon key for auth/cloud sync
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/echolingo.git
 cd echolingo
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Set up environment variables:
-```bash
 cp .env.example .env.local
 ```
 
-4. Edit `.env.local` with your API configuration:
+Edit `.env.local`:
+
 ```env
 LLM_API_KEY=your_api_key_here
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
+
+AZURE_SPEECH_KEY=your_azure_speech_key
+AZURE_SPEECH_REGION=eastus
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### Supported API Providers
+### Supported LLM Providers
 
-| Provider | Base URL | Recommended Model |
-|----------|----------|-------------------|
+| Provider | Base URL | Example Model |
+|----------|----------|---------------|
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 | DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
-| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-turbo` |
-| 智谱 AI | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` |
-| 月之暗面 | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| Tongyi Qianwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-turbo` |
+| Zhipu AI | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` |
+| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
 | Groq | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` |
-| Ollama (local) | `http://localhost:11434/v1` | `qwen2.5:7b` |
+| Ollama local | `http://localhost:11434/v1` | `qwen2.5:7b` |
 
 ### Running the App
 
@@ -68,81 +73,75 @@ LLM_MODEL=gpt-4o-mini
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser.
+Open http://localhost:3000.
 
-## How to Test the MVP Flow
+## Main Routes
 
-1. **Start the app**: Run `npm run dev` and open http://localhost:3000
-2. **Landing page**: Verify the EchoLingo title, tagline, and feature cards are displayed
-3. **Start practice**: Click "Start Practice" to go to the practice page
-4. **Answer questions**: Type answers to the examiner's IELTS Part 1 questions
-5. **Continue conversation**: Have 3-5 exchanges with the AI examiner
-6. **End session**: Click "End Session" in the header
-7. **View feedback**: Wait for feedback generation, then review your band score and suggestions
-8. **Check history**: Navigate to History page to see your saved session
-9. **Review session**: Click on a session to view the full transcript and feedback
+| Route | Purpose |
+|-------|---------|
+| `/` | Home dashboard with entry points, countdown, and practice status |
+| `/practice` | Core practice flow |
+| `/practice/setup` | Practice mode/topic setup |
+| `/practice/exam` | Full IELTS mock exam |
+| `/practice/shadowing` | Shadowing and pronunciation practice |
+| `/history` | Session history, filtering, export/import, recordings |
+| `/stats` | Practice statistics, goals, trends, recommendations |
+| `/settings` | Voice, language, reminders, and app settings |
+| `/login` | Supabase email/Google auth |
+| `/admin` | Protected admin area |
+| `/debug` | Development/debug utilities |
 
 ## Project Structure
 
-```
+```text
 src/
 ├── app/
 │   ├── api/
-│   │   ├── examiner/route.ts    # Examiner question generation
-│   │   └── feedback/route.ts    # Feedback generation
+│   │   ├── examiner/route.ts
+│   │   ├── feedback/route.ts
+│   │   ├── pronunciation/route.ts
+│   │   └── tts/route.ts
+│   ├── admin/
 │   ├── history/
-│   │   └── page.tsx             # Session history page
+│   ├── login/
 │   ├── practice/
-│   │   └── page.tsx             # Main practice page
-│   ├── globals.css              # Global styles
-│   ├── layout.tsx               # Root layout
-│   └── page.tsx                 # Landing page
+│   ├── settings/
+│   └── stats/
+├── components/
+│   ├── ErrorAnnotations.tsx
+│   ├── PronunciationFeedback.tsx
+│   ├── VoiceControls.tsx
+│   └── ...
+├── hooks/
 ├── lib/
-│   └── history.ts               # localStorage utility
+├── locales/
 └── types/
-    └── index.ts                 # TypeScript types
 ```
-
-## Current MVP Limitations
-
-- **Text-based only**: No voice input/output (planned for future)
-- **Part 1 only**: Currently supports IELTS Speaking Part 1 questions
-- **Local storage**: Session history is stored in browser localStorage only
-- **No user accounts**: No login or cloud sync (planned for future)
-- **Single language**: English only
-
-## Future Improvements
-
-- [ ] Voice-based practice with speech-to-text and text-to-speech
-- [ ] IELTS Speaking Part 2 and Part 3 support
-- [ ] User accounts with cloud sync
-- [ ] Pronunciation scoring with audio analysis
-- [ ] Progress tracking and analytics
-- [ ] Multi-language support
-- [ ] Mobile app
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `LLM_API_KEY` | API key for the LLM provider | Yes |
-| `LLM_BASE_URL` | Base URL for the LLM API (must be OpenAI-compatible) | Yes |
-| `LLM_MODEL` | Model name to use | Yes |
+| Variable | Description | Required For |
+|----------|-------------|--------------|
+| `LLM_API_KEY` | API key for the OpenAI-compatible LLM provider | AI examiner and feedback |
+| `LLM_BASE_URL` | Base URL for the OpenAI-compatible API | AI examiner and feedback |
+| `LLM_MODEL` | Chat model name | AI examiner and feedback |
+| `AZURE_SPEECH_KEY` | Azure Speech Services subscription key | TTS and pronunciation assessment |
+| `AZURE_SPEECH_REGION` | Azure Speech Services region, for example `eastus` | TTS and pronunciation assessment |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Auth and cloud sync |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon public key | Auth and cloud sync |
 
-## Contributing
+## Current Limitations
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+- Azure voice features require valid Speech Services credentials and network access.
+- Speech recognition depends on browser Web Speech API support.
+- Supabase-backed features require the database schema/migrations to be applied.
+- Payments, plans, social features, and other commercial operations are future/backlog items, not implemented runtime features.
 
-## License
+## Scripts
 
-This project is open source and available under the [MIT License](LICENSE).
-
-## Acknowledgments
-
-- Built with Next.js and Tailwind CSS
-- Powered by OpenAI-compatible APIs
-- Inspired by the need for accessible IELTS Speaking practice
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+```

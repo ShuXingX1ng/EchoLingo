@@ -1,5 +1,10 @@
 import { getSessions, type SavedSession } from "./history";
 
+export type WeakDimension = {
+  name: string;
+  count: number;
+};
+
 export type PracticeStats = {
   totalSessions: number;
   thisWeekSessions: number;
@@ -13,6 +18,9 @@ export type PracticeStats = {
   recentSessions: SavedSession[];
   bandHistory: { date: string; band: number }[];
   weeklyTrend: { week: string; count: number }[];
+  trendDirection: "up" | "down" | "stable";
+  weakDimensions: WeakDimension[];
+  practiceDays: number;
 };
 
 function getWeekStart(date: Date): Date {
@@ -62,6 +70,9 @@ export function calculateStats(): PracticeStats {
       recentSessions: [],
       bandHistory: [],
       weeklyTrend: [],
+      trendDirection: "stable",
+      weakDimensions: [],
+      practiceDays: 0,
     };
   }
 
@@ -126,6 +137,42 @@ export function calculateStats(): PracticeStats {
     });
   }
 
+  // Trend direction: compare last 5 sessions band avg vs previous 5
+  const recentBands = bandHistory.slice(-5).map((h) => h.band);
+  const previousBands = bandHistory.slice(-10, -5).map((h) => h.band);
+  let trendDirection: "up" | "down" | "stable" = "stable";
+  if (recentBands.length >= 3 && previousBands.length >= 3) {
+    const recentAvg = recentBands.reduce((a, b) => a + b, 0) / recentBands.length;
+    const previousAvg = previousBands.reduce((a, b) => a + b, 0) / previousBands.length;
+    const diff = recentAvg - previousAvg;
+    if (diff > 0.3) trendDirection = "up";
+    else if (diff < -0.3) trendDirection = "down";
+  }
+
+  // Weak dimensions from recent session weaknesses
+  const dimensionCounts: Record<string, number> = {};
+  for (const session of sessions.slice(0, 10)) {
+    if (session.feedback?.weaknesses) {
+      for (const w of session.feedback.weaknesses) {
+        const lower = w.toLowerCase();
+        let dim = "other";
+        if (lower.includes("fluency") || lower.includes("coherence") || lower.includes("pause") || lower.includes("hesitat")) dim = "fluency";
+        else if (lower.includes("vocab") || lower.includes("lexical") || lower.includes("word choice") || lower.includes("range")) dim = "vocabulary";
+        else if (lower.includes("grammar") || lower.includes("tense") || lower.includes("sentence") || lower.includes("structur")) dim = "grammar";
+        else if (lower.includes("pronunc") || lower.includes("accent") || lower.includes("sound") || lower.includes("clarity")) dim = "pronunciation";
+        dimensionCounts[dim] = (dimensionCounts[dim] || 0) + 1;
+      }
+    }
+  }
+  const weakDimensions: WeakDimension[] = Object.entries(dimensionCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }));
+
+  // Practice days: unique days with at least one session
+  const uniqueDays = new Set(sessions.map((s) => formatDate(new Date(s.createdAt))));
+  const practiceDays = uniqueDays.size;
+
   return {
     totalSessions: sessions.length,
     thisWeekSessions,
@@ -139,6 +186,9 @@ export function calculateStats(): PracticeStats {
     recentSessions,
     bandHistory,
     weeklyTrend,
+    trendDirection,
+    weakDimensions,
+    practiceDays,
   };
 }
 
@@ -163,4 +213,15 @@ export function getBandLabel(band: number): string {
   if (band >= 5) return "Moderate";
   if (band >= 4) return "Limited";
   return "Beginner";
+}
+
+export function getDimensionLabel(dim: string): string {
+  const labels: Record<string, string> = {
+    fluency: "Fluency & Coherence",
+    vocabulary: "Lexical Resource",
+    grammar: "Grammar Range",
+    pronunciation: "Pronunciation",
+    other: "Other",
+  };
+  return labels[dim] || dim;
 }

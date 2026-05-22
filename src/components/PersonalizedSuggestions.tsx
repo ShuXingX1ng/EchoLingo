@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   getPersonalizedSuggestions,
   getErrorStats,
-  type UserProfile,
 } from "@/lib/error-patterns";
 import { useAuth } from "@/lib/auth-context";
 

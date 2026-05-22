@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   getErrorLogs,
@@ -20,17 +20,17 @@ export default function DebugPage() {
   const [selectedLog, setSelectedLog] = useState<ErrorLogEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadLogs();
-  }, []);
-
-  const loadLogs = () => {
+  const loadLogs = useCallback(() => {
     setIsLoading(true);
     const allLogs = getErrorLogs();
     setLogs(allLogs);
     setSummary(getErrorSummary());
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const handleClearAll = () => {
     if (confirm("Are you sure you want to clear all error logs?")) {

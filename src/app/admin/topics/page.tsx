@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { TOPICS, type Topic } from "@/lib/topics";
 import { createTopic, updateTopic, deleteTopic } from "@/lib/supabase-topics";

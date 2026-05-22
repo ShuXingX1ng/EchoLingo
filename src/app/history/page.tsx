@@ -4,13 +4,15 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { getSessions, deleteSession, clearAllSessions } from "@/lib/history";
 import type { SavedSession } from "@/lib/history";
-import MuteButton from "@/components/MuteButton";
 import BackupModal from "@/components/BackupModal";
 import RecordingsList from "@/components/RecordingsList";
 import PersonalizedSuggestions from "@/components/PersonalizedSuggestions";
-import PronunciationFeedback from "@/components/PronunciationFeedback";
+import { FeedbackReview } from "@/components/FeedbackPanel";
+import DesktopNav from "@/components/DesktopNav";
+import { useTranslation } from "@/lib/i18n";
 
 export default function HistoryPage() {
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<SavedSession | null>(
     null
@@ -71,7 +73,7 @@ export default function HistoryPage() {
 
   // 删除单个会话
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this session?")) {
+    if (confirm(t("history.confirmDelete"))) {
       deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
       setSelectedIds((prev) => {
@@ -86,7 +88,7 @@ export default function HistoryPage() {
   const handleBatchDelete = () => {
     if (
       confirm(
-        `Are you sure you want to delete ${selectedIds.size} sessions?`
+        t("history.confirmDeleteMultiple", { count: selectedIds.size })
       )
     ) {
       selectedIds.forEach((id) => deleteSession(id));
@@ -138,11 +140,7 @@ export default function HistoryPage() {
 
   // 清空所有数据
   const handleClearAll = () => {
-    if (
-      confirm(
-        "Are you sure you want to delete ALL sessions? This cannot be undone."
-      )
-    ) {
+    if (confirm(t("history.confirmDeleteAll"))) {
       clearAllSessions();
       setSessions([]);
       setSelectedIds(new Set());
@@ -163,73 +161,42 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              ← Home
-            </Link>
-            <h1 className="font-semibold text-gray-900 dark:text-white">
-              Practice History
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <MuteButton />
-            <Link
-              href="/stats"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              Stats
-            </Link>
-            <Link
-              href="/practice"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-            >
-              New Session
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <DesktopNav active="history" />
 
       {/* Content */}
-      <main className="max-w-3xl mx-auto p-4 sm:p-6">
+      <main className="max-w-5xl mx-auto p-4 sm:p-6">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="flex gap-1.5 mb-4">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
+              <div className="w-3 h-3 bg-slate-900 rounded-full animate-bounce" />
               <div
-                className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                className="w-3 h-3 bg-slate-900 rounded-full animate-bounce"
                 style={{ animationDelay: "0.15s" }}
               />
               <div
-                className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                className="w-3 h-3 bg-slate-900 rounded-full animate-bounce"
                 style={{ animationDelay: "0.3s" }}
               />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Loading history...
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {t("history.loading")}
             </p>
           </div>
         ) : sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
             <div className="text-6xl mb-6">📝</div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No Practice Sessions Yet
+            <h2 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+              {t("history.emptyTitle")}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-md">
-              Complete your first IELTS Speaking practice session to see your
-              history here. Your transcripts and feedback will be saved locally.
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-md">
+              {t("history.emptyDesc")}
             </p>
             <Link
               href="/practice"
-              className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
             >
-              Start Your First Session
+              {t("history.emptyCta")}
             </Link>
           </div>
         ) : (
@@ -245,13 +212,13 @@ export default function HistoryPage() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search feedback..."
+                  placeholder={t("history.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
                 />
                 <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -274,10 +241,10 @@ export default function HistoryPage() {
                     onChange={(e) =>
                       setSortBy(e.target.value as "date" | "band")
                     }
-                    className="px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none"
+                    className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
                   >
-                    <option value="date">Newest First</option>
-                    <option value="band">Highest Band</option>
+                    <option value="date">{t("history.sortNewest")}</option>
+                    <option value="band">{t("history.sortHighest")}</option>
                   </select>
 
                   {/* 选择模式 */}
@@ -288,11 +255,11 @@ export default function HistoryPage() {
                     }}
                     className={`px-3 py-2 text-xs rounded-lg transition-colors ${
                       isSelectMode
-                        ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                        : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white"
+                        : "border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                   >
-                    {isSelectMode ? "Cancel" : "Select"}
+                    {isSelectMode ? t("history.cancel") : t("history.select")}
                   </button>
                 </div>
 
@@ -300,28 +267,28 @@ export default function HistoryPage() {
                   {/* 备份 */}
                   <button
                     onClick={() => setIsBackupModalOpen(true)}
-                    className="px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                   >
-                    Backup
+                    {t("history.backup")}
                   </button>
 
                   {/* 导出 */}
                   <div className="relative group">
-                    <button className="px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      Export
+                    <button className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      {t("history.export")}
                     </button>
-                    <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                       <button
                         onClick={() => handleExport("json")}
-                        className="w-full px-4 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-lg"
+                        className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-lg"
                       >
-                        Export JSON
+                        {t("history.exportJson")}
                       </button>
                       <button
                         onClick={() => handleExport("csv")}
-                        className="w-full px-4 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-b-lg"
+                        className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-lg"
                       >
-                        Export CSV
+                        {t("history.exportCsv")}
                       </button>
                     </div>
                   </div>
@@ -331,33 +298,33 @@ export default function HistoryPage() {
                     onClick={handleClearAll}
                     className="px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                   >
-                    Clear All
+                    {t("history.clearAll")}
                   </button>
                 </div>
               </div>
 
               {/* 批量操作栏 */}
               {isSelectMode && (
-                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={toggleSelectAll}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs text-slate-900 dark:text-white hover:underline"
                     >
                       {selectedIds.size === filteredSessions.length
-                        ? "Deselect All"
-                        : "Select All"}
+                        ? t("history.deselectAll")
+                        : t("history.selectAll")}
                     </button>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {selectedIds.size} selected
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {t("history.selected", { count: selectedIds.size })}
                     </span>
                   </div>
                   <button
                     onClick={handleBatchDelete}
                     disabled={selectedIds.size === 0}
-                    className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 bg-white dark:bg-slate-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Delete Selected
+                    {t("history.deleteSelected")}
                   </button>
                 </div>
               )}
@@ -365,16 +332,21 @@ export default function HistoryPage() {
 
             {/* 会话列表 */}
             <div className="space-y-3">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {filteredSessions.length} session
-                {filteredSessions.length !== 1 ? "s" : ""}
-                {searchQuery && ` found for "${searchQuery}"`}
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {searchQuery
+                  ? t("history.sessionsFound", {
+                      count: filteredSessions.length,
+                      query: searchQuery,
+                    })
+                  : t("history.sessions", {
+                      count: filteredSessions.length,
+                    })}
               </p>
 
               {filteredSessions.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    No sessions match your search.
+                  <p className="text-slate-500 dark:text-slate-400">
+                    {t("history.noMatch")}
                   </p>
                 </div>
               ) : (
@@ -385,10 +357,10 @@ export default function HistoryPage() {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div
-                      className={`w-full bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-5 border transition-all text-left group ${
+                      className={`w-full bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-5 border transition-all text-left group ${
                         isSelectMode && selectedIds.has(session.id)
-                          ? "border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800"
-                          : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md"
+                          ? "border-slate-900 dark:border-white ring-2 ring-slate-200 dark:ring-slate-700"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-md"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -398,7 +370,7 @@ export default function HistoryPage() {
                             type="checkbox"
                             checked={selectedIds.has(session.id)}
                             onChange={() => toggleSelect(session.id)}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            className="w-4 h-4 text-slate-900 rounded focus:ring-slate-900"
                           />
                         )}
 
@@ -412,7 +384,7 @@ export default function HistoryPage() {
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              <p className="text-sm font-medium text-slate-900 dark:text-white">
                                 {new Date(
                                   session.createdAt
                                 ).toLocaleDateString("en-US", {
@@ -423,26 +395,38 @@ export default function HistoryPage() {
                                   minute: "2-digit",
                                 })}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                IELTS Part 1 · {session.messages.length}{" "}
-                                messages
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                {formatMode(session.mode)} ·{" "}
+                                {session.messages.length} messages
                               </p>
                             </div>
                             <div className="flex items-center gap-3 ml-4">
-                              <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1.5 rounded-full text-sm font-semibold group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
-                                Band {session.feedback.estimatedBand}
+                              <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 px-3 py-1.5 rounded-full text-sm font-semibold group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50 transition-colors">
+                                {t("history.band", {
+                                  score: session.feedback.estimatedBand,
+                                })}
                               </div>
                               {!isSelectMode && (
-                                <span className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all">
+                                <span className="text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:translate-x-1 transition-all">
                                   →
                                 </span>
                               )}
                             </div>
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 line-clamp-2">
-                            {session.feedback.improvementSuggestions[0] ||
-                              "Session completed"}
-                          </p>
+                          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                            <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+                              <span className="font-medium">
+                                {t("history.focus")}{" "}
+                              </span>
+                              {firstFeedbackItem(session.feedback.weaknesses, t("history.noFeedback"))}
+                            </p>
+                            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-100">
+                              <span className="font-medium">
+                                {t("history.next")}{" "}
+                              </span>
+                              {firstFeedbackItem(session.feedback.improvementSuggestions, t("history.noFeedback"))}
+                            </p>
+                          </div>
                         </button>
 
                         {/* 删除按钮 */}
@@ -452,8 +436,8 @@ export default function HistoryPage() {
                               e.stopPropagation();
                               handleDelete(session.id);
                             }}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                            title="Delete session"
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            title={t("history.confirmDelete")}
                           >
                             <svg
                               className="w-4 h-4"
@@ -500,23 +484,27 @@ function SessionDetail({
   onBack: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <DesktopNav active="history" />
+
+      {/* Sticky sub-header for back navigation */}
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200 dark:border-white/10 dark:bg-slate-950/90 px-4 py-3">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
-              ← Back
+              ← {t("history.back")}
             </button>
             <div>
-              <h1 className="font-semibold text-gray-900 dark:text-white">
-                Session Details
+              <h1 className="font-semibold text-slate-900 dark:text-white">
+                {t("history.details")}
               </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {new Date(session.createdAt).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "short",
@@ -528,13 +516,13 @@ function SessionDetail({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-4 py-1.5 rounded-full text-sm font-semibold">
-              Band {session.feedback.estimatedBand}
+            <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 px-4 py-1.5 rounded-full text-sm font-semibold">
+              {t("history.band", { score: session.feedback.estimatedBand })}
             </div>
             <button
               onClick={onDelete}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              title="Delete session"
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              title={t("history.confirmDelete")}
             >
               <svg
                 className="w-4 h-4"
@@ -552,14 +540,14 @@ function SessionDetail({
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Content */}
-      <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+      <main className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Transcript */}
         <section>
-          <h2 className="font-medium text-gray-900 dark:text-white mb-4">
-            Transcript
+          <h2 className="font-medium text-slate-900 dark:text-white mb-4">
+            {t("history.transcript")}
           </h2>
           <div className="space-y-3">
             {session.messages.map((message) => (
@@ -572,13 +560,13 @@ function SessionDetail({
                 <div
                   className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                     message.role === "user"
-                      ? "bg-blue-600 text-white rounded-br-md"
-                      : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm"
+                      ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md"
+                      : "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md shadow-sm"
                   }`}
                 >
                   {message.role === "examiner" && (
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Examiner
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      {t("history.examiner")}
                     </p>
                   )}
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -590,134 +578,34 @@ function SessionDetail({
           </div>
         </section>
 
-        {/* Feedback */}
-        <section className="bg-white dark:bg-gray-800 rounded-2xl p-5 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-          {/* Recordings */}
+        <section className="bg-white dark:bg-slate-800 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
           <RecordingsList sessionId={session.id} />
-          <h2 className="font-medium text-gray-900 dark:text-white mb-5">
-            Feedback
-          </h2>
-          <div className="space-y-5">
-            <FeedbackSection
-              title="Fluency and Coherence"
-              content={session.feedback.fluencyAndCoherence}
-            />
-            <FeedbackSection
-              title="Lexical Resource"
-              content={session.feedback.lexicalResource}
-            />
-            <FeedbackSection
-              title="Grammar Range and Accuracy"
-              content={session.feedback.grammarRangeAndAccuracy}
-            />
-            <FeedbackSection
-              title="Pronunciation"
-              content={session.feedback.pronunciation}
-            />
-
-            {session.feedback.pronunciationAssessment && (
-              <PronunciationFeedback assessment={session.feedback.pronunciationAssessment} />
-            )}
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                Strengths
-              </h3>
-              <ul className="space-y-2">
-                {session.feedback.strengths.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                Areas for Improvement
-              </h3>
-              <ul className="space-y-2">
-                {session.feedback.weaknesses.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="text-orange-500 mt-0.5">→</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                Improvement Suggestions
-              </h3>
-              <ol className="space-y-2">
-                {session.feedback.improvementSuggestions.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    <span className="font-medium text-blue-500">{i + 1}.</span>
-                    {item}
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                Improved Sample Answer
-              </h3>
-              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {session.feedback.improvedSampleAnswer}
-                </p>
-              </div>
-            </div>
-          </div>
         </section>
+
+        <FeedbackReview
+          feedback={session.feedback}
+          title={t("feedback.studyReview")}
+          primaryActionHref="/practice/setup"
+          primaryActionLabel={t("history.startNew")}
+          containerClassName="max-w-5xl shadow-sm"
+        />
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-8">
           <Link
             href="/practice"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
           >
-            Start New Session
+            {t("history.startNew")}
           </Link>
           <button
             onClick={onBack}
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Back to History
+            {t("history.backToHistory")}
           </button>
         </div>
       </main>
-    </div>
-  );
-}
-
-function FeedbackSection({
-  title,
-  content,
-}: {
-  title: string;
-  content: string;
-}) {
-  return (
-    <div>
-      <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-        {title}
-      </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-        {content}
-      </p>
     </div>
   );
 }
@@ -732,6 +620,24 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function firstFeedbackItem(items: string[], fallback: string) {
+  return items[0] || fallback;
+}
+
+function formatMode(mode: string) {
+  const labels: Record<string, string> = {
+    ielts_part_1: "IELTS Part 1",
+    ielts_part_2: "IELTS Part 2",
+    ielts_part_3: "IELTS Part 3",
+    part1: "IELTS Part 1",
+    part2: "IELTS Part 2",
+    part3: "IELTS Part 3",
+    full: "Full Speaking Test",
+  };
+
+  return labels[mode] ?? "IELTS Practice";
 }
 
 // 工具函数：转换为 CSV

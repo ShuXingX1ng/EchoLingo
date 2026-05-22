@@ -44,10 +44,12 @@ export async function measureApiCall<T>(
 }
 
 // Web Vitals 监控（仅开发环境）
-export function initWebVitals() {
+export function initWebVitals(): () => void {
   if (typeof window === "undefined" || process.env.NODE_ENV !== "development") {
-    return;
+    return () => {};
   }
+
+  const observers: PerformanceObserver[] = [];
 
   // 监控 LCP (Largest Contentful Paint)
   if ("PerformanceObserver" in window) {
@@ -60,6 +62,7 @@ export function initWebVitals() {
         }
       });
       lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+      observers.push(lcpObserver);
 
       // 监控 FID (First Input Delay)
       const fidObserver = new PerformanceObserver((list) => {
@@ -71,6 +74,7 @@ export function initWebVitals() {
         });
       });
       fidObserver.observe({ type: "first-input", buffered: true });
+      observers.push(fidObserver);
 
       // 监控 CLS (Cumulative Layout Shift)
       let clsValue = 0;
@@ -84,10 +88,16 @@ export function initWebVitals() {
         logMetric("CLS", clsValue);
       });
       clsObserver.observe({ type: "layout-shift", buffered: true });
+      observers.push(clsObserver);
     } catch {
       // PerformanceObserver not fully supported
     }
   }
+
+  // 返回清理函数
+  return () => {
+    observers.forEach((observer) => observer.disconnect());
+  };
 }
 
 // 类型声明

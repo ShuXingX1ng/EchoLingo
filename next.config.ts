@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   // 启用压缩
@@ -9,10 +13,9 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
-  // 实验性功能
-  experimental: {
-    // 优化 CSS
-    optimizeCss: true,
+  // Pin Turbopack to this repository so parent lockfiles do not affect root inference.
+  turbopack: {
+    root: projectRoot,
   },
 
   // Headers 优化

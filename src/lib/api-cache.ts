@@ -11,9 +11,15 @@ const pendingRequests = new Map<string, Promise<unknown>>();
 
 const DEFAULT_CACHE_TTL = 0; // 默认不缓存（对话 API 不应该缓存）
 
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
 export function clearApiCache(): void {
   cache.clear();
   pendingRequests.clear();
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
 }
 
 export async function fetchWithCache<T>(
@@ -67,18 +73,18 @@ export async function fetchWithCache<T>(
   // 记录待处理请求
   pendingRequests.set(key, promise);
 
-  return promise as Promise<T>;
-}
-
-// 定期清理过期缓存
-if (typeof window !== "undefined") {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of cache.entries()) {
-      if (now - entry.timestamp > 60000) {
-        // 1 分钟后清理
-        cache.delete(key);
+  // 启动定期清理（如果尚未启动）
+  if (typeof window !== "undefined" && !cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of cache.entries()) {
+        if (now - entry.timestamp > 60000) {
+          // 1 分钟后清理
+          cache.delete(key);
+        }
       }
-    }
-  }, 30000); // 每 30 秒检查一次
+    }, 30000); // 每 30 秒检查一次
+  }
+
+  return promise as Promise<T>;
 }

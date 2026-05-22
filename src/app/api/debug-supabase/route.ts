@@ -28,7 +28,7 @@ export async function GET() {
     }
 
     // Test 2: Check if sessions table exists
-    const { data: tableCheck, error: tableError } = await supabase
+    const { error: tableError } = await supabase
       .from("sessions")
       .select("count")
       .limit(1);

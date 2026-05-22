@@ -6,6 +6,11 @@ import { encodeWAV } from "@/lib/audio-utils";
 
 type VoiceState = "idle" | "listening" | "processing" | "speaking";
 
+type RecognitionInstance = {
+  stop(): void;
+  abort(): void;
+};
+
 interface VoiceControlsProps {
   onResult: (text: string) => void;
   onAudioResult?: (audioBlob: Blob) => void; // 音频数据回调，用于发音评估
@@ -27,8 +32,7 @@ export default function VoiceControls({
   const [interimText, setInterimText] = useState("");
   const [isSupported, setIsSupported] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<RecognitionInstance | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -92,7 +96,7 @@ export default function VoiceControls({
       onAudioResult(wavBlob);
       audioDataRef.current = [];
     }
-  }, [onAudioResult, encodeWAV]);
+  }, [onAudioResult]);
 
   const startTimer = useCallback(() => {
     stopTimer();
@@ -141,12 +145,16 @@ export default function VoiceControls({
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
         scriptProcessorRef.current = processor;
 
+        const MAX_AUDIO_CHUNKS = 1000; // 限制最大音频块数量 (~60秒@16kHz)
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0);
           // Copy the data
           const data = new Float32Array(inputData.length);
           data.set(inputData);
-          audioDataRef.current.push(data);
+          // 限制内存使用，防止无限增长
+          if (audioDataRef.current.length < MAX_AUDIO_CHUNKS) {
+            audioDataRef.current.push(data);
+          }
         };
 
         source.connect(processor);
@@ -166,7 +174,7 @@ export default function VoiceControls({
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       let finalTranscript = "";
       let interimTranscript = "";
 
@@ -207,7 +215,7 @@ export default function VoiceControls({
     setState("listening");
     setInterimText("");
     startTimer(); // 开始计时
-  }, [isSupported, disabled, isProcessing, onResult, onAudioResult, startTimer, stopAudioRecording, startTimer]);
+  }, [isSupported, disabled, isProcessing, onResult, onAudioResult, startTimer, stopAudioRecording]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {

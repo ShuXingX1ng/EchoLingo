@@ -7,31 +7,39 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+const DISMISSED_KEY = "pwa_install_dismissed";
+
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // 检查是否已忽略过
+    if (localStorage.getItem(DISMISSED_KEY) === "true") {
+      return;
+    }
+
     // 检查是否已安装
     if (
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as { standalone?: boolean }).standalone === true
     ) {
-      setIsInstalled(true);
       return;
     }
 
     // 监听安装事件
     const handleBeforeInstall = (e: Event) => {
+      // 再次检查是否已忽略
+      if (localStorage.getItem(DISMISSED_KEY) === "true") {
+        return;
+      }
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowInstall(true);
     };
 
     const handleAppInstalled = () => {
-      setIsInstalled(true);
       setShowInstall(false);
       setDeferredPrompt(null);
     };
@@ -52,7 +60,7 @@ export default function PWAInstallPrompt() {
     const { outcome } = await deferredPrompt.userChoice;
 
     if (outcome === "accepted") {
-      setIsInstalled(true);
+      // 用户接受了安装
     }
 
     setShowInstall(false);
@@ -61,26 +69,11 @@ export default function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowInstall(false);
-    // 存储用户选择，24小时内不再显示
-    localStorage.setItem(
-      "pwa_install_dismissed",
-      Date.now().toString()
-    );
+    // 永久存储用户选择，不再显示
+    localStorage.setItem(DISMISSED_KEY, "true");
   };
 
-  // 检查是否被用户忽略
-  useEffect(() => {
-    const dismissed = localStorage.getItem("pwa_install_dismissed");
-    if (dismissed) {
-      const dismissedTime = parseInt(dismissed);
-      const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
-      if (hoursSinceDismiss < 24) {
-        setShowInstall(false);
-      }
-    }
-  }, []);
-
-  if (isInstalled || !showInstall) {
+  if (!showInstall) {
     return null;
   }
 

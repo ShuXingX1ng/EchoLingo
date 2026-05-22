@@ -23,7 +23,7 @@ export default function UserMenu() {
 
   if (loading) {
     return (
-      <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
+      <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse" />
     );
   }
 
@@ -31,7 +31,7 @@ export default function UserMenu() {
     return (
       <Link
         href="/login"
-        className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
       >
         {t("auth.login")}
       </Link>
@@ -45,28 +45,29 @@ export default function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
       >
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-8 h-8 rounded-full"
+          <span
+            role="img"
+            aria-label={displayName}
+            className="h-8 w-8 rounded-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${avatarUrl})` }}
           />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
+          <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white dark:text-slate-950 flex items-center justify-center text-white text-sm font-medium">
             {displayName.charAt(0).toUpperCase()}
           </div>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
-          <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-white/10 py-2 z-50">
+          <div className="px-4 py-2 border-b border-slate-200 dark:border-white/10">
+            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
               {displayName}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
               {user.email}
             </p>
           </div>
@@ -75,7 +76,7 @@ export default function UserMenu() {
             <Link
               href="/admin"
               onClick={() => setOpen(false)}
-              className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
             >
               {t("nav.admin")}
             </Link>
@@ -86,7 +87,7 @@ export default function UserMenu() {
               signOut();
               setOpen(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
           >
             {t("auth.logout")}
           </button>

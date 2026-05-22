@@ -46,6 +46,7 @@ export function LineChart({
     .join(" ");
 
   const areaD = `${pathD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+  const formatValue = (value: number) => `${valuePrefix}${value}${valueSuffix}`;
 
   return (
     <div className="w-full">
@@ -102,6 +103,7 @@ export function LineChart({
         {data.map((d, i) => (
           <span
             key={i}
+            title={formatValue(d.value)}
             className="text-[10px] text-gray-500 dark:text-gray-400"
           >
             {i % Math.ceil(data.length / 6) === 0 ? d.label : ""}

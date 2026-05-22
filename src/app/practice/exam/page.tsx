@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ChatMessage, SessionFeedback, PronunciationAssessmentResult } from "@/types";
 import { saveSession } from "@/lib/history";
@@ -12,9 +11,8 @@ import { useTranslation } from "@/lib/i18n";
 import VoiceInput from "@/components/VoiceInput";
 import VoiceOutput from "@/components/VoiceOutput";
 import VoiceControls from "@/components/VoiceControls";
-import MuteButton from "@/components/MuteButton";
-import ErrorAnnotations from "@/components/ErrorAnnotations";
-import PronunciationFeedback from "@/components/PronunciationFeedback";
+import DesktopNav from "@/components/DesktopNav";
+import FeedbackPanel from "@/components/FeedbackPanel";
 
 type ExamPhase = "part1" | "part2-prep" | "part2-speak" | "part3" | "ended";
 
@@ -27,9 +25,9 @@ export default function ExamPageWrapper() {
       fallback={
         <div className="flex items-center justify-center min-h-screen">
           <div className="flex gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
           </div>
         </div>
       }
@@ -89,20 +87,6 @@ function ExamPage() {
     return () => clearInterval(timer);
   }, [phase, prepTimeLeft]);
 
-  // Speak timer countdown
-  useEffect(() => {
-    if (phase !== "part2-speak") return;
-    if (speakTimeLeft <= 0) {
-      // Auto-advance: inject a transition message and request Part 3
-      handleSpeakTimeout();
-      return;
-    }
-    const timer = setInterval(() => {
-      setSpeakTimeLeft((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [phase, speakTimeLeft]);
-
   // Detect phase transitions from examiner messages
   const detectPhaseTransition = useCallback(
     (examinerMessage: string) => {
@@ -140,7 +124,7 @@ function ExamPage() {
     [phase]
   );
 
-  const fetchExaminerResponse = async (currentMessages: ChatMessage[]) => {
+  const fetchExaminerResponse = useCallback(async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/examiner", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -161,9 +145,9 @@ function ExamPage() {
 
     const data = await response.json();
     return data.message as string;
-  };
+  }, [topicId]);
 
-  const fetchFeedback = async (currentMessages: ChatMessage[]) => {
+  const fetchFeedback = useCallback(async (currentMessages: ChatMessage[]) => {
     const response = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,7 +166,7 @@ function ExamPage() {
     }
 
     return response.json() as Promise<SessionFeedback>;
-  };
+  }, []);
 
   const fetchPronunciationAssessment = async (
     audioBlob: Blob,
@@ -275,7 +259,20 @@ function ExamPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages]);
+  }, [fetchExaminerResponse, isLoading, messages]);
+
+  // Speak timer countdown
+  useEffect(() => {
+    if (phase !== "part2-speak") return;
+    if (speakTimeLeft <= 0) {
+      handleSpeakTimeout();
+      return;
+    }
+    const timer = setInterval(() => {
+      setSpeakTimeLeft((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [handleSpeakTimeout, phase, speakTimeLeft]);
 
   const handleVoiceResult = useCallback((text: string) => {
     setInput((prev) => (prev ? prev + " " + text : text));
@@ -318,7 +315,7 @@ function ExamPage() {
         setIsLoading(false);
       }
     },
-    [isLoading, phase, messages, detectPhaseTransition]
+    [fetchExaminerResponse, isLoading, phase, messages, detectPhaseTransition]
   );
 
   const handleAudioResult = useCallback((audioBlob: Blob) => {
@@ -401,72 +398,58 @@ function ExamPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  // Get timer urgency level for styling
+  const getTimerUrgency = (timeLeft: number, totalTime: number) => {
+    const percentLeft = (timeLeft / totalTime) * 100;
+    if (percentLeft <= 10) return "critical"; // ≤10% remaining
+    if (percentLeft <= 25) return "warning";  // ≤25% remaining
+    return "normal";
+  };
+
   const phaseConfig = {
-    part1: { label: "Part 1", color: "bg-blue-500", desc: "Introduction" },
+    part1: { label: "Part 1", color: "bg-emerald-500", desc: t("exam.phase.introduction") },
     "part2-prep": {
       label: "Part 2",
       color: "bg-yellow-500",
-      desc: `Preparation — ${formatTime(prepTimeLeft)}`,
+      desc: `${t("exam.phase.preparation")} — ${formatTime(prepTimeLeft)}`,
     },
     "part2-speak": {
       label: "Part 2",
       color: "bg-orange-500",
-      desc: `Speaking — ${formatTime(speakTimeLeft)}`,
+      desc: `${t("exam.phase.speaking")} — ${formatTime(speakTimeLeft)}`,
     },
-    part3: { label: "Part 3", color: "bg-purple-500", desc: "Discussion" },
-    ended: { label: "Ended", color: "bg-gray-500", desc: "Test complete" },
+    part3: { label: "Part 3", color: "bg-purple-500", desc: t("exam.phase.discussion") },
+    ended: { label: t("exam.phase.ended"), color: "bg-slate-500", desc: t("exam.phase.testComplete") },
   };
 
   const currentPhase = phaseConfig[phase];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+      <DesktopNav
+        active="practice"
+        maxWidth="4xl"
+        rightContent={
+          phase !== "ended" ? (
+            <button
+              onClick={handleEndExam}
+              disabled={isLoading}
+              className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
             >
-              ← {t("nav.home")}
-            </Link>
-            <div>
-              <h1 className="font-semibold text-gray-900 dark:text-white">
-                {t("exam.title")}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <MuteButton />
-            {phase !== "ended" && (
-              <button
-                onClick={handleEndExam}
-                disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {t("exam.endExam")}
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+              {t("exam.endExam")}
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Phase Indicator */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2">
-        <div className="max-w-3xl mx-auto">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 px-4 py-2">
+        <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2">
             {(["part1", "part2-prep", "part3"] as ExamPhase[]).map(
               (p, index) => {
                 const config = phaseConfig[p];
-                const isActive =
-                  phase === p ||
-                  (p === "part2-prep" &&
-                    (phase === "part2-prep" || phase === "part2-speak")) ||
-                  (p === "part1" &&
-                    !["part1"].includes(phase) &&
-                    phase !== "ended") ||
-                  (p === "part3" && phase === "ended");
                 const isPast =
                   (p === "part1" && phase !== "part1") ||
                   (p === "part2-prep" && phase === "part3") ||
@@ -481,7 +464,7 @@ function ExamPage() {
                     {index > 0 && (
                       <div
                         className={`h-0.5 flex-1 rounded ${
-                          isPast ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                          isPast ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
                         }`}
                       />
                     )}
@@ -489,10 +472,10 @@ function ExamPage() {
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                           isCurrent
-                            ? "bg-blue-600 text-white"
+                            ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
                             : isPast
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                            ? "bg-emerald-500 text-white"
+                            : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                         }`}
                       >
                         {index + 1}
@@ -500,8 +483,8 @@ function ExamPage() {
                       <span
                         className={`text-xs font-medium hidden sm:inline ${
                           isCurrent
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-gray-500 dark:text-gray-400"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-slate-500 dark:text-slate-400"
                         }`}
                       >
                         {config.label}
@@ -515,7 +498,7 @@ function ExamPage() {
 
           {/* Timer / Status */}
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
               {currentPhase.desc}
             </span>
             {(phase === "part2-prep" || phase === "part2-speak") && (
@@ -524,7 +507,7 @@ function ExamPage() {
                   (phase === "part2-prep" && prepTimeLeft <= 10) ||
                   (phase === "part2-speak" && speakTimeLeft <= 30)
                     ? "text-red-500"
-                    : "text-gray-700 dark:text-gray-300"
+                    : "text-slate-700 dark:text-slate-300"
                 }`}
               >
                 {phase === "part2-prep"
@@ -536,9 +519,93 @@ function ExamPage() {
         </div>
       </div>
 
+      {/* Part 2 Prominent Timer */}
+      {(phase === "part2-prep" || phase === "part2-speak") && (
+        <div className={`border-b px-4 py-3 transition-colors duration-300 ${
+          phase === "part2-prep"
+            ? getTimerUrgency(prepTimeLeft, PREP_TIME) === "critical"
+              ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+              : getTimerUrgency(prepTimeLeft, PREP_TIME) === "warning"
+              ? "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800"
+              : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+            : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "critical"
+            ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+            : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "warning"
+            ? "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800"
+            : "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+        }`}>
+          <div className="max-w-4xl mx-auto">
+            {/* Timer Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-lg ${
+                  phase === "part2-prep" ? "📝" : "🎤"
+                }`} />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {phase === "part2-prep" ? t("exam.prepTime") : t("exam.speakTime")}
+                </span>
+              </div>
+              <div className={`text-2xl font-mono font-bold tabular-nums ${
+                phase === "part2-prep"
+                  ? getTimerUrgency(prepTimeLeft, PREP_TIME) === "critical"
+                    ? "text-red-600 dark:text-red-400 animate-pulse"
+                    : getTimerUrgency(prepTimeLeft, PREP_TIME) === "warning"
+                    ? "text-orange-600 dark:text-orange-400"
+                    : "text-yellow-600 dark:text-yellow-400"
+                  : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "critical"
+                  ? "text-red-600 dark:text-red-400 animate-pulse"
+                  : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "warning"
+                  ? "text-orange-600 dark:text-orange-400"
+                  : "text-emerald-600 dark:text-emerald-400"
+              }`}>
+                {phase === "part2-prep" ? formatTime(prepTimeLeft) : formatTime(speakTimeLeft)}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+                  phase === "part2-prep"
+                    ? getTimerUrgency(prepTimeLeft, PREP_TIME) === "critical"
+                      ? "bg-red-500"
+                      : getTimerUrgency(prepTimeLeft, PREP_TIME) === "warning"
+                      ? "bg-orange-500"
+                      : "bg-yellow-500"
+                    : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "critical"
+                    ? "bg-red-500"
+                    : getTimerUrgency(speakTimeLeft, SPEAK_TIME) === "warning"
+                    ? "bg-orange-500"
+                    : "bg-emerald-500"
+                }`}
+                style={{
+                  width: `${
+                    phase === "part2-prep"
+                      ? (prepTimeLeft / PREP_TIME) * 100
+                      : (speakTimeLeft / SPEAK_TIME) * 100
+                  }%`
+                }}
+              />
+            </div>
+
+            {/* Warning Messages */}
+            {phase === "part2-prep" && prepTimeLeft <= 10 && prepTimeLeft > 0 && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-2 text-center animate-pulse">
+                ⏰ {prepTimeLeft <= 5 ? t("exam.prepEndingSoon") : t("exam.prepTimeWarning")}
+              </p>
+            )}
+            {phase === "part2-speak" && speakTimeLeft <= 30 && speakTimeLeft > 0 && (
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-2 text-center animate-pulse">
+                ⏰ {speakTimeLeft <= 10 ? t("exam.speakEndingSoon") : t("exam.speakTimeWarning")}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="max-w-4xl mx-auto space-y-4">
           {messages.map((message, index) => (
             <div
               key={message.id}
@@ -550,13 +617,13 @@ function ExamPage() {
               <div
                 className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-blue-600 text-white rounded-br-md"
-                    : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm"
+                    ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md"
+                    : "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md shadow-sm"
                 }`}
               >
                 {message.role === "examiner" && (
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       {t("practice.examiner")}
                     </p>
                     <VoiceOutput
@@ -574,8 +641,8 @@ function ExamPage() {
 
           {isLoading && (
             <div className="flex justify-start animate-message-in">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-200 dark:border-gray-700 shadow-sm min-w-[200px]">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm min-w-[200px]">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">
                   {t("practice.examiner")}
                 </p>
                 <div className="space-y-2">
@@ -584,11 +651,11 @@ function ExamPage() {
                 </div>
                 <div className="flex items-center gap-2 mt-3">
                   <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                   </div>
-                  <span className="text-xs text-blue-500 dark:text-blue-400">
+                  <span className="text-xs text-emerald-500 dark:text-emerald-400">
                     {t("practice.thinking")}
                   </span>
                 </div>
@@ -614,19 +681,19 @@ function ExamPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
-        <div className="max-w-3xl mx-auto">
+      <div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-white/10 p-4">
+        <div className="max-w-4xl mx-auto">
           {phase !== "ended" ? (
             <>
               {/* Mode Toggle */}
               <div className="flex justify-center mb-3">
-                <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800/50">
+                <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800/50">
                   <button
                     onClick={() => setInputMode("text")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "text"
-                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                   >
                     {t("practice.textMode")}
@@ -635,8 +702,8 @@ function ExamPage() {
                     onClick={() => setInputMode("voice")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "voice"
-                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                   >
                     {t("practice.voiceMode")}
@@ -656,13 +723,13 @@ function ExamPage() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder={t("practice.inputPlaceholder")}
-                    className="flex-1 px-4 py-3 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow"
+                    className="flex-1 px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 transition-shadow"
                     disabled={isLoading}
                   />
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading}
-                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {t("practice.send")}
                   </button>
@@ -684,18 +751,18 @@ function ExamPage() {
               {isFeedbackLoading ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     {t("practice.generating")}
                   </p>
                 </div>
               ) : feedback ? (
                 <button
                   onClick={() => (window.location.href = "/practice/exam")}
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
                 >
                   {t("exam.newExam")}
                 </button>
@@ -706,7 +773,7 @@ function ExamPage() {
                   </p>
                   <button
                     onClick={() => (window.location.href = "/practice/exam")}
-                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
                   >
                     {t("practice.tryAgain")}
                   </button>
@@ -718,120 +785,14 @@ function ExamPage() {
       </div>
 
       {/* Feedback Panel */}
-      {feedback && <FeedbackPanel feedback={feedback} />}
-    </div>
-  );
-}
-
-function FeedbackPanel({ feedback }: { feedback: SessionFeedback }) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {t("exam.resultTitle")}
-            </h2>
-            <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-4 py-1.5 rounded-full text-sm font-semibold">
-              Band {feedback.estimatedBand}
-            </div>
-          </div>
-
-          <div className="space-y-5">
-            <FeedbackSection title={t("feedback.fluency")} content={feedback.fluencyAndCoherence} />
-            <FeedbackSection title={t("feedback.vocabulary")} content={feedback.lexicalResource} />
-            <FeedbackSection title={t("feedback.grammar")} content={feedback.grammarRangeAndAccuracy} />
-            <FeedbackSection title={t("feedback.pronunciation")} content={feedback.pronunciation} />
-
-            {feedback.pronunciationAssessment && (
-              <PronunciationFeedback assessment={feedback.pronunciationAssessment} />
-            )}
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.strengths")}
-              </h3>
-              <ul className="space-y-2">
-                {feedback.strengths.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.weaknesses")}
-              </h3>
-              <ul className="space-y-2">
-                {feedback.weaknesses.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <span className="text-orange-500 mt-0.5">→</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.suggestions")}
-              </h3>
-              <ol className="space-y-2">
-                {feedback.improvementSuggestions.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <span className="font-medium text-blue-500">{i + 1}.</span>
-                    {item}
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                {t("feedback.sampleAnswer")}
-              </h3>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {feedback.improvedSampleAnswer}
-                </p>
-              </div>
-            </div>
-
-            {feedback.errorAnnotations && (
-              <ErrorAnnotations annotations={feedback.errorAnnotations} />
-            )}
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={() => (window.location.href = "/practice/exam")}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              {t("exam.newExam")}
-            </button>
-            <button
-              onClick={() => (window.location.href = "/history")}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              {t("nav.history")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeedbackSection({ title, content }: { title: string; content: string }) {
-  return (
-    <div>
-      <h3 className="font-medium text-gray-900 dark:text-white mb-2">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{content}</p>
+      {feedback && (
+        <FeedbackPanel
+          feedback={feedback}
+          title={t("exam.resultTitle")}
+          primaryActionHref="/practice/exam"
+          primaryActionLabel={t("exam.newExam")}
+        />
+      )}
     </div>
   );
 }

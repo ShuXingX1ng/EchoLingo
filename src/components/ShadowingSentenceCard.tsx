@@ -12,10 +12,8 @@ interface ShadowingSentenceCardProps {
   isRecording: boolean;
   isEvaluating: boolean;
   assessment: PronunciationAssessmentResult | null;
-  onListen: () => void;
   onRecord: () => void;
   onStopRecord: () => void;
-  onEvaluate: () => void;
   onNext: () => void;
   onTryAgain: () => void;
 }
@@ -27,25 +25,24 @@ export default function ShadowingSentenceCard({
   assessment,
   onRecord,
   onStopRecord,
-  onEvaluate,
   onNext,
   onTryAgain,
 }: ShadowingSentenceCardProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
       {/* Sentence Display */}
-      <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
           {t("shadowing.listenAndRepeat")}
         </p>
-        <p className="text-lg font-medium text-gray-900 dark:text-white leading-relaxed">
+        <p className="text-lg font-medium text-slate-900 dark:text-white leading-relaxed">
           {sentence}
         </p>
         <div className="mt-3 flex items-center gap-2">
           <VoiceOutput text={sentence} autoPlay={false} />
-          <span className="text-xs text-gray-400 dark:text-gray-500">
+          <span className="text-xs text-slate-400 dark:text-slate-500">
             {t("shadowing.playTTS")}
           </span>
         </div>
@@ -103,18 +100,18 @@ export default function ShadowingSentenceCard({
             {isEvaluating && (
               <div className="flex flex-col items-center gap-3 py-4">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
-                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
-                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" />
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }} />
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }} />
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   {t("shadowing.evaluating")}
                 </p>
               </div>
             )}
 
             {!isRecording && !isEvaluating && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 {t("shadowing.tapToRecord")}
               </p>
             )}
@@ -125,13 +122,13 @@ export default function ShadowingSentenceCard({
             <div className="flex gap-3 justify-center pt-2">
               <button
                 onClick={onTryAgain}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 {t("shadowing.tryAgain")}
               </button>
               <button
                 onClick={onNext}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
               >
                 {t("shadowing.nextSentence")}
               </button>

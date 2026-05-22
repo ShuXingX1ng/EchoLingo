@@ -6,6 +6,7 @@ import NetworkStatus from "./NetworkStatus";
 import PWAInstallPrompt from "./PWAInstallPrompt";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 import DataMigration from "./DataMigration";
+import MobileNav from "./MobileNav";
 import { setupGlobalErrorHandlers } from "@/lib/error-logger";
 import { AuthProvider } from "@/lib/auth-context";
 import { I18nProvider } from "@/lib/i18n";
@@ -29,6 +30,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <PWAInstallPrompt />
           <ServiceWorkerRegistration />
           <DataMigration />
+          <MobileNav />
         </ErrorBoundary>
       </AuthProvider>
     </I18nProvider>
