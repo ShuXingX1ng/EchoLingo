@@ -362,6 +362,7 @@ src/
 │   ├── auth-context.tsx      # 认证上下文
 │   ├── unified-history.ts    # 统一历史管理
 │   ├── supabase-history.ts   # 云端历史操作
+│   ├── feedback-actions.ts   # 反馈保存共享逻辑
 │   ├── i18n.tsx              # 国际化
 │   ├── history.ts            # 本地历史记录
 │   ├── topics.ts             # 话题库 (36 个)

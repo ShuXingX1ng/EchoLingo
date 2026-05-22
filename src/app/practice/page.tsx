@@ -2,10 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import type { ChatMessage, SessionFeedback, PronunciationAssessmentResult } from "@/types";
-import { saveSession } from "@/lib/history";
-import { updateErrorPatterns } from "@/lib/error-patterns";
-import { recordProgress } from "@/lib/supabase-progress";
+import type { ChatMessage, SessionFeedback } from "@/types";
+import { fetchFeedback, saveSessionAndUpdateLearning } from "@/lib/feedback-actions";
 import { useAuth } from "@/lib/auth-context";
 import { useTranslation } from "@/lib/i18n";
 import VoiceInput from "@/components/VoiceInput";
@@ -101,56 +99,6 @@ function PracticePage() {
     return data.message as string;
   }, [practiceMode, topicId]);
 
-  const fetchFeedback = useCallback(async (currentMessages: ChatMessage[]) => {
-    const response = await fetch("/api/feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "ielts_part_1",
-        messages: currentMessages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(
-        data.error ||
-          "Failed to generate feedback. Please check your API configuration."
-      );
-    }
-
-    return response.json() as Promise<SessionFeedback>;
-  }, []);
-
-  const fetchPronunciationAssessment = async (
-    audioBlob: Blob,
-    referenceText: string
-  ): Promise<PronunciationAssessmentResult | null> => {
-    try {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.webm");
-      formData.append("text", referenceText);
-
-      const response = await fetch("/api/pronunciation", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        console.error("Pronunciation assessment failed:", response.status);
-        return null;
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error("Pronunciation assessment error:", error);
-      return null;
-    }
-  };
-
   const handleSend = async () => {
     if (!input.trim() || isLoading || isSessionEnded) return;
 
@@ -204,47 +152,19 @@ function PracticePage() {
     setMessages(finalMessages);
 
     try {
-      const feedbackData = await fetchFeedback(finalMessages);
+      const feedbackData = await fetchFeedback(finalMessages, practiceMode === "full" ? "full" : "ielts_part_1");
 
-      // Perform pronunciation assessment if audio is available
-      if (lastAudioBlobRef.current && lastUserMessageRef.current) {
-        const pronunciationResult = await fetchPronunciationAssessment(
-          lastAudioBlobRef.current,
-          lastUserMessageRef.current
-        );
-
-        if (pronunciationResult) {
-          feedbackData.pronunciationAssessment = pronunciationResult;
-          // Update the pronunciation feedback text with real assessment
-          feedbackData.pronunciation = pronunciationResult.summary;
-        }
-      }
+      await saveSessionAndUpdateLearning(
+        finalMessages,
+        feedbackData,
+        user?.id,
+        topicId,
+        practiceMode,
+        lastAudioBlobRef.current,
+        lastUserMessageRef.current
+      );
 
       setFeedback(feedbackData);
-      saveSession(finalMessages, feedbackData);
-
-      // Update error patterns for personalized learning
-      if (user) {
-        // Add pronunciation weaknesses if assessment is available
-        const feedbackForPatterns = { ...feedbackData };
-        if (feedbackData.pronunciationAssessment) {
-          const mispronounced = feedbackData.pronunciationAssessment.words.filter(
-            (w) => w.errorType === "Mispronunciation" && w.score < 70
-          );
-          if (mispronounced.length > 0) {
-            feedbackForPatterns.weaknesses = [
-              ...feedbackData.weaknesses,
-              `Pronunciation: ${mispronounced.map((w) => w.word).join(", ")}`,
-            ];
-          }
-        }
-        updateErrorPatterns(user.id, feedbackForPatterns);
-
-        // Record learning progress
-        if (topicId && feedbackData.estimatedBand) {
-          recordProgress(user.id, topicId, practiceMode, feedbackData.estimatedBand);
-        }
-      }
     } catch (err) {
       setError(
         err instanceof Error

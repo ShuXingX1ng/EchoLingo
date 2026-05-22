@@ -998,3 +998,31 @@
 **验证结果**:
 - Code review 完成，数据层职责边界清晰
 - 不做大改，记录发现供后续优化参考
+
+---
+
+### Entry 30: 代码结构收敛 — 反馈保存逻辑抽取 (Phase F)
+
+**完成阶段**: Phase F 代码结构收敛
+
+**完成内容**:
+- 创建 `src/lib/feedback-actions.ts` 共享模块
+- 抽取 `fetchFeedback` - 统一反馈 API 调用
+- 抽取 `fetchPronunciationAssessment` - 统一发音评估调用
+- 抽取 `saveSessionAndUpdateLearning` - 统一保存会话 + 更新错误模式 + 记录进度
+- 重构 `practice/page.tsx` 使用新模块，移除重复代码
+- 重构 `exam/page.tsx` 使用新模块，移除重复代码
+
+**关键文件**:
+- `src/lib/feedback-actions.ts` - 反馈保存共享模块（新建）
+- `src/app/practice/page.tsx` - 重构使用新模块
+- `src/app/practice/exam/page.tsx` - 重构使用新模块
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+
+**代码减少**:
+- practice/page.tsx 减少约 40 行
+- exam/page.tsx 减少约 50 行
+- 消除重复的 fetchFeedback、fetchPronunciationAssessment 和反馈保存逻辑
