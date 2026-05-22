@@ -516,6 +516,13 @@
 | 2026-05-18 | Next 16 配置清理 | 固定 Turbopack root，迁移 middleware 到 proxy，构建提示清零 |
 | 2026-05-18 | 下一阶段优化方案 | 新增优化路线文档，明确新窗口接手顺序 |
 | 2026-05-22 | 桌面端网页统一 | DesktopNav 共享组件、颜色/宽度统一、i18n 全覆盖（120+ key） |
+| 2026-05-22 | E2E Mock 规划 | Phase D3 完成：7 条路径 smoke 验收、6 类外部依赖 mock 方案、Playwright 安装前置条件 |
+| 2026-05-22 | 数据流 Review | Phase E1 完成：发现 unified-history 为死代码、feedback-actions 绕过云端保存等 4 个 P0/P1 风险 |
+| 2026-05-22 | E2 修复 + 退出登录 | feedback-actions 改用 unified-history 保存到云端；设置页面新增退出登录按钮 |
+| 2026-05-22 | 历史页云端读取 | history/page.tsx 改用 unified-history 读取/删除会话，补齐历史页 P0 数据流 |
+| 2026-05-22 | 统计页云端读取 | stats.ts 改用 unified-history，统计页等待异步会话数据后渲染 |
+| 2026-05-22 | Session ID 与模式保存 | 本地会话改用 crypto.randomUUID，并保留 unified-history 传入的练习模式 |
+| 2026-05-22 | 备份错误模式 | backup.ts 导出/恢复 error-patterns，备份校验覆盖可选用户画像 |
 
 ---
 
@@ -1067,3 +1074,327 @@
 - useShadowingPractice.ts 移除约 30 行重复录音/API 调用
 - practice/page.tsx 移除约 30 行重复 UI 模板
 - exam/page.tsx 移除约 30 行重复 UI 模板
+
+---
+
+### Entry 32: E2E Mock 规划 (Phase D3)
+
+**完成阶段**: Phase D3 测试与 CI — E2E 规划
+
+**完成内容**:
+
+**D3.1 候选 E2E 路径与 smoke 验收**:
+- 盘点 7 条最值得覆盖的页面路径：`/`、`/practice/setup`、`/practice`、`/practice/exam`、`/practice/shadowing`、`/history`、`/stats`
+- 为每条路径定义"无外部 API"的 smoke 验收标准（页面加载、关键 CTA 可见、空状态不崩溃、无 console error）
+
+**D3.2 外部依赖 mock 方案**:
+- LLM API（`/api/examiner` + `/api/feedback`）：通过 Playwright `page.route()` 拦截，返回固定 JSON 响应
+- Azure TTS（`/api/tts`）：拦截返回空音频 blob 或 stub audio play 为 noop
+- Azure Pronunciation（`/api/pronunciation`）：拦截返回固定评估结果 JSON
+- Supabase Auth/History：未登录走 localStorage 路径无需 mock；已登录场景 stub `useAuth` 返回测试用户
+- Audio Recording：Playwright Chromium 使用 `--use-fake-device-for-media-stream` 启动参数
+- localStorage：默认不 mock，使用 fresh context；需预置数据时通过 `page.evaluate()` 写入
+
+**D3.3 测试层级划分**:
+- 单元/组件测试（Vitest + RTL）：纯 UI 渲染、参数拼接、工具函数
+- E2E 测试（Playwright）：跨页面导航、关键交互路径、状态转换
+- 真实 API E2E（手动）：完整端到端，不纳入 CI
+
+**D3.4 推荐 E2E 测试用例**:
+- P0：首页→setup→练习→结束→反馈→历史 核心路径 smoke
+- P0：首页→模拟考试 smoke
+- P0：历史页/统计页空状态
+- P1：setup 参数传递、text/voice 模式切换、考试计时器
+- P2：API 错误处理、深色模式
+
+**D3.5 Playwright 安装前置条件**:
+- 明确当前不安装 Playwright
+- 安装前需满足：mock 方案验证可行、CI 稳定、维护责任人确定、运行环境确定
+- 判断标准：Phase E/F 重构频繁触碰核心路径且组件测试不足时安装
+
+**关键文件**:
+- `docs/NEXT_OPTIMIZATION_PLAN.md` — D3 章节全面更新
+- `docs/TASKS.md` — 标记 D3 完成
+- `docs/DEVELOPMENT_LOG.md` — 本次记录
+
+**验证结果**:
+- 文档更新，无代码变更
+- 未修改业务代码，未引入新依赖
+
+---
+
+### Entry 33: 数据流 Review (Phase E1)
+
+**完成阶段**: Phase E1 数据层 review 深化
+
+**完成内容**:
+
+#### E1.1 文件职责梳理
+
+| 文件 | 职责 | 存储层 | 读取方 |
+|------|------|--------|--------|
+| `history.ts` | 会话 CRUD（同步） | localStorage `echolingo_sessions` | `feedback-actions.ts`、`history/page.tsx`、`stats.ts`、`backup.ts` |
+| `supabase-history.ts` | 会话 CRUD（云端） | Supabase `sessions` 表 | `unified-history.ts`（但无页面直接调用） |
+| `unified-history.ts` | 会话路由层（local/cloud） | 两者 | `DataMigration.tsx`（仅迁移功能） |
+| `feedback-actions.ts` | 保存会话 + 更新学习数据 | localStorage + Supabase | `practice/page.tsx`、`exam/page.tsx` |
+| `error-patterns.ts` | 用户错误模式分析 | localStorage `echolingo_user_profile_{userId}` | `recommendations.ts`、`PersonalizedSuggestions.tsx` |
+| `recommendations.ts` | 个性化话题推荐 | 读取 error-patterns + supabase-progress | `PersonalizedSuggestions.tsx` |
+| `supabase-progress.ts` | 学习进度记录 | Supabase `learning_progress` 表 | `feedback-actions.ts`、`recommendations.ts` |
+| `recordings.ts` | 音频录制存储 | IndexedDB `echolingo_recordings` | `RecordingsList.tsx` |
+| `stats.ts` | 学习统计计算 | 读取 `history.ts` | `stats/page.tsx` |
+| `backup.ts` | 数据备份/导入导出 | 读取 `history.ts` + `goals.ts` | `BackupModal.tsx` |
+
+#### E1.2 保存策略分析
+
+**未登录场景**：
+- 会话：`feedback-actions.ts` → `history.ts`（localStorage）✅ 正常
+- 错误模式：`error-patterns.ts`（localStorage）✅ 正常
+- 学习进度：`supabase-progress.ts`（Supabase，静默失败）⚠️ 数据丢失
+- 录音：IndexedDB ✅ 正常
+- 统计/历史/备份：读取 localStorage ✅ 正常
+
+**已登录场景**：
+- 会话：`feedback-actions.ts` → `history.ts`（仅 localStorage）❌ **云端未保存**
+- 错误模式：`error-patterns.ts`（仅 localStorage）❌ **不同设备不共享**
+- 学习进度：`supabase-progress.ts`（Supabase）✅ 正常
+- 录音：IndexedDB（仅本地）❌ **不上传云端**
+- 统计/历史/备份：读取 localStorage ❌ **云端会话不可见**
+
+#### E1.3 关键风险发现
+
+**🔴 P0 — `unified-history.ts` 是死代码**
+
+`unified-history.ts` 设计了云端+本地双写逻辑，但实际只有 `DataMigration.tsx` 引用它（仅用于迁移）。核心写入路径 `feedback-actions.ts` 直接调用 `history.ts`，完全绕过云端保存。
+
+影响：已登录用户的所有练习会话只保存在 localStorage，换设备后数据丢失。
+
+**🔴 P0 — History/Stats 页不读取云端数据**
+
+`history/page.tsx` 和 `stats.ts` 直接导入 `history.ts`，只读 localStorage。即使 `unified-history.ts` 的 `getSessions()` 能合并云端+本地数据，也从未被调用。
+
+影响：已登录用户在新设备上看到空历史记录。
+
+**🟡 P1 — Session ID 不一致**
+
+- 本地会话 ID：`Date.now().toString()`（时间戳字符串）
+- 云端会话 ID：Supabase UUID
+- 迁移后 ID 变化，IndexedDB 录音的 `sessionId` 引用断裂
+
+影响：迁移本地数据到云端后，录音关联丢失。
+
+**🟡 P1 — error-patterns 不跨设备同步**
+
+`error-patterns.ts` 使用 localStorage（`echolingo_user_profile_{userId}`），不上传云端。`recommendations.ts` 同时依赖 error-patterns（本地）和 supabase-progress（云端），数据源不一致。
+
+影响：换设备后个性化建议丢失，推荐引擎基于不完整数据工作。
+
+**🟡 P1 — backup.ts 只备份本地数据**
+
+`backup.ts` 的 `createBackup()` 读取 `history.ts`（localStorage），不包含 error-patterns、learning-progress 或 recordings。导入也只写入 localStorage。
+
+影响：备份不完整，恢复后缺少学习进度和个性化数据。
+
+**🟢 P2 — supabase-progress 无本地回退**
+
+`supabase-progress.ts` 直接操作 Supabase，无 localStorage 备份。未登录时 `recordProgress()` 静默失败，学习进度丢失。
+
+影响：未登录用户的学习进度不可恢复。
+
+#### E1.4 最小可行重构建议
+
+**建议 1：让 `feedback-actions.ts` 使用 `unified-history.ts`**（解决 P0）
+
+将 `feedback-actions.ts` 第 2 行：
+```
+import { saveSession } from "./history";
+```
+改为：
+```
+import { saveSession } from "./unified-history";
+```
+
+影响范围：`practice/page.tsx`、`exam/page.tsx` 的保存路径。需验证 `saveSessionAndUpdateLearning` 返回类型兼容。
+
+**建议 2：让 `history/page.tsx` 使用 `unified-history.ts`**（解决 P0）
+
+将 `history/page.tsx` 第 5-6 行：
+```
+import { getSessions, deleteSession, clearAllSessions } from "@/lib/history";
+import type { SavedSession } from "@/lib/history";
+```
+改为：
+```
+import { getSessions, deleteSession, clearAllSessions } from "@/lib/unified-history";
+import type { SavedSession } from "@/lib/history";
+```
+
+注意：`getSessions()` 变为 async，需调整 `useEffect` 调用方式。`deleteSession` 和 `clearAllSessions` 也变为 async。
+
+**建议 3：让 `stats.ts` 使用 `unified-history.ts`**（解决 P0）
+
+`stats.ts` 第 1 行改为从 `unified-history.ts` 导入。`calculateStats()` 需变为 async。
+
+**建议 4：统一 Session ID 生成**（解决 P1）
+
+在 `history.ts` 的 `saveSession()` 中，将 ID 生成从 `Date.now().toString()` 改为使用 `crypto.randomUUID()`，确保本地和云端 ID 格式一致。
+
+**建议 5：error-patterns 增加云端同步**（解决 P1，可延后）
+
+在 `feedback-actions.ts` 中，调用 `updateErrorPatterns()` 后同步写入 Supabase。或在 `supabase-progress.ts` 中增加 error-patterns 表。
+
+**建议 6：backup.ts 增加 error-patterns 导出**（解决 P1，可延后）
+
+在 `createBackup()` 中增加 `errorPatterns` 字段，导入时恢复。
+
+#### E1.5 建议执行顺序
+
+1. 建议 1（feedback-actions → unified-history）— 一行改动，修复核心保存路径
+2. 建议 4（统一 Session ID）— 独立改动，为后续铺路
+3. 建议 2（history page → unified-history）— 需处理 async 变化
+4. 建议 3（stats → unified-history）— 需处理 async 变化
+5. 建议 5、6 — 可延后，不影响核心功能
+
+**关键文件**:
+- `src/lib/feedback-actions.ts` — 核心保存路径，当前绕过云端
+- `src/lib/history.ts` — localStorage CRUD
+- `src/lib/supabase-history.ts` — Supabase CRUD
+- `src/lib/unified-history.ts` — 路由层（设计正确但未被使用）
+- `src/app/history/page.tsx` — 直接读取 localStorage
+- `src/lib/stats.ts` — 直接读取 localStorage
+- `src/lib/error-patterns.ts` — localStorage only
+- `src/lib/backup.ts` — 只备份本地数据
+
+**验证结果**:
+- 文档更新，无代码变更
+- 未修改业务代码，未引入新依赖
+- review 结论基于代码静态分析
+
+---
+
+### Entry 34: E2 数据流修复 + 退出登录修复
+
+**完成阶段**: Phase E2 + Bug fix
+
+**完成内容**:
+
+**E2: 修复 `feedback-actions.ts` 绕过云端保存（P0）**
+
+- `src/lib/feedback-actions.ts` 第 2 行 `import { saveSession } from "./history"` → `"./unified-history"`
+- 第 82 行 `saveSession()` 调用增加 `await` 和 `practiceMode` 参数传递
+- 效果：已登录用户练习/考试结束后，会话正确保存到 Supabase 云端 + localStorage 本地备份
+
+**退出登录修复**
+
+- `src/lib/auth-context.tsx`：`signOut` 函数增加 try-catch 错误处理，`signOut()` 失败时仍清空本地 user/profile 状态
+- `src/app/settings/page.tsx`：设置页面新增"账户"区域，显示用户邮箱和退出登录按钮
+- `src/locales/en.json` + `src/locales/zh.json`：新增 `settings.account` 翻译 key
+- 效果：用户在设置页面可直接退出登录，不再依赖 DesktopNav 头像下拉菜单
+
+**关键文件**:
+- `src/lib/feedback-actions.ts` — import 路径修改
+- `src/lib/auth-context.tsx` — signOut 错误处理
+- `src/app/settings/page.tsx` — 新增账户区域
+- `src/locales/en.json` — 新增 `settings.account`
+- `src/locales/zh.json` — 新增 `settings.account`
+
+**验证结果**:
+- `npm run lint` 通过
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，6 文件 / 23 测试
+
+---
+
+### Entry 35: 历史页云端读取修复
+
+**完成阶段**: Phase E 数据与云端同步稳定性 — P0 历史页读取路径
+
+**完成内容**:
+- `src/app/history/page.tsx` 从 `@/lib/history` 切换为 `@/lib/unified-history`，历史页读取会话时自动走已登录云端优先、未登录本地 fallback。
+- 将历史页初始化加载、单条删除、批量删除、清空全部和导入后刷新调整为 async，匹配统一历史 API。
+- 保留现有历史列表、详情复盘、搜索排序、导出、备份导入、录音回放和批量选择 UI 行为。
+
+**关键文件**:
+- `src/app/history/page.tsx` — 历史页数据入口改为 unified history，并处理 async 状态更新。
+- `docs/DEVELOPMENT_LOG.md` — 记录本次完成内容和验证结果。
+- `docs/PROJECT_CONTEXT.md` — 更新当前数据管理能力说明。
+- `docs/TASKS.md` — 标记 Phase E 历史页 P0 修复完成，保留下一项数据流任务。
+
+**验证结果**:
+- `npm run typecheck` 通过。
+- `npm run lint` 通过。
+- `npm run test:unit:run` 通过，6 个测试文件 / 23 个测试。
+- `npm run build` 通过。
+
+---
+
+### Entry 36: 统计页云端读取修复
+
+**完成阶段**: Phase E 数据与云端同步稳定性 — P0 统计页读取路径
+
+**完成内容**:
+- `src/lib/stats.ts` 从 `history.ts` 切换为 `unified-history.ts`，`calculateStats()` 改为 async，统计计算会读取已登录云端优先、本地 fallback 的统一会话列表。
+- `src/app/stats/page.tsx` 在 `useEffect` 中等待 `calculateStats()` 完成后再更新 UI，并保留现有 300ms loading 过渡和本地目标进度计算。
+- 增加卸载保护，避免统计异步读取返回后更新已卸载组件。
+
+**关键文件**:
+- `src/lib/stats.ts` — 统计数据源改为 unified history。
+- `src/app/stats/page.tsx` — 统计页加载流程改为 async。
+- `docs/DEVELOPMENT_LOG.md` — 记录本次完成内容和验证结果。
+- `docs/PROJECT_CONTEXT.md` — 更新数据管理状态。
+- `docs/TASKS.md` — 标记 Phase E 统计页 P0 修复完成。
+
+**验证结果**:
+- `npm run typecheck` 通过。
+- `npm run lint` 通过。
+- `npm run test:unit:run` 通过，6 个测试文件 / 23 个测试。
+- `npm run build` 通过。
+
+---
+
+### Entry 37: Session ID 与本地模式保存修复
+
+**完成阶段**: Phase E 数据与云端同步稳定性 — P1 Session ID 与本地备份准确性
+
+**完成内容**:
+- `src/lib/history.ts` 新增 `createSessionId()`，优先使用 `crypto.randomUUID()` 生成本地会话 ID，降低迁移和本地/云端 ID 格式不一致风险。
+- `history.saveSession()` 增加 `mode` 参数并默认保持 `ielts_part_1`，避免未登录或云端失败 fallback 时练习模式被固定成 Part 1。
+- `src/lib/unified-history.ts` 在云端保存成功后的本地备份和本地 fallback 中都传入 `mode`，让历史和统计的 Part 分布更准确。
+
+**关键文件**:
+- `src/lib/history.ts` — 本地会话 ID 生成和 mode 保存。
+- `src/lib/unified-history.ts` — 本地备份/fallback 传递真实练习模式。
+- `docs/DEVELOPMENT_LOG.md` — 记录本次完成内容和验证结果。
+- `docs/PROJECT_CONTEXT.md` — 更新数据层稳定性状态。
+- `docs/TASKS.md` — 标记 Phase E Session ID 修复完成。
+
+**验证结果**:
+- `npm run typecheck` 通过。
+- `npm run lint` 通过。
+- `npm run test:unit:run` 通过，6 个测试文件 / 23 个测试。
+- `npm run build` 通过。
+
+---
+
+### Entry 38: 备份错误模式补齐
+
+**完成阶段**: Phase E 数据与云端同步稳定性 — P1 备份范围
+
+**完成内容**:
+- `src/lib/error-patterns.ts` 增加 `getAllUserProfiles()` 和 `restoreUserProfiles()`，用于导出/恢复 localStorage 中的用户错误模式画像。
+- `src/lib/backup.ts` 在备份数据中增加可选 `errorPatterns` 字段，导出时包含用户画像，导入时恢复该字段。
+- 备份校验保持向后兼容：旧备份没有 `errorPatterns` 仍然有效；新备份会校验用户画像的核心结构。
+- `src/lib/backup.test.ts` 增加 error-patterns 备份校验用例。
+
+**关键文件**:
+- `src/lib/error-patterns.ts` — 错误模式画像导出/恢复工具。
+- `src/lib/backup.ts` — 备份格式增加可选 `errorPatterns` 并支持导入恢复。
+- `src/lib/backup.test.ts` — 新增备份校验测试。
+- `docs/DEVELOPMENT_LOG.md` — 记录本次完成内容和验证结果。
+- `docs/PROJECT_CONTEXT.md` — 更新备份能力状态。
+- `docs/TASKS.md` — 标记 Phase E 备份范围补齐完成。
+
+**验证结果**:
+- `npm run typecheck` 通过。
+- `npm run lint` 通过。
+- `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试。
+- `npm run build` 通过。

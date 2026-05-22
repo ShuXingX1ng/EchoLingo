@@ -1,4 +1,5 @@
-import { getSessions, type SavedSession } from "./history";
+import type { SavedSession } from "./history";
+import { getSessions } from "./unified-history";
 
 export type WeakDimension = {
   name: string;
@@ -50,8 +51,8 @@ function getWeekLabel(date: Date): string {
   return `${month}/${day}`;
 }
 
-export function calculateStats(): PracticeStats {
-  const sessions = getSessions();
+export async function calculateStats(): Promise<PracticeStats> {
+  const sessions = await getSessions();
   const now = new Date();
   const weekStart = getWeekStart(now);
   const monthStart = getMonthStart(now);

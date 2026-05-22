@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import DesktopNav from "@/components/DesktopNav";
 import { AZURE_VOICES } from "@/components/VoiceOutput";
 import { useTranslation } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
 import {
   getGoals,
   saveGoals,
@@ -23,6 +24,7 @@ import {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const { user, signOut } = useAuth();
   const [selectedVoice, setSelectedVoice] = useState<string>("en-US-AriaNeural");
   const [rate, setRate] = useState(0.95);
   const [isMuted, setIsMuted] = useState(false);
@@ -516,6 +518,32 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* Account */}
+        {user && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              {t("settings.account")}
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {user.email}
+            </p>
+            <button
+              onClick={async () => {
+                console.log("[Settings] signOut clicked, signOut type:", typeof signOut);
+                try {
+                  await signOut();
+                  console.log("[Settings] signOut completed");
+                } catch (err) {
+                  console.error("[Settings] signOut error:", err);
+                }
+              }}
+              className="w-full px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              {t("auth.logout")}
+            </button>
+          </div>
+        )}
 
         {/* Info */}
         <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">

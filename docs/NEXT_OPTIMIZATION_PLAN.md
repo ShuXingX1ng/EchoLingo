@@ -328,66 +328,179 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - 不追求覆盖率数字本身。
 - 不为稳定 UI 快照引入脆弱的大量 snapshot。
 
-### D3. E2E 规划（下一项推荐）
+### D3. E2E 规划 ✅
 
 目标：先定义最值得覆盖的路径、mock 边界和验收标准，暂时不急着安装 Playwright。
 
 背景：EchoLingo 的核心路径依赖 LLM、Azure pronunciation、Supabase auth/history 和浏览器录音。直接做真实 API E2E 会慢、不稳定、需要 secret，也不适合默认 CI。
 
-具体任务：
+#### D3.1 候选 E2E 路径与 smoke 验收
 
-- [ ] 盘点最值得覆盖的页面路径：
-  - `/`
-  - `/practice/setup`
-  - `/practice`
-  - `/practice/exam`
-  - `/history`
-  - `/stats`
-- [ ] 为每条路径定义“无外部 API”的 smoke 验收：
-  - 页面能加载。
-  - 关键导航和 CTA 可见。
-  - 关键空状态/loading/error 不崩溃。
-  - 不出现 console error。
-- [ ] 标记必须 mock 的流程：
-  - LLM feedback / examiner response。
-  - Azure pronunciation。
-  - Supabase auth/history。
-  - audio recording / microphone permission。
-- [ ] 决定测试层级：
-  - 组件测试覆盖纯 UI 和参数拼接。
-  - E2E 只覆盖跨页面路径和关键回归。
-- [ ] 写入 README 或 docs，说明未来安装 Playwright 前需要满足的前置条件。
+| 路径 | 页面职责 | 关键 smoke 验收 |
+|------|---------|----------------|
+| `/` | 落地页，学习进度入口 | DesktopNav 可见；主 CTA（开始练习/模拟考试/跟读）链接可点；无 console error |
+| `/practice/setup` | 模式与话题选择 | 三种训练类型卡片渲染；四种模式（Part1/2/3/Full）可选；话题列表渲染；start URL 拼接正确 |
+| `/practice` | 普通练习聊天页 | 初始考官消息加载；输入框和 Send 按钮可见；text/voice 模式切换可用；结束会话按钮可见 |
+| `/practice/exam` | 模拟考试页 | Part 1 考官 greeting 加载；阶段指示器渲染；输入框可见；End Exam 按钮可见 |
+| `/practice/shadowing` | 跟读练习页 | setup 视图渲染；模式和话题选择可用；start 按钮可点 |
+| `/history` | 历史记录页 | 空状态引导 CTA 可见；加载状态不崩溃；搜索框渲染 |
+| `/stats` | 学习进度页 | 空状态引导 CTA 可见；加载状态不崩溃；DesktopNav stats 高亮 |
 
-候选文件：
+#### D3.2 外部依赖 mock 方案
 
-- `docs/NEXT_OPTIMIZATION_PLAN.md`
-- `README.md`
-- `src/app/practice/page.tsx`
-- `src/app/practice/exam/page.tsx`
-- `src/app/practice/setup/page.tsx`
-- `src/app/history/page.tsx`
-- `src/app/stats/page.tsx`
-- `src/lib/feedback-actions.ts`
-- `src/lib/unified-history.ts`
+**1. LLM API（`/api/examiner` + `/api/feedback`）**
 
-风险点：
+- 依赖：`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 环境变量
+- 文件：`src/app/api/examiner/route.ts`、`src/app/api/feedback/route.ts`
+- mock 策略：
+  - E2E 层：拦截 `fetch("/api/examiner", ...)` 和 `fetch("/api/feedback", ...)`，返回固定 JSON 响应
+  - API route 层：不修改业务代码；通过 MSW（Mock Service Worker）或 Playwright `page.route()` 拦截
+- mock 响应示例：
+  ```json
+  // examiner
+  { "message": "That's interesting. Can you tell me more about your hometown?" }
+  // feedback
+  {
+    "estimatedBand": 6.5,
+    "fluencyAndCoherence": "Good fluency with minor hesitations.",
+    "lexicalResource": "Adequate vocabulary range.",
+    "grammarRangeAndAccuracy": "Mix of simple and complex structures.",
+    "pronunciation": "Clear pronunciation overall.",
+    "strengths": ["Good use of examples"],
+    "weaknesses": ["Limited complex vocabulary"],
+    "improvementSuggestions": ["Practice using more advanced vocabulary", "Work on linking words"],
+    "improvedSampleAnswer": "Sample improved answer..."
+  }
+  ```
 
-- 如果未先设计 mock，E2E 容易误触真实外部服务。
-- audio recording 和 microphone permission 在 CI 环境中天然不稳定。
-- 过早安装 Playwright 会增加维护负担，但不一定立即提升质量。
+**2. Azure TTS（`/api/tts`）**
+
+- 依赖：`AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`
+- 文件：`src/app/api/tts/route.ts`、`src/components/VoiceOutput.tsx`
+- mock 策略：
+  - E2E 层：拦截 `fetch("/api/tts", ...)`，返回空音频 blob 或短静音 WAV
+  - 或直接 stub `VoiceOutput` 的 audio play 调用为 noop
+
+**3. Azure Pronunciation（`/api/pronunciation`）**
+
+- 依赖：同上 Azure 凭据
+- 文件：`src/app/api/pronunciation/route.ts`
+- mock 策略：
+  - E2E 层：拦截 `fetch("/api/pronunciation", ...)`，返回固定评估结果 JSON
+- mock 响应示例：
+  ```json
+  {
+    "score": 85,
+    "accuracyScore": 82,
+    "fluencyScore": 88,
+    "completenessScore": 91,
+    "words": [{ "word": "hello", "score": 90, "accuracyScore": 88 }],
+    "summary": "Good pronunciation."
+  }
+  ```
+
+**4. Supabase Auth / History**
+
+- 依赖：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- 文件：`src/lib/auth-context.tsx`、`src/lib/supabase-history.ts`、`src/lib/unified-history.ts`
+- mock 策略：
+  - E2E 层：未登录场景不需要 mock Supabase（走 localStorage 路径）
+  - 已登录场景：stub `useAuth` 返回 `{ user: { id: "test-user" } }`，拦截 Supabase REST 请求返回空数据
+  - 或设置测试环境变量指向 Supabase 本地模拟（未来考虑）
+
+**5. Audio Recording / Microphone**
+
+- 依赖：浏览器 `MediaRecorder` / `getUserMedia` API
+- 文件：`src/hooks/useAudioRecorder.ts`、`src/components/VoiceInput.tsx`、`src/components/VoiceControls.tsx`
+- mock 策略：
+  - Playwright Chromium：使用 `--use-fake-device-for-media-stream` 和 `--use-fake-ui-for-media-stream` 启动参数
+  - 或通过 `page.context().grantPermissions(["microphone"])` 授权
+  - 不实际录制音频，VoiceInput/VoiceControls 的 STT 结果通过 stub 注入
+
+**6. localStorage**
+
+- 文件：`src/lib/history.ts`、`src/lib/reminders.ts`、`src/lib/goals.ts`
+- mock 策略：
+  - 默认不 mock，E2E 测试使用 fresh context（Playwright 每个测试独立 browserContext）
+  - 需要预置数据时，通过 `page.evaluate()` 直接写入 localStorage
+
+#### D3.3 测试层级划分
+
+| 层级 | 工具 | 覆盖范围 | 是否需要 mock |
+|------|------|---------|--------------|
+| 单元/组件测试 | Vitest + RTL | 纯 UI 渲染、参数拼接、工具函数 | 不需要外部 mock，已有覆盖 |
+| E2E 测试（推荐优先） | Playwright | 跨页面导航、关键交互路径、状态转换 | 需要 mock 外部 API |
+| 真实 API E2E | Playwright + 真实 key | 完整端到端（不纳入 CI） | 不 mock，手动运行 |
+
+#### D3.4 推荐 E2E 测试用例（按优先级）
+
+**P0 — 核心路径 smoke：**
+
+1. **首页 → setup → 练习 → 结束 → 反馈 → 历史**
+   - 从首页点击"开始练习"
+   - setup 页选择 Part 1 + 任意话题
+   - 练习页发送一条消息，收到 mock 考官回复
+   - 结束会话，等待 mock 反馈
+   - 反馈面板展示预估 Band
+   - 导航到历史页，确认会话已保存
+
+2. **首页 → 模拟考试**
+   - 从首页点击"模拟考试"
+   - 考试页 Part 1 greeting 加载
+   - 阶段指示器可见
+
+3. **历史页空状态**
+   - 无数据时展示空状态引导 CTA
+
+4. **统计页空状态**
+   - 无数据时展示空状态引导 CTA
+
+**P1 — 关键交互：**
+
+5. **setup 页参数传递**
+   - 带 `?focus=fluency,grammar` 参数访问 setup
+   - 训练目标横幅正确显示
+
+6. **练习页 text/voice 模式切换**
+   - 切换到 voice 模式，VoiceControls 可见
+   - 切换回 text 模式，输入框可见
+
+7. **考试 Part 2 计时器**
+   - 进入 Part 2 阶段后计时器可见
+
+**P2 — 边界场景：**
+
+8. **API 错误处理**
+   - examiner API 返回 500，页面展示错误横幅
+   - feedback API 返回 500，页面展示错误提示
+
+9. **深色模式**
+   - 切换深色模式后页面不崩溃
+
+#### D3.5 Playwright 安装前置条件
+
+当前阶段 **不安装 Playwright**。安装前需满足：
+
+- [ ] 本文档中的 mock 方案已验证可行（至少通过手动测试或脚本验证 mock 响应格式）
+- [ ] CI 工作流稳定通过（lint、typecheck、unit test、build）
+- [ ] 团队确认 E2E 维护责任人
+- [ ] 确定 E2E 运行环境（本地 / CI / 两者）
+- [ ] 确定是否引入 MSW 作为 API mock 层，还是纯用 Playwright `page.route()`
+
+判断标准：当 Phase E/F 的重构开始频繁触碰核心路径（practice → feedback → history），且组件测试不足以捕获跨页面回归时，安装 Playwright。
+
+#### D3.6 文件清单
+
+不涉及业务代码修改。规划文档更新：
+
+- `docs/NEXT_OPTIMIZATION_PLAN.md` — 本章节
 
 验收标准：
 
-- [ ] 文档中列出每条候选 E2E 路径、mock 点和不依赖 secret 的验收标准。
-- [ ] 明确暂不做真实 API key E2E。
-- [ ] 明确是否需要安装 Playwright，以及安装前的判断标准。
-- [ ] 未修改业务代码。
-
-不做：
-
-- 不安装 Playwright，除非后续任务明确要求。
-- 不接入真实 LLM/Azure/Supabase。
-- 不把 E2E 作为发布阻塞项，直到 mock 策略稳定。
+- [x] 文档中列出每条候选 E2E 路径、mock 点和不依赖 secret 的验收标准。
+- [x] 明确暂不做真实 API key E2E。
+- [x] 明确是否需要安装 Playwright，以及安装前的判断标准。
+- [x] 未修改业务代码。
 
 ## Phase E: 数据与云端同步稳定性
 
@@ -395,15 +508,31 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 背景：项目已经有本地历史、云端历史、统一历史入口、错误模式、推荐引擎、学习进度、录音回放等多个数据源。Entry 29 已完成第一轮职责边界 review，下一步应在不大改数据层的前提下深化数据流说明，并只对最小边界做重构。
 
-### E1. 数据流 review 深化
+### E1. 数据流 review 深化 ✅
+
+review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
+
+**🔴 P0 — `unified-history.ts` 是死代码**
+
+`unified-history.ts` 设计了云端+本地双写逻辑，但实际只有 `DataMigration.tsx` 引用它。核心写入路径 `feedback-actions.ts` 直接调用 `history.ts`，完全绕过云端保存。`history/page.tsx` 和 `stats.ts` 也直接读取 `history.ts`，不读云端数据。
+
+**🟡 P1 — Session ID 不一致 / error-patterns 不跨设备 / backup 不完整**
+
+最小可行重构建议（按优先级）：
+
+1. `feedback-actions.ts` 第 2 行 `import { saveSession } from "./history"` → 改为 `"./unified-history"`
+2. 统一 Session ID 为 `crypto.randomUUID()`
+3. `history/page.tsx` 改用 `unified-history.ts`（需处理 async）
+4. `stats.ts` 改用 `unified-history.ts`（需处理 async）
+5. `backup.ts` 增加 error-patterns 导出
 
 具体任务：
 
-- [ ] 输出当前数据流说明：
+- [x] 输出当前数据流说明：
   - 未登录：会话、反馈、错误模式、进度、录音如何保存。
   - 已登录：云端保存、本地备份、读取优先级如何工作。
   - 离线或 API 失败：是否降级到本地，用户是否可恢复。
-- [ ] 梳理每个文件职责：
+- [x] 梳理每个文件职责：
   - `src/lib/history.ts`
   - `src/lib/supabase-history.ts`
   - `src/lib/unified-history.ts`
@@ -411,16 +540,16 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
   - `src/lib/recommendations.ts`
   - `src/lib/supabase-progress.ts`
   - `src/lib/feedback-actions.ts`
-  - `src/lib/audio-storage.ts` 或当前录音 IndexedDB 相关文件（先用 `rg` 确认实际文件名）。
-- [ ] 检查是否存在重复保存、覆盖、丢失、不同步：
+  - `src/lib/recordings.ts`（IndexedDB 录音存储）
+- [x] 检查是否存在重复保存、覆盖、丢失、不同步：
   - `saveSession` 是否同时触发本地和云端写入。
   - `saveSessionAndUpdateLearning` 是否清楚区分保存会话、更新错误模式、记录 progress。
   - 历史页、统计页、复盘页是否读取同一份最终结果。
   - 录音文件是否和 session id 稳定关联。
-- [ ] 给出最小可行重构建议：
+- [x] 给出最小可行重构建议：
   - 每条建议只包含一个明确边界。
   - 先写 review 结论，再决定是否改代码。
-- [ ] 判断需要补充哪些测试。
+- [x] 判断需要补充哪些测试。
 
 候选文件：
 
@@ -623,18 +752,16 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 ## 推荐下一项开发任务
 
-**Phase D3: E2E mock 规划。**
+**Phase E2: 修复 P0 数据流问题 — 让 `feedback-actions.ts` 使用 `unified-history.ts`。**
 
 原因：
 
-- Phase A、B、D1、D2 和桌面端统一已经完成。
-- CI 已存在，不应重复实现。
-- Phase E/F 后续改动会继续触碰核心路径，先规划 E2E mock 能降低后续回归风险。
-- 该任务只需要文档和少量代码阅读，不需要安装 Playwright，不会引入新的依赖或外部 API 风险。
+- Phase E1 review 发现 `unified-history.ts` 是死代码，`feedback-actions.ts` 绕过云端保存。
+- 这是一行 import 改动，风险最小，但能立即修复已登录用户会话不保存到云端的问题。
+- 修复后需验证 `saveSessionAndUpdateLearning` 返回类型兼容、历史页/统计页能正确读取。
 
 建议交付物：
 
-- 更新 `docs/NEXT_OPTIMIZATION_PLAN.md` 或 README 中的 E2E 规划章节。
-- 列出 `/`、`/practice/setup`、`/practice`、`/practice/exam`、`/history`、`/stats` 的 smoke path。
-- 明确 LLM、Azure pronunciation、Supabase auth/history、audio recording 的 mock 方案。
-- 明确是否安装 Playwright 的判断条件。
+- 修改 `src/lib/feedback-actions.ts` 第 2 行 import 路径。
+- 验证 `npm run lint && npm run typecheck && npm run test:unit:run`。
+- 更新 `docs/DEVELOPMENT_LOG.md`。

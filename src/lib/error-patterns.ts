@@ -50,6 +50,39 @@ export function saveUserProfile(profile: UserProfile): void {
   }
 }
 
+export function getAllUserProfiles(): UserProfile[] {
+  if (typeof window === "undefined") return [];
+
+  const profiles: UserProfile[] = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(`${PROFILE_KEY}_`)) continue;
+
+    try {
+      const data = localStorage.getItem(key);
+      if (data) {
+        profiles.push(JSON.parse(data));
+      }
+    } catch {
+      // Skip malformed profile entries instead of blocking backup creation.
+    }
+  }
+
+  return profiles;
+}
+
+export function restoreUserProfiles(profiles: UserProfile[]): number {
+  let restored = 0;
+
+  for (const profile of profiles) {
+    saveUserProfile(profile);
+    restored++;
+  }
+
+  return restored;
+}
+
 // Update error patterns based on feedback
 export function updateErrorPatterns(
   userId: string,

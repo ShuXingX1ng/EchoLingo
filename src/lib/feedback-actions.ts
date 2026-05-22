@@ -1,5 +1,5 @@
 import type { ChatMessage, SessionFeedback } from "@/types";
-import { saveSession } from "./history";
+import { saveSession } from "./unified-history";
 import { updateErrorPatterns } from "./error-patterns";
 import { recordProgress } from "./supabase-progress";
 
@@ -78,8 +78,8 @@ export async function saveSessionAndUpdateLearning(
     }
   }
 
-  // Save session
-  saveSession(messages, feedbackData);
+  // Save session (unified: cloud + local backup for authenticated, local-only fallback)
+  await saveSession(messages, feedbackData, practiceMode);
 
   // Update error patterns for personalized learning
   if (userId) {

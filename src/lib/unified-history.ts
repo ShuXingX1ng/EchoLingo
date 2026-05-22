@@ -24,13 +24,13 @@ export async function saveSession(
     );
     if (cloudSession) {
       // Also save locally as backup
-      localHistory.saveSession(messages, feedback);
+      localHistory.saveSession(messages, feedback, mode);
       return cloudSession;
     }
   }
 
   // Fallback to local storage
-  return localHistory.saveSession(messages, feedback);
+  return localHistory.saveSession(messages, feedback, mode);
 }
 
 // Get all sessions (auto-detect local vs cloud)

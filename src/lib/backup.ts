@@ -1,11 +1,17 @@
 import { getSessions, type SavedSession } from "./history";
 import { getGoals, type PracticeGoal } from "./goals";
+import {
+  getAllUserProfiles,
+  restoreUserProfiles,
+  type UserProfile,
+} from "./error-patterns";
 
 export type BackupData = {
   version: string;
   createdAt: string;
   sessions: SavedSession[];
   goals: PracticeGoal | null;
+  errorPatterns?: UserProfile[];
   settings: {
     voiceURI: string | null;
     voiceRate: string | null;
@@ -21,6 +27,7 @@ export function createBackup(): BackupData {
     createdAt: new Date().toISOString(),
     sessions: getSessions(),
     goals: getGoals(),
+    errorPatterns: getAllUserProfiles(),
     settings: {
       voiceURI: localStorage.getItem("echolingo_voice_uri"),
       voiceRate: localStorage.getItem("echolingo_voice_rate"),
@@ -59,6 +66,23 @@ export function validateBackup(data: unknown): data is BackupData {
     if (!Array.isArray(session.messages)) return false;
     if (!session.feedback || typeof session.feedback !== "object") return false;
     if (typeof session.feedback.estimatedBand !== "number") return false;
+  }
+
+  if (backup.errorPatterns !== undefined) {
+    if (!Array.isArray(backup.errorPatterns)) return false;
+
+    for (const profile of backup.errorPatterns) {
+      if (!profile || typeof profile !== "object") return false;
+
+      const userProfile = profile as Record<string, unknown>;
+      if (typeof userProfile.userId !== "string") return false;
+      if (!Array.isArray(userProfile.commonErrors)) return false;
+      if (!Array.isArray(userProfile.strengths)) return false;
+      if (!Array.isArray(userProfile.weakAreas)) return false;
+      if (typeof userProfile.practiceCount !== "number") return false;
+      if (typeof userProfile.averageBand !== "number") return false;
+      if (typeof userProfile.lastUpdated !== "string") return false;
+    }
   }
 
   return true;
@@ -112,6 +136,10 @@ export function importBackup(file: File): Promise<ImportResult> {
 
         if (data.goals) {
           localStorage.setItem("echolingo_goals", JSON.stringify(data.goals));
+        }
+
+        if (data.errorPatterns) {
+          restoreUserProfiles(data.errorPatterns);
         }
 
         if (data.settings) {

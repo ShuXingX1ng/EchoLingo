@@ -363,6 +363,7 @@
   "settings.testVoice": "Test Voice",
   "settings.playing": "Playing...",
   "settings.saveSettings": "Save Settings",
+  "settings.account": "Account",
   "settings.aboutTitle": "About Settings",
   "settings.aboutGoals": "Practice goals help you stay motivated and track progress",
   "settings.aboutVoices": "Voices are powered by Azure Neural TTS for natural sound",

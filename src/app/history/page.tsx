@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { getSessions, deleteSession, clearAllSessions } from "@/lib/history";
+import {
+  getSessions,
+  deleteSession,
+  clearAllSessions,
+} from "@/lib/unified-history";
 import type { SavedSession } from "@/lib/history";
 import BackupModal from "@/components/BackupModal";
 import RecordingsList from "@/components/RecordingsList";
@@ -24,16 +28,21 @@ export default function HistoryPage() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
-  useEffect(() => {
+  const refreshSessions = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const loaded = getSessions();
+      const loaded = await getSessions();
       setSessions(loaded);
     } catch {
-      // localStorage not available
+      setSessions([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    void refreshSessions();
+  }, [refreshSessions]);
 
   // 筛选和排序
   const filteredSessions = useMemo(() => {
@@ -72,26 +81,30 @@ export default function HistoryPage() {
   }, [sessions, searchQuery, sortBy]);
 
   // 删除单个会话
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm(t("history.confirmDelete"))) {
-      deleteSession(id);
+      await deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
+      return true;
     }
+
+    return false;
   };
 
   // 批量删除
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (
       confirm(
         t("history.confirmDeleteMultiple", { count: selectedIds.size })
       )
     ) {
-      selectedIds.forEach((id) => deleteSession(id));
+      const idsToDelete = Array.from(selectedIds);
+      await Promise.all(idsToDelete.map((id) => deleteSession(id)));
       setSessions((prev) => prev.filter((s) => !selectedIds.has(s.id)));
       setSelectedIds(new Set());
       setIsSelectMode(false);
@@ -139,9 +152,9 @@ export default function HistoryPage() {
   };
 
   // 清空所有数据
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm(t("history.confirmDeleteAll"))) {
-      clearAllSessions();
+      await clearAllSessions();
       setSessions([]);
       setSelectedIds(new Set());
     }
@@ -152,9 +165,11 @@ export default function HistoryPage() {
       <SessionDetail
         session={selectedSession}
         onBack={() => setSelectedSession(null)}
-        onDelete={() => {
-          handleDelete(selectedSession.id);
-          setSelectedSession(null);
+        onDelete={async () => {
+          const deleted = await handleDelete(selectedSession.id);
+          if (deleted) {
+            setSelectedSession(null);
+          }
         }}
       />
     );
@@ -467,9 +482,7 @@ export default function HistoryPage() {
       <BackupModal
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}
-        onImportComplete={() => {
-          setSessions(getSessions());
-        }}
+        onImportComplete={refreshSessions}
       />
     </div>
   );

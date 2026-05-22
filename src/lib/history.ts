@@ -12,13 +12,22 @@ export type SavedSession = {
 const STORAGE_KEY = "echolingo_sessions";
 const MAX_SESSIONS = 50; // 最大保存会话数
 
+function createSessionId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function saveSession(
   messages: ChatMessage[],
-  feedback: SessionFeedback
+  feedback: SessionFeedback,
+  mode: string = "ielts_part_1"
 ): SavedSession {
   const session: SavedSession = {
-    id: Date.now().toString(),
-    mode: "ielts_part_1",
+    id: createSessionId(),
+    mode,
     messages,
     feedback,
     createdAt: messages[0]?.createdAt || new Date().toISOString(),

@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await Promise.race([signOutPromise, timeoutPromise]);
       console.log("[Auth] signOut result:", result);
 
-      const { error } = result as { error: any };
+      const { error } = result as { error: unknown };
       console.log("[Auth] signOut response:", { error });
       if (error) {
         console.error("[Auth] Sign out error:", error);

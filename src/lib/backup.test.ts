@@ -40,6 +40,16 @@ const validBackup: BackupData = {
   },
 };
 
+const validUserProfile = {
+  userId: "user-1",
+  commonErrors: [],
+  strengths: ["Clear answer"],
+  weakAreas: ["Grammar"],
+  practiceCount: 3,
+  averageBand: 6.5,
+  lastUpdated: "2026-05-17T00:00:00.000Z",
+};
+
 describe("validateBackup", () => {
   it("accepts a well formed backup", () => {
     expect(validateBackup(validBackup)).toBe(true);
@@ -70,6 +80,31 @@ describe("validateBackup", () => {
             },
           },
         ],
+      })
+    ).toBe(false);
+  });
+
+  it("accepts optional error pattern profiles", () => {
+    expect(
+      validateBackup({
+        ...validBackup,
+        errorPatterns: [validUserProfile],
+      })
+    ).toBe(true);
+  });
+
+  it("rejects malformed error pattern profiles", () => {
+    expect(
+      validateBackup({
+        ...validBackup,
+        errorPatterns: [{ ...validUserProfile, userId: undefined }],
+      })
+    ).toBe(false);
+
+    expect(
+      validateBackup({
+        ...validBackup,
+        errorPatterns: [{ ...validUserProfile, commonErrors: {} }],
       })
     ).toBe(false);
   });

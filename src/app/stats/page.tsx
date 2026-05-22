@@ -22,12 +22,35 @@ export default function StatsPage() {
   const { t } = useTranslation();
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadStats() {
+      try {
+        const loadedStats = await calculateStats();
+        if (!isMounted) return;
+
+        setStats(loadedStats);
+        setGoalProgress(calculateGoalProgress());
+      } catch {
+        if (!isMounted) return;
+
+        setStats(null);
+        setGoalProgress(calculateGoalProgress());
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
     const timer = setTimeout(() => {
-      setStats(calculateStats());
-      setGoalProgress(calculateGoalProgress());
-      setIsLoading(false);
+      void loadStats();
     }, 300);
-    return () => clearTimeout(timer);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   if (isLoading) {

@@ -181,7 +181,7 @@
 
 ### 下一阶段优化路线
 
-详见 `docs/NEXT_OPTIMIZATION_PLAN.md`。D2 和 B1 已完成，下一步建议执行 Phase A1。
+详见 `docs/NEXT_OPTIMIZATION_PLAN.md`。Phase E 当前清单已完成：反馈保存、历史页读取、统计页读取、Session ID 和备份范围均已收敛。下一步建议转向 Phase C 移动端核心流程打磨，或继续深化 error-patterns 云端同步。
 
 ### Phase A: 学习闭环统一
 
@@ -209,13 +209,18 @@
 - [x] 扩展 `FeedbackPanel` 发音队列/无发音队列状态测试
 - [x] 覆盖 practice setup 训练类型和 start URL
 - [x] 新增 CI 质量门：lint、typecheck、unit test、build
-- [ ] 规划 mock 外部 API 的 E2E 测试
+- [x] 规划 mock 外部 API 的 E2E 测试
 
 ### Phase E: 数据与云端同步稳定性
 
 - [x] Review `history.ts`、`supabase-history.ts`、`unified-history.ts` 职责边界
 - [x] 明确未登录/已登录/离线时的保存策略
 - [x] 检查 error patterns 与 recommendations 是否消费最新复盘结果
+- [x] 修复 P0：`feedback-actions.ts` 使用 `unified-history.ts` 保存会话（当前绕过云端）
+- [x] 修复 P0：`history/page.tsx` 使用 `unified-history.ts` 读取会话（已登录云端优先，未登录本地 fallback）
+- [x] 修复 P0：`stats.ts` 使用 `unified-history.ts` 读取会话（已登录云端优先，未登录本地 fallback）
+- [x] 修复 P1：统一 Session ID 生成为 `crypto.randomUUID()`，并保留本地 fallback 的真实练习模式
+- [x] 修复 P1：`backup.ts` 增加 error-patterns 导出/恢复，并保持旧备份兼容
 
 ### Phase F: 代码结构收敛
 
@@ -258,7 +263,7 @@
 
 ### 第四阶段：网页端优化 (当前)
 
-10. **E2E 测试** - 规划 mock 外部 API 的端到端测试
+10. ~~**E2E 测试** - 规划 mock 外部 API 的端到端测试~~ ✅
 11. **数据同步稳定性** - 审查 localStorage、Supabase、IndexedDB 职责边界
 12. **网页端交互打磨** - 练习流程、反馈展示、历史回看的桌面端体验优化
 

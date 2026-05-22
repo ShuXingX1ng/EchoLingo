@@ -363,6 +363,7 @@
   "settings.testVoice": "测试语音",
   "settings.playing": "播放中...",
   "settings.saveSettings": "保存设置",
+  "settings.account": "账户",
   "settings.aboutTitle": "关于设置",
   "settings.aboutGoals": "练习目标帮助你保持动力并追踪进度",
   "settings.aboutVoices": "语音由 Azure Neural TTS 提供，音色自然",
