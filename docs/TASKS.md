@@ -213,9 +213,9 @@
 
 ### Phase E: 数据与云端同步稳定性
 
-- [ ] Review `history.ts`、`supabase-history.ts`、`unified-history.ts` 职责边界
-- [ ] 明确未登录/已登录/离线时的保存策略
-- [ ] 检查 error patterns 与 recommendations 是否消费最新复盘结果
+- [x] Review `history.ts`、`supabase-history.ts`、`unified-history.ts` 职责边界
+- [x] 明确未登录/已登录/离线时的保存策略
+- [x] 检查 error patterns 与 recommendations 是否消费最新复盘结果
 
 ### Phase F: 代码结构收敛
 

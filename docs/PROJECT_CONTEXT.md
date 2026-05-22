@@ -56,6 +56,21 @@
 - 质量门：lint、typecheck、unit test、build
 - 本地质量门命令：`npm run lint && npm run typecheck && npm run test:unit:run && npm run build`
 
+### 数据层架构
+
+| 模块 | 职责 | 存储 | API |
+|------|------|------|-----|
+| `history.ts` | 本地会话存储 | localStorage (max 50) | 同步 |
+| `supabase-history.ts` | 云端会话存储 | Supabase (max 100) | 异步 |
+| `unified-history.ts` | 统一入口 | 自动选择 | 异步 |
+| `error-patterns.ts` | 错误模式分析 | localStorage | 同步 |
+| `recommendations.ts` | 话题推荐 | 读取 progress + error-patterns | 异步 |
+
+**保存策略**：
+- 已登录：云端 + 本地备份，读取优先云端
+- 未登录：本地存储
+- 迁移：支持本地 → 云端一键迁移
+
 ---
 
 ## 核心功能

@@ -959,3 +959,42 @@
 **验证结果**:
 - YAML 语法验证通过
 - CI 文件存在并通过本地检查
+
+---
+
+### Entry 29: 数据层审查 (Phase E)
+
+**完成阶段**: Phase E 数据与云端同步稳定性
+
+**完成内容**:
+
+**E1. 数据层职责边界审查**:
+- `history.ts`: 本地 localStorage 存储，同步 API，最大 50 会话
+- `supabase-history.ts`: Supabase 云端存储，异步 API，最大 100 会话
+- `unified-history.ts`: 统一入口，自动检测登录状态选择后端
+
+**保存策略确认**:
+- 已登录：云端 + 本地备份，读取优先云端
+- 未登录：本地存储
+- 迁移：支持本地 → 云端一键迁移
+
+**E2. 错误模式与推荐联动审查**:
+- `error-patterns.ts` 只消费 `feedback.weaknesses` 数组
+- 未使用 `errorAnnotations`（具体错误标注）和 `improvementSuggestions`
+- `recommendations.ts` 生成泛化理由，未关联用户具体错误
+- 推荐引擎依赖 `error-patterns.ts` + `supabase-progress.ts`
+
+**发现的改进空间**:
+- 推荐理由可引用具体错误模式（如 "Practice: Subject-verb agreement"）
+- 但需修改数据结构，当前保持稳定优先
+
+**关键文件**:
+- `src/lib/history.ts` - 本地存储模块
+- `src/lib/supabase-history.ts` - 云端存储模块
+- `src/lib/unified-history.ts` - 统一入口
+- `src/lib/error-patterns.ts` - 错误模式分析
+- `src/lib/recommendations.ts` - 推荐引擎
+
+**验证结果**:
+- Code review 完成，数据层职责边界清晰
+- 不做大改，记录发现供后续优化参考
