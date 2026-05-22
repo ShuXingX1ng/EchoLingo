@@ -49,6 +49,13 @@
 - 完成有意义的开发任务后，使用 `.agents/skills/update-dev-log` / `$update-project-docs` 更新 `docs/DEVELOPMENT_LOG.md`、`docs/PROJECT_CONTEXT.md` 和 `docs/TASKS.md`。
 - 文档更新只记录实际完成的工作和真实验证结果；商业化、支付、订阅、社交能力默认保持在 future/backlog。
 
+### CI/CD
+
+- GitHub Actions 工作流：`.github/workflows/ci.yml`
+- 触发条件：push 和 pull_request 到 main 分支
+- 质量门：lint、typecheck、unit test、build
+- 本地质量门命令：`npm run lint && npm run typecheck && npm run test:unit:run && npm run build`
+
 ---
 
 ## 核心功能

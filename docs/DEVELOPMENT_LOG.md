@@ -940,3 +940,22 @@
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，6 个测试文件 / 23 个测试
 - `npm run build` 通过，Next.js 16.2.6 / Turbopack 构建成功
+
+---
+
+### Entry 28: CI 工作流
+
+**完成阶段**: Phase D1 测试与 CI
+
+**完成内容**:
+- 创建 GitHub Actions CI 工作流文件 `.github/workflows/ci.yml`
+- 配置质量门：lint、typecheck、unit test、build
+- 触发条件：push 和 pull_request 到 main 分支
+- 使用 Node.js 20 和 npm 缓存
+
+**关键文件**:
+- `.github/workflows/ci.yml` - CI 工作流配置
+
+**验证结果**:
+- YAML 语法验证通过
+- CI 文件存在并通过本地检查

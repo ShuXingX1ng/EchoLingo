@@ -208,7 +208,7 @@
 - [x] 增加 `MobileNav` 显示/隐藏逻辑组件测试
 - [x] 扩展 `FeedbackPanel` 发音队列/无发音队列状态测试
 - [x] 覆盖 practice setup 训练类型和 start URL
-- [ ] 新增 CI 质量门：lint、typecheck、unit test、build
+- [x] 新增 CI 质量门：lint、typecheck、unit test、build
 - [ ] 规划 mock 外部 API 的 E2E 测试
 
 ### Phase E: 数据与云端同步稳定性
