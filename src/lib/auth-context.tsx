@@ -86,9 +86,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    console.log("[Auth] signOut called");
+    console.log("[Auth] supabase client:", supabase);
+    console.log("[Auth] supabase.auth:", supabase.auth);
+    console.log("[Auth] calling supabase.auth.signOut()...");
+    try {
+      // Add timeout to detect hanging requests
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("signOut timeout after 5s")), 5000)
+      );
+
+      const signOutPromise = supabase.auth.signOut();
+      console.log("[Auth] signOut promise created");
+
+      const result = await Promise.race([signOutPromise, timeoutPromise]);
+      console.log("[Auth] signOut result:", result);
+
+      const { error } = result as { error: any };
+      console.log("[Auth] signOut response:", { error });
+      if (error) {
+        console.error("[Auth] Sign out error:", error);
+      }
+    } catch (err) {
+      console.error("[Auth] signOut exception:", err);
+    }
+    console.log("[Auth] clearing local state...");
+    setUser(null);
+    setProfile(null);
+    console.log("[Auth] redirecting to /...");
+    window.location.href = "/";
   };
 
   return (
