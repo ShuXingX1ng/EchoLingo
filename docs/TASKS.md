@@ -221,6 +221,9 @@
 - [x] 修复 P0：`stats.ts` 使用 `unified-history.ts` 读取会话（已登录云端优先，未登录本地 fallback）
 - [x] 修复 P1：统一 Session ID 生成为 `crypto.randomUUID()`，并保留本地 fallback 的真实练习模式
 - [x] 修复 P1：`backup.ts` 增加 error-patterns 导出/恢复，并保持旧备份兼容
+- [x] E2：`error-patterns.ts` 扩展消费 `errorAnnotations` 和 `improvementSuggestions`
+- [x] E2：`recommendations.ts` 推荐理由关联具体高频错误 pattern
+- [x] E2：新增 `error-patterns.test.ts` 覆盖 20 个测试用例
 
 ### Phase F: 代码结构收敛
 

@@ -32,6 +32,15 @@ function getWeakSkills(userId: string): string[] {
     .map(([skill]) => skill);
 }
 
+// Get a specific error pattern for a skill type to use in recommendation reasons
+function getTopErrorForSkill(userId: string, skill: string): string | null {
+  const profile = getUserProfile(userId);
+  if (!profile) return null;
+
+  const match = profile.commonErrors.find((e) => e.type === skill);
+  return match?.pattern ?? null;
+}
+
 // Get topics the user hasn't practiced yet
 function getUnpracticedTopics(progress: LearningProgress[]): Topic[] {
   const practicedIds = new Set(progress.map((p) => p.topic_id));
@@ -123,11 +132,16 @@ export async function getRecommendations(userId: string): Promise<Recommendation
         break;
     }
 
+    const topError = getTopErrorForSkill(userId, topWeakSkill);
+
     for (const topic of targetTopics) {
       if (!usedTopicIds.has(topic.id)) {
+        const reason = topError
+          ? `Work on ${topWeakSkill}: "${topError}"`
+          : `Improve your ${topWeakSkill}`;
         recommendations.push({
           topic,
-          reason: `Improve your ${topWeakSkill}`,
+          reason,
           priority: 2,
           focusArea: topWeakSkill,
         });

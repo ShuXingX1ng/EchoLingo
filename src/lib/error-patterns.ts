@@ -1,5 +1,7 @@
 // User error pattern analysis and storage for personalized learning
 
+import type { ErrorAnnotation } from "@/types";
+
 export interface ErrorPattern {
   id: string;
   userId: string;
@@ -92,6 +94,8 @@ export function updateErrorPatterns(
     fluencyAndCoherence: string;
     pronunciation: string;
     weaknesses: string[];
+    errorAnnotations?: ErrorAnnotation[];
+    improvementSuggestions?: string[];
   }
 ): UserProfile {
   const existing = getUserProfile(userId) || {
@@ -104,11 +108,10 @@ export function updateErrorPatterns(
     lastUpdated: new Date().toISOString(),
   };
 
-  // Extract error patterns from weaknesses
   const newPatterns: ErrorPattern[] = [];
 
+  // Extract error patterns from weaknesses (original path)
   feedback.weaknesses.forEach((weakness) => {
-    // Check if this pattern already exists
     const existingPattern = existing.commonErrors.find(
       (p) => p.pattern.toLowerCase() === weakness.toLowerCase()
     );
@@ -117,29 +120,7 @@ export function updateErrorPatterns(
       existingPattern.frequency++;
       existingPattern.lastOccurred = new Date().toISOString();
     } else {
-      // Determine type based on keywords
-      let type: ErrorPattern["type"] = "fluency";
-      const lowerWeakness = weakness.toLowerCase();
-
-      if (
-        lowerWeakness.includes("grammar") ||
-        lowerWeakness.includes("tense") ||
-        lowerWeakness.includes("sentence structure")
-      ) {
-        type = "grammar";
-      } else if (
-        lowerWeakness.includes("vocabulary") ||
-        lowerWeakness.includes("word") ||
-        lowerWeakness.includes("lexical")
-      ) {
-        type = "vocabulary";
-      } else if (
-        lowerWeakness.includes("pronunciation") ||
-        lowerWeakness.includes("accent") ||
-        lowerWeakness.includes("sound")
-      ) {
-        type = "pronunciation";
-      }
+      const type = inferTypeFromText(weakness);
 
       newPatterns.push({
         id: `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -153,10 +134,61 @@ export function updateErrorPatterns(
     }
   });
 
+  // Extract error patterns from errorAnnotations (richer signal)
+  if (feedback.errorAnnotations) {
+    for (const annotation of feedback.errorAnnotations) {
+      const patternText = annotation.corrected || annotation.original;
+      const existingPattern = existing.commonErrors.find(
+        (p) => p.pattern.toLowerCase() === patternText.toLowerCase()
+      );
+
+      if (existingPattern) {
+        existingPattern.frequency++;
+        existingPattern.lastOccurred = new Date().toISOString();
+        // Add example if not already present
+        if (
+          annotation.original &&
+          !existingPattern.examples.includes(annotation.original)
+        ) {
+          existingPattern.examples.push(annotation.original);
+          if (existingPattern.examples.length > 5) {
+            existingPattern.examples = existingPattern.examples.slice(-5);
+          }
+        }
+      } else {
+        newPatterns.push({
+          id: `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId,
+          type: annotation.type,
+          pattern: patternText,
+          examples: annotation.original ? [annotation.original] : [],
+          frequency: 1,
+          lastOccurred: new Date().toISOString(),
+          improvement: annotation.explanation,
+        });
+      }
+    }
+  }
+
   // Merge new patterns
   existing.commonErrors = [...existing.commonErrors, ...newPatterns]
     .sort((a, b) => b.frequency - a.frequency)
     .slice(0, 20); // Keep top 20 most frequent errors
+
+  // Enrich patterns with improvement suggestions where missing
+  if (feedback.improvementSuggestions && feedback.improvementSuggestions.length > 0) {
+    for (const pattern of existing.commonErrors) {
+      if (!pattern.improvement) {
+        // Find a suggestion that relates to this pattern's type
+        const matchingSuggestion = feedback.improvementSuggestions.find((s) =>
+          s.toLowerCase().includes(pattern.type)
+        );
+        if (matchingSuggestion) {
+          pattern.improvement = matchingSuggestion;
+        }
+      }
+    }
+  }
 
   // Update practice count
   existing.practiceCount++;
@@ -166,6 +198,33 @@ export function updateErrorPatterns(
   saveUserProfile(existing);
 
   return existing;
+}
+
+function inferTypeFromText(text: string): ErrorPattern["type"] {
+  const lower = text.toLowerCase();
+
+  if (
+    lower.includes("grammar") ||
+    lower.includes("tense") ||
+    lower.includes("sentence structure")
+  ) {
+    return "grammar";
+  }
+  if (
+    lower.includes("vocabulary") ||
+    lower.includes("word") ||
+    lower.includes("lexical")
+  ) {
+    return "vocabulary";
+  }
+  if (
+    lower.includes("pronunciation") ||
+    lower.includes("accent") ||
+    lower.includes("sound")
+  ) {
+    return "pronunciation";
+  }
+  return "fluency";
 }
 
 // Get personalized suggestions based on error patterns

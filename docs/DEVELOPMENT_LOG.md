@@ -1462,3 +1462,38 @@ import type { SavedSession } from "@/lib/history";
 - `npm run lint` 通过，0 warning / 0 error
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试
+
+---
+
+### Entry 41: Phase E2 — 错误模式与推荐联动补强
+
+**完成阶段**: Phase E2 数据与云端同步稳定性深化
+
+**完成内容**:
+
+**error-patterns.ts 数据消费扩展**:
+- `updateErrorPatterns` 新增消费 `errorAnnotations`：从标注错误中提取 typed pattern、corrected 文本和 examples
+- 新增消费 `improvementSuggestions`：自动填充 `ErrorPattern.improvement` 字段
+- 抽取 `inferTypeFromText()` 辅助函数，减少重复代码
+- 新增 `ErrorAnnotation` 类型导入
+- 兼容旧数据：`errorAnnotations` 和 `improvementSuggestions` 均为可选字段，缺失时不崩溃
+- examples 上限 5 条，commonErrors 上限 20 条（保持不变）
+
+**recommendations.ts 推荐理由优化**:
+- 新增 `getTopErrorForSkill()` 函数，按 skill type 获取最高频具体错误
+- 推荐理由从泛化 `"Improve your grammar"` 改为具体 `"Work on grammar: "subject-verb agreement""`
+- 无匹配错误时保持 fallback 泛化理由
+
+**测试覆盖**:
+- 新增 `src/lib/error-patterns.test.ts`，20 个测试用例
+- 覆盖：基础 weakness 处理、type 推断、errorAnnotations 提取、duplicate 合并、examples 累积上限、improvementSuggestions 填充、不覆盖已有 improvement、向后兼容（缺失字段）、getUserProfile、getPersonalizedSuggestions、getErrorStats
+
+**关键文件**:
+- `src/lib/error-patterns.ts` — 数据消费扩展
+- `src/lib/recommendations.ts` — 推荐理由关联具体错误
+- `src/lib/error-patterns.test.ts` — 新增测试文件
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试

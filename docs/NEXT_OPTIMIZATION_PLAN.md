@@ -587,15 +587,15 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - 不删除本地备份路径。
 - 不实现商业化、订阅、配额或运营统计。
 
-### E2. 错误模式与推荐联动补强
+### E2. 错误模式与推荐联动补强 ✅
 
 具体任务：
 
-- [ ] 检查 `error-patterns.ts` 是否只消费 `feedback.weaknesses`。
-- [ ] 评估是否应消费 `errorAnnotations` 和 `improvementSuggestions`。
-- [ ] 检查 `recommendations.ts` 的推荐理由是否能关联最近几次练习的具体错误。
-- [ ] 设计最小数据结构调整，优先兼容旧历史数据。
-- [ ] 能补测试就补测试，尤其是旧数据缺字段时的降级。
+- [x] 检查 `error-patterns.ts` 是否只消费 `feedback.weaknesses`。
+- [x] 评估是否应消费 `errorAnnotations` 和 `improvementSuggestions`。
+- [x] 检查 `recommendations.ts` 的推荐理由是否能关联最近几次练习的具体错误。
+- [x] 设计最小数据结构调整，优先兼容旧历史数据。
+- [x] 能补测试就补测试，尤其是旧数据缺字段时的降级。
 
 候选文件：
 
@@ -613,9 +613,9 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 验收标准：
 
-- [ ] 推荐理由比泛化提示更贴近最近反馈。
-- [ ] 旧数据缺少新字段时不崩溃。
-- [ ] 相关测试覆盖有字段/无字段两种路径。
+- [x] 推荐理由比泛化提示更贴近最近反馈。
+- [x] 旧数据缺少新字段时不崩溃。
+- [x] 相关测试覆盖有字段/无字段两种路径。
 
 不做：
 
