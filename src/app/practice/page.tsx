@@ -288,18 +288,18 @@ function PracticePage() {
         <div className="mx-auto grid max-w-4xl gap-3 text-sm sm:grid-cols-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Session goal
+              {t("practice.sessionGoal")}
             </p>
             <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
-              Give clear, extended answers
+              {t("practice.sessionGoalHint")}
             </p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Evidence collected
+              {t("practice.evidenceCollected")}
             </p>
             <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
-              {messages.filter((message) => message.role === "user").length} candidate answers
+              {t("practice.candidateAnswers", { count: messages.filter((message) => message.role === "user").length })}
             </p>
           </div>
           <div>
@@ -336,12 +336,12 @@ function PracticePage() {
                 className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
                     ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md"
-                    : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm"
+                    : "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md shadow-sm"
                 }`}
               >
                 {message.role === "examiner" && (
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       {t("practice.examiner")}
                     </p>
                     <VoiceOutput
@@ -373,13 +373,13 @@ function PracticePage() {
             <>
               {/* Mode Toggle */}
               <div className="flex justify-center mb-3">
-                <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800/50">
+                <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800/50">
                   <button
                     onClick={() => setInputMode("text")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "text"
-                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                   >
                     {t("practice.textMode")}
@@ -388,8 +388,8 @@ function PracticePage() {
                     onClick={() => setInputMode("voice")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "voice"
-                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                   >
                     {t("practice.voiceMode")}

@@ -1433,3 +1433,32 @@ import type { SavedSession } from "@/lib/history";
 - `npm run lint` 通过，0 warning / 0 error
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试
+
+---
+
+### Entry 40: 网页端交互打磨
+
+**完成阶段**: 网页端体验优化
+
+**完成内容**:
+
+**Practice 页面**:
+- context strip 硬编码英文文案国际化：Session goal / Evidence collected / candidate answers
+- 新增 i18n key：`practice.sessionGoal`、`practice.sessionGoalHint`、`practice.evidenceCollected`、`practice.candidateAnswers`
+- 消息气泡 `gray-*` → `slate-*` 颜色统一（examiner 气泡背景、边框、文字）
+- 模式切换按钮 `gray-*` → `slate-*` 颜色统一
+
+**FeedbackPanel 组件**:
+- `bandLevel()` 函数改为使用 i18n，新增 `feedback.bandLevel.ready/building/strengthen/foundation` 中英文翻译
+- footer CTA 按钮从 `emerald-600` 统一为 `slate-950`（与全站主按钮风格一致）
+
+**关键文件**:
+- `src/app/practice/page.tsx` — i18n 和颜色统一
+- `src/components/FeedbackPanel.tsx` — bandLevel i18n 和 CTA 颜色
+- `src/locales/en.json` — 新增 8 个翻译 key
+- `src/locales/zh.json` — 新增 8 个翻译 key
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，6 个测试文件 / 25 个测试

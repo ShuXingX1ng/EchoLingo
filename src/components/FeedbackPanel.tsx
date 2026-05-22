@@ -23,11 +23,11 @@ type FeedbackReviewProps = {
   showFooter?: boolean;
 };
 
-function bandLevel(band: number) {
-  if (band >= 7) return "Ready for refinement";
-  if (band >= 6) return "Building exam consistency";
-  if (band >= 5) return "Strengthen the basics";
-  return "Foundation practice";
+function bandLevel(band: number, t: (key: string) => string) {
+  if (band >= 7) return t("feedback.bandLevel.ready");
+  if (band >= 6) return t("feedback.bandLevel.building");
+  if (band >= 5) return t("feedback.bandLevel.strengthen");
+  return t("feedback.bandLevel.foundation");
 }
 
 function getNextFocus(feedback: SessionFeedback) {
@@ -111,7 +111,7 @@ export function FeedbackReview({
               {feedback.estimatedBand}
             </p>
             <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
-              {bandLevel(feedback.estimatedBand)}
+              {bandLevel(feedback.estimatedBand, t)}
             </p>
           </div>
         </div>
@@ -294,7 +294,7 @@ export function FeedbackReview({
             </Link>
             <Link
               href={primaryActionHref}
-              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              className="inline-flex items-center justify-center rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
               {primaryActionLabel}
             </Link>
