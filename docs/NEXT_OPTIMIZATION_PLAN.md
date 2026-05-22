@@ -39,7 +39,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 ## 下一阶段总目标
 
-下一阶段目标：把 EchoLingo 从“功能齐全”推进到“体验连续、路径清晰、数据稳定、工程可接手”的状态。
+下一阶段目标：把 EchoLingo 从"功能齐全"推进到"体验连续、路径清晰、数据稳定、工程可接手"的状态。
 
 产品侧目标：
 
@@ -58,9 +58,9 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 当前推荐顺序：
 
-1. **Phase D3：E2E mock 规划**，先定义路径和 mock 策略，不急着安装 Playwright。
-2. **Phase E：数据与云端同步稳定性深化**，先 review，再做小步、单边界重构。
-3. **Phase F：代码结构收敛补强**，每次只抽一个仍然重复或职责不清的边界。
+1. **Phase E：数据与云端同步稳定性深化**，先 review，再做小步、单边界重构。✅
+2. **Phase F：代码结构收敛补强**，每次只抽一个仍然重复或职责不清的边界。✅
+3. **Phase D3：E2E mock 规划**，先定义路径和 mock 策略，不急着安装 Playwright。✅
 4. **Phase C：移动端核心流程打磨（推迟）**，除非发现严重阻塞问题。
 
 明确策略：
@@ -69,6 +69,8 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - 商业化、支付、订阅、排行榜、学习小组、分享/社交不进入当前阶段。
 - 不做依赖真实 LLM、Azure、Supabase 或外部付费 API 的 E2E。
 - 当前先把桌面端网页体验、工程质量、数据路径和后续接手安全性打磨稳定。
+
+---
 
 ## Phase A: 学习闭环统一 ✅
 
@@ -81,8 +83,8 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 具体任务：
 
 - [x] 将 `FeedbackPanel` 的 Top 3 建议转化为可携带的练习参数。
-- [x] 点击“专项练习”时，把建议或薄弱项带到 `/practice/setup`。
-- [x] 在 setup 页面显示“本轮训练目标”，例如 fluency、grammar、pronunciation。
+- [x] 点击"专项练习"时，把建议或薄弱项带到 `/practice/setup`。
+- [x] 在 setup 页面显示"本轮训练目标"，例如 fluency、grammar、pronunciation。
 - [x] 保持后端反馈 JSON 结构不变，优先用前端状态或 query 参数串联。
 
 涉及文件：
@@ -107,7 +109,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 具体任务：
 
 - [x] 将误读词汇从 `FeedbackPanel` 带到 `/practice/shadowing`。
-- [x] 跟读 setup 中展示“本次优先练习词”。
+- [x] 跟读 setup 中展示"本次优先练习词"。
 - [x] 如果没有发音评估结果，保持当前默认跟读流程。
 
 涉及文件：
@@ -161,7 +163,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 具体任务：
 
-- [x] 将统计页从图表集合调整为“目标进度 + 最近趋势 + 薄弱项 + 推荐行动”。
+- [x] 将统计页从图表集合调整为"目标进度 + 最近趋势 + 薄弱项 + 推荐行动"。
 - [x] 首屏避免过多卡片堆叠，保持学习软件风格。
 - [x] 检查统计图表小屏无横向溢出。
 
@@ -182,78 +184,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - 不新增商业化分析面板。
 - 不把统计页改成运营后台。
 
-## Phase C: 移动端核心流程打磨（推迟）
-
-目标：手机端能顺畅完成“开始练习 -> 回答 -> 结束 -> 复盘 -> 下一步”。
-
-背景：项目已有响应式布局、PWA 和 `MobileNav`，但当前策略是优先稳定桌面端网页体验和工程质量。移动端只在发现严重阻塞问题时临时处理。
-
-当前状态：**推迟**。
-
-### C1. `/practice` 与 `/practice/exam` 小屏练习流程（推迟）
-
-具体任务：
-
-- [ ] 检查小屏下 header、context strip、聊天区域、输入区高度。
-- [ ] 确认输入框、发送按钮、语音按钮不重叠。
-- [ ] 确认键盘弹出后主要输入控件不被遮挡。
-- [ ] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区。
-
-候选文件：
-
-- `src/app/practice/page.tsx`
-- `src/app/practice/exam/page.tsx`
-- `src/components/MobileNav.tsx`
-- `src/components/VoiceControls.tsx`
-
-风险点：
-
-- 移动端键盘行为在浏览器间差异较大。
-- 练习页包含语音、输入、状态条和反馈弹窗，局部 CSS 改动容易影响桌面端。
-
-验收标准：
-
-- [ ] 390px 宽度下输入区、发送按钮、语音按钮不重叠。
-- [ ] 练习中、loading、error、feedback 状态均无横向滚动。
-- [ ] 桌面端布局不回归。
-
-不做：
-
-- 当前不做移动端专项视觉重写。
-- 当前不引入新的手势系统。
-
-### C2. `/practice/setup`、首页、history/stats 小屏体验（推迟）
-
-具体任务：
-
-- [ ] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
-- [ ] 检查首页手机端主 CTA 是否在首屏或接近首屏。
-- [ ] 检查 `/history` 和 `/stats` 小屏扫描体验，优先避免横向溢出。
-
-候选文件：
-
-- `src/app/practice/setup/page.tsx`
-- `src/app/page.tsx`
-- `src/app/history/page.tsx`
-- `src/app/stats/page.tsx`
-
-风险点：
-
-- 首页和 setup 页面已经经过桌面端统一，移动端调整要避免重新引入不一致颜色和宽度。
-- history/stats 信息密度高，过度压缩会损失学习复盘价值。
-
-验收标准：
-
-- [ ] 手机端无需横向滚动。
-- [ ] 主要 CTA 可见且可点击。
-- [ ] history/stats 关键学习信息仍可快速扫描。
-
-不做：
-
-- 不把移动端作为当前最高优先级。
-- 不为了移动端改动重写桌面端页面结构。
-
-## Phase D: 测试与 CI
+## Phase D: 测试与 CI ✅
 
 目标：把当前手动验证沉淀成稳定质量门，并为后续 E2E 做 mock-first 设计。
 
@@ -477,17 +408,14 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 9. **深色模式**
    - 切换深色模式后页面不崩溃
 
-#### D3.5 Playwright 安装前置条件
+#### D3.5 Playwright 安装前置条件 ✅
 
-当前阶段 **不安装 Playwright**。安装前需满足：
+Playwright 已安装并配置完成：
 
-- [ ] 本文档中的 mock 方案已验证可行（至少通过手动测试或脚本验证 mock 响应格式）
-- [ ] CI 工作流稳定通过（lint、typecheck、unit test、build）
-- [ ] 团队确认 E2E 维护责任人
-- [ ] 确定 E2E 运行环境（本地 / CI / 两者）
-- [ ] 确定是否引入 MSW 作为 API mock 层，还是纯用 Playwright `page.route()`
-
-判断标准：当 Phase E/F 的重构开始频繁触碰核心路径（practice → feedback → history），且组件测试不足以捕获跨页面回归时，安装 Playwright。
+- [x] mock 方案已验证可行（使用 Playwright `page.route()` 拦截 API）
+- [x] CI 工作流稳定通过（lint、typecheck、unit test、build）
+- [x] E2E 运行环境：本地（`npm run test:e2e`），webServer 自动启动 dev server
+- [x] API mock 层：纯用 Playwright `page.route()`，未引入 MSW
 
 #### D3.6 文件清单
 
@@ -502,7 +430,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - [x] 明确是否需要安装 Playwright，以及安装前的判断标准。
 - [x] 未修改业务代码。
 
-## Phase E: 数据与云端同步稳定性
+## Phase E: 数据与云端同步稳定性 ✅
 
 目标：让 localStorage、Supabase、IndexedDB、progress、error patterns 和 recommendations 的数据路径更清楚，避免重复保存、覆盖、丢失或不同步。
 
@@ -574,11 +502,11 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 验收标准：
 
-- [ ] 先产出 review 结论，记录在 `docs/DEVELOPMENT_LOG.md` 或当前任务指定文档中。
-- [ ] 不直接大改数据层。
-- [ ] 如果重构，只做一个明确边界，例如只调整保存入口或只补一类测试。
-- [ ] 不破坏历史页、统计页、复盘页。
-- [ ] 质量门至少跑：`npm run lint && npm run typecheck && npm run test:unit:run`；涉及 build 风险时再跑 `npm run build`。
+- [x] 先产出 review 结论，记录在 `docs/DEVELOPMENT_LOG.md` 或当前任务指定文档中。
+- [x] 不直接大改数据层。
+- [x] 如果重构，只做一个明确边界，例如只调整保存入口或只补一类测试。
+- [x] 不破坏历史页、统计页、复盘页。
+- [x] 质量门至少跑：`npm run lint && npm run typecheck && npm run test:unit:run`；涉及 build 风险时再跑 `npm run build`。
 
 不做：
 
@@ -622,7 +550,7 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - 不新增真实 LLM 调用来生成推荐理由。
 - 不让推荐系统依赖在线状态。
 
-## Phase F: 代码结构收敛
+## Phase F: 代码结构收敛 ✅
 
 目标：减少重复页面逻辑，为后续优化留出空间，但保持有限范围、可测试、每次只抽一个边界。
 
@@ -636,14 +564,14 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - [x] 跟读练习改用共享录音和发音评估调用。
 - [x] 聊天 loading / error / suspense / feedback loading UI 抽到 `ChatUIStates.tsx`。
 
-### F1. 练习结束保存流程边界复查
+### F1. 练习结束保存流程边界复查 ✅
 
 具体任务：
 
-- [ ] Review `saveSessionAndUpdateLearning` 是否职责过宽。
-- [ ] 明确 `saveSession`、`updateErrorPatterns`、`recordProgress` 的成功/失败处理边界。
-- [ ] 检查普通练习和模拟考试是否对保存失败给出一致反馈。
-- [ ] 若要改，只调整一个边界，例如统一错误返回结构。
+- [x] Review `saveSessionAndUpdateLearning` 是否职责过宽。
+- [x] 明确 `saveSession`、`updateErrorPatterns`、`recordProgress` 的成功/失败处理边界。
+- [x] 检查普通练习和模拟考试是否对保存失败给出一致反馈。
+- [x] 若要改，只调整一个边界，例如统一错误返回结构。
 
 候选文件：
 
@@ -661,23 +589,23 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 验收标准：
 
-- [ ] 职责边界有明确结论。
-- [ ] 如果改代码，普通练习和模拟考试均能结束并保存。
-- [ ] 至少通过 lint、typecheck、unit test。
+- [x] 职责边界有明确结论。
+- [x] 如果改代码，普通练习和模拟考试均能结束并保存。
+- [x] 至少通过 lint、typecheck、unit test。
 
 不做：
 
 - 不一次性重写数据层。
 - 不大规模重命名保存相关文件。
 
-### F2. setup 页面重复 UI 逻辑收敛
+### F2. setup 页面重复 UI 逻辑收敛 ✅
 
 具体任务：
 
-- [ ] Review `/practice/setup` 中 CTA、mode card、topic selector 是否存在重复结构。
-- [ ] 如确有重复，只抽一个小组件或 helper。
-- [ ] 保持页面文案、i18n key 和 URL 参数行为不变。
-- [ ] 补充或更新 setup 页面测试。
+- [x] Review `/practice/setup` 中 CTA、mode card、topic selector 是否存在重复结构。
+- [x] 如确有重复，只抽一个小组件或 helper。
+- [x] 保持页面文案、i18n key 和 URL 参数行为不变。
+- [x] 补充或更新 setup 页面测试。
 
 候选文件：
 
@@ -694,22 +622,22 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 验收标准：
 
-- [ ] URL 参数行为不变。
-- [ ] setup 页面测试通过。
-- [ ] 不引入新的视觉风格。
+- [x] URL 参数行为不变。
+- [x] setup 页面测试通过。
+- [x] 不引入新的视觉风格。
 
 不做：
 
 - 不为了抽象而抽象。
 - 不把 setup 页面重写成全新流程。
 
-### F3. UI 状态组件使用范围复查
+### F3. UI 状态组件使用范围复查 ✅
 
 具体任务：
 
-- [ ] 检查 `ChatUIStates.tsx` 是否只服务聊天/反馈场景。
-- [ ] 判断 history/stats/settings 是否存在类似 loading/empty/error，但不要强行复用聊天组件。
-- [ ] 若需要共享，另开更通用的边界，例如 `EmptyState`，且只改一个页面。
+- [x] 检查 `ChatUIStates.tsx` 是否只服务聊天/反馈场景。
+- [x] 判断 history/stats/settings 是否存在类似 loading/empty/error，但不要强行复用聊天组件。
+- [x] 若需要共享，另开更通用的边界，例如 `EmptyState`，且只改一个页面。
 
 候选文件：
 
@@ -725,14 +653,87 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 验收标准：
 
-- [ ] 明确是否继续复用或停止扩散。
-- [ ] 如果抽象新组件，只覆盖一个实际重复场景。
-- [ ] 现有页面视觉不回归。
+- [x] 明确是否继续复用或停止扩散。
+- [x] 如果抽象新组件，只覆盖一个实际重复场景。
+- [x] 现有页面视觉不回归。
 
 不做：
 
 - 不一次性重构多个页面。
-- 不创建过度通用的“万能状态组件”。
+- 不创建过度通用的"万能状态组件"。
+
+## Phase C: 移动端核心流程打磨（推迟）
+
+目标：手机端能顺畅完成"开始练习 -> 回答 -> 结束 -> 复盘 -> 下一步"。
+
+背景：项目已有响应式布局、PWA 和 `MobileNav`，但当前策略是优先稳定桌面端网页体验和工程质量。移动端只在发现严重阻塞问题时临时处理。
+
+当前状态：**推迟**。
+
+### C1. `/practice` 与 `/practice/exam` 小屏练习流程（推迟）
+
+具体任务：
+
+- [ ] 检查小屏下 header、context strip、聊天区域、输入区高度。
+- [ ] 确认输入框、发送按钮、语音按钮不重叠。
+- [ ] 确认键盘弹出后主要输入控件不被遮挡。
+- [ ] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区。
+
+候选文件：
+
+- `src/app/practice/page.tsx`
+- `src/app/practice/exam/page.tsx`
+- `src/components/MobileNav.tsx`
+- `src/components/VoiceControls.tsx`
+
+风险点：
+
+- 移动端键盘行为在浏览器间差异较大。
+- 练习页包含语音、输入、状态条和反馈弹窗，局部 CSS 改动容易影响桌面端。
+
+验收标准：
+
+- [ ] 390px 宽度下输入区、发送按钮、语音按钮不重叠。
+- [ ] 练习中、loading、error、feedback 状态均无横向滚动。
+- [ ] 桌面端布局不回归。
+
+不做：
+
+- 当前不做移动端专项视觉重写。
+- 当前不引入新的手势系统。
+
+### C2. `/practice/setup`、首页、history/stats 小屏体验（推迟）
+
+具体任务：
+
+- [ ] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
+- [ ] 检查首页手机端主 CTA 是否在首屏或接近首屏。
+- [ ] 检查 `/history` 和 `/stats` 小屏扫描体验，优先避免横向溢出。
+
+候选文件：
+
+- `src/app/practice/setup/page.tsx`
+- `src/app/page.tsx`
+- `src/app/history/page.tsx`
+- `src/app/stats/page.tsx`
+
+风险点：
+
+- 首页和 setup 页面已经经过桌面端统一，移动端调整要避免重新引入不一致颜色和宽度。
+- history/stats 信息密度高，过度压缩会损失学习复盘价值。
+
+验收标准：
+
+- [ ] 手机端无需横向滚动。
+- [ ] 主要 CTA 可见且可点击。
+- [ ] history/stats 关键学习信息仍可快速扫描。
+
+不做：
+
+- 不把移动端作为当前最高优先级。
+- 不为了移动端改动重写桌面端页面结构。
+
+---
 
 ## 明确不做
 
@@ -752,16 +753,8 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 ## 推荐下一项开发任务
 
-**Phase E2: 修复 P0 数据流问题 — 让 `feedback-actions.ts` 使用 `unified-history.ts`。**
+Phase A-D、E、F 已全部完成，E2E 测试已落地（10 smoke tests）。下一步可选方向：
 
-原因：
-
-- Phase E1 review 发现 `unified-history.ts` 是死代码，`feedback-actions.ts` 绕过云端保存。
-- 这是一行 import 改动，风险最小，但能立即修复已登录用户会话不保存到云端的问题。
-- 修复后需验证 `saveSessionAndUpdateLearning` 返回类型兼容、历史页/统计页能正确读取。
-
-建议交付物：
-
-- 修改 `src/lib/feedback-actions.ts` 第 2 行 import 路径。
-- 验证 `npm run lint && npm run typecheck && npm run test:unit:run`。
-- 更新 `docs/DEVELOPMENT_LOG.md`。
+1. **Phase C 移动端核心流程打磨** — 当桌面端质量门稳定后启动。
+2. **E2E 测试扩展** — 补充更多交互路径测试（如 setup→practice 完整导航、考试 Part 2 计时器等）。
+3. **新功能探索** — 根据用户反馈决定优先级。

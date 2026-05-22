@@ -1,0 +1,168 @@
+import { test, expect } from "@playwright/test";
+import { mockAllApis, mockExaminerApi, mockTtsApi } from "./helpers";
+
+test.describe("P0 — Core path smoke tests", () => {
+  test("home page loads with DesktopNav and main CTAs", async ({ page }) => {
+    await page.goto("/");
+
+    // DesktopNav visible (desktop nav is hidden on mobile, but Playwright uses desktop viewport)
+    await expect(page.locator("nav").first()).toBeVisible();
+
+    // Main CTA links are present
+    await expect(page.locator('a[href="/practice/setup"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/practice/exam"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/practice/shadowing"]').first()).toBeVisible();
+
+    // No console errors
+    const errors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+    });
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    expect(errors).toHaveLength(0);
+  });
+
+  test("practice setup page renders modes and topics", async ({ page }) => {
+    await page.goto("/practice/setup");
+
+    // Training type cards visible — use role selectors to avoid ambiguity
+    await expect(page.getByRole("button", { name: /speaking drill/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /mock exam/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /shadowing/i })).toBeVisible();
+
+    // Mode cards visible
+    await expect(page.getByRole("button", { name: /part 1/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /part 2/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /part 3/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /full test/i }).first()).toBeVisible();
+
+    // Start button visible
+    await expect(page.getByRole("link", { name: /start practice/i })).toBeVisible();
+  });
+
+  test("practice → end → feedback → history", async ({ page }) => {
+    test.setTimeout(60_000);
+    await mockAllApis(page);
+
+    // 1. Navigate directly to practice page (Part 1 mode)
+    await page.goto("/practice?mode=part1");
+
+    // 2. Verify initial examiner message loads
+    await expect(page.getByText(/examiner/i).first()).toBeVisible({ timeout: 10000 });
+
+    // 3. Type and send a message
+    const input = page.locator('input[type="text"]');
+    await input.fill("I come from Shanghai, which is a large coastal city.");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // 4. Wait for mock examiner response
+    await expect(
+      page.getByText("That's interesting. Can you tell me more about your hometown?")
+    ).toBeVisible({ timeout: 10000 });
+
+    // 5. End session
+    await page.getByText(/end session/i).click();
+
+    // 6. Wait for feedback panel
+    await expect(page.getByText(/estimated band/i)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("6.5")).toBeVisible();
+
+    // 7. Feedback panel shows study plan and action buttons
+    await expect(page.getByText(/next study plan/i)).toBeVisible();
+    await expect(page.getByText(/what worked/i)).toBeVisible();
+    await expect(page.getByText(/focus areas/i)).toBeVisible();
+
+    // 8. Navigate to history via the feedback panel footer link
+    await page.locator('a[href="/history"]').last().click();
+    await page.waitForURL("**/history**");
+
+    // 9. History page loads
+    await expect(page.locator("nav").first()).toBeVisible();
+  });
+
+  test("home → mock exam entry", async ({ page }) => {
+    await page.goto("/");
+
+    // Click mock exam CTA
+    await page.locator('a[href="/practice/exam"]').first().click();
+    await page.waitForURL("**/practice/exam**");
+
+    // Verify exam page loads
+    await expect(page.locator("nav").first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("history page empty state", async ({ page }) => {
+    await page.goto("/history");
+
+    // Should show empty state title
+    await expect(page.getByText(/no practice sessions yet/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("stats page empty state", async ({ page }) => {
+    await page.goto("/stats");
+
+    // Should show empty state title
+    await expect(page.getByText(/no practice data yet/i)).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe("P1 — Key interactions", () => {
+  test("setup page passes focus params via URL", async ({ page }) => {
+    await page.goto("/practice/setup?focus=fluency,grammar");
+
+    // Training goal banner should show the focus areas
+    await expect(page.getByText(/training goal/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("practice page text/voice mode toggle", async ({ page }) => {
+    await mockExaminerApi(page);
+    await mockTtsApi(page);
+    await page.goto("/practice?mode=part1");
+
+    // Wait for page to load
+    await expect(page.getByText(/examiner/i).first()).toBeVisible({ timeout: 10000 });
+
+    // Text mode is default - input visible
+    await expect(page.locator('input[type="text"]')).toBeVisible();
+
+    // Switch to voice mode
+    await page.getByText(/voice mode/i).click();
+
+    // Switch back to text mode
+    await page.getByText(/text mode/i).click();
+    await expect(page.locator('input[type="text"]')).toBeVisible();
+  });
+});
+
+test.describe("P2 — Edge cases", () => {
+  test("practice page handles examiner API error", async ({ page }) => {
+    await page.route("**/api/examiner", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Internal server error" }),
+      })
+    );
+    await mockTtsApi(page);
+
+    await page.goto("/practice?mode=part1");
+    await expect(page.getByText(/examiner/i).first()).toBeVisible({ timeout: 10000 });
+
+    const input = page.locator('input[type="text"]');
+    await input.fill("Test answer");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // Should show error banner
+    await expect(page.getByText(/failed|error/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("dark mode does not crash pages", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+    await expect(page.locator("nav").first()).toBeVisible();
+
+    await page.goto("/practice/setup");
+    await expect(page.getByText(/choose the kind of practice/i)).toBeVisible({ timeout: 10000 });
+  });
+});

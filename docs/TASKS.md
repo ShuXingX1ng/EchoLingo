@@ -269,8 +269,8 @@
 
 ### 第四阶段：网页端优化 (当前)
 
-10. ~~**E2E 测试** - 规划 mock 外部 API 的端到端测试~~ ✅
-11. **数据同步稳定性** - 审查 localStorage、Supabase、IndexedDB 职责边界
+10. ~~**E2E 测试** - Playwright 安装、mock 外部 API、P0/P1/P2 smoke 测试~~ ✅
+11. ~~**数据同步稳定性** - 审查 localStorage、Supabase、IndexedDB 职责边界~~ ✅
 12. **网页端交互打磨** - 练习流程、反馈展示、历史回看的桌面端体验优化
 
 ### 第五阶段：移动端优化 (暂缓)
@@ -288,8 +288,8 @@
 
 ## 技术债务
 
-- [ ] 单元测试覆盖持续扩展（已有 topics、backup、audio-utils、FeedbackPanel 发音队列、MobileNav、practice setup 覆盖）
-- [ ] E2E 测试
+- [ ] 单元测试覆盖持续扩展（已有 topics、backup、audio-utils、FeedbackPanel 发音队列、MobileNav、practice setup、error-patterns 覆盖）
+- [x] E2E 测试 — Playwright + 10 smoke tests (P0/P1/P2)
 - [ ] 性能监控完善
 - [x] lint warnings 清零
 - [x] Next 16 构建提示清零（Turbopack root + Proxy 迁移）

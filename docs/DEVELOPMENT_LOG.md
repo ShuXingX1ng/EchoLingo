@@ -1497,3 +1497,58 @@ import type { SavedSession } from "@/lib/history";
 - `npm run lint` 通过，0 warning / 0 error
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
+
+---
+
+### Entry 42: E2E 测试落地 — Playwright 安装与 P0/P1/P2 smoke 测试
+
+**完成阶段**: Phase D3 E2E 测试规划 → 落地
+
+**完成内容**:
+
+**Playwright 安装与配置**:
+- 安装 `@playwright/test` 和 Chromium 浏览器
+- 创建 `playwright.config.ts`：单 worker、非并行、list reporter、webServer 自动启动 dev server
+- Chromium 配置 `--use-fake-device-for-media-stream` 和 `--use-fake-ui-for-media-stream` 绕过麦克风权限
+- 新增 `test:e2e` 和 `test:e2e:ui` npm scripts
+
+**Mock 工具层 (`e2e/helpers.ts`)**:
+- `mockExaminerApi()` — 拦截 `/api/examiner` 返回固定考官消息
+- `mockFeedbackApi()` — 拦截 `/api/feedback` 返回完整 SessionFeedback（含 errorAnnotations）
+- `mockTtsApi()` — 拦截 `/api/tts` 返回空音频 blob
+- `mockPronunciationApi()` — 拦截 `/api/pronunciation` 返回固定评分结果
+- `mockAllApis()` — 一次性设置所有 mock
+
+**Smoke 测试 (`e2e/smoke.spec.ts`)**:
+
+P0 — 核心路径：
+1. 首页加载 DesktopNav 和主 CTA 链接，无 console error
+2. setup 页渲染训练类型、模式卡片和 Start 按钮
+3. 练习 → 结束 → 反馈 → 历史完整流程（mock API）
+4. 首页 → 模拟考试入口导航
+5. 历史页空状态展示
+6. 统计页空状态展示
+
+P1 — 关键交互：
+7. setup 页 `?focus=fluency,grammar` 参数传递
+8. 练习页 text/voice 模式切换
+
+P2 — 边界场景：
+9. examiner API 返回 500 时展示错误横幅
+10. 深色模式下首页和 setup 页不崩溃
+
+**Vitest 配置修复**:
+- `vitest.config.mts` 新增 `exclude: ["e2e/**"]`，避免 Vitest 误加载 Playwright 测试文件
+
+**关键文件**:
+- `playwright.config.ts` — Playwright 配置
+- `e2e/helpers.ts` — API mock 工具
+- `e2e/smoke.spec.ts` — P0/P1/P2 smoke 测试
+- `vitest.config.mts` — 排除 e2e 目录
+- `package.json` — 新增 @playwright/test 依赖和 scripts
+
+**验证结果**:
+- `npx playwright test` 10 passed (8.7s)
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
