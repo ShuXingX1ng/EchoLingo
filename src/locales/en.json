@@ -380,5 +380,13 @@
 
   "loading": "Loading...",
   "error.generic": "Something went wrong. Please try again.",
-  "error.network": "Network error. Please check your connection."
+  "error.network": "Network error. Please check your connection.",
+
+  "dailyTasks.title": "Today's Learning Plan",
+  "dailyTasks.completed": "completed",
+  "dailyTasks.noTasks": "Start practicing to get personalized daily tasks.",
+  "dailyTasks.typePractice": "Practice",
+  "dailyTasks.typeShadowing": "Shadowing",
+  "dailyTasks.typeReview": "Review",
+  "dailyTasks.start": "Start"
 }

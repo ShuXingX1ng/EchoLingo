@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DesktopNav from "@/components/DesktopNav";
+import DailyTasks from "@/components/DailyTasks";
 import LearningPath from "@/components/LearningPath";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -216,7 +217,10 @@ export default function Home() {
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <LearningPath />
+          <div className="space-y-6">
+            <DailyTasks />
+            <LearningPath />
+          </div>
 
           <div className="border border-slate-300 bg-white p-6 dark:border-white/10 dark:bg-slate-900/80">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">

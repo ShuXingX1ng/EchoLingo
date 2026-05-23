@@ -1775,3 +1775,35 @@ P2 — 边界场景：
 - E2E 测试：20 测试通过
 - 后端测试：86 测试通过
 - 质量门：lint 0 error、typecheck pass、build pass
+
+---
+
+### Entry 39: 学习计划功能
+
+**完成内容**:
+
+新增每日学习计划功能，基于 Supabase 数据为已登录用户生成个性化任务清单。
+
+**功能特性**:
+- 练习任务：从未练习/低分话题中选择 Part 1/2/3
+- 跟读任务：每日发音练习
+- 复习任务：针对 band < 6.0 的话题重做
+- 进度追踪：显示今日完成情况
+
+**任务生成逻辑**:
+1. 从 Supabase `learning_progress` 表读取用户进度
+2. 从 Supabase `sessions` 表读取最近 7 天会话
+3. 生成 2-3 个练习任务 + 1 个跟读任务 + 0-1 个复习任务
+4. 根据今日会话标记已完成任务
+
+**关键文件**:
+- `src/lib/learning-plan.ts` (新增) - 学习计划生成逻辑
+- `src/components/DailyTasks.tsx` (新增) - 每日任务 UI 组件
+- `src/app/page.tsx` (修改) - 首页集成
+- `src/locales/en.json` (修改) - 英文文案
+- `src/locales/zh.json` (修改) - 中文文案
+
+**验证结果**:
+- 质量门：lint 0 error、typecheck pass、build pass
+- 单元测试：86 测试通过
+- E2E 测试：20 测试通过

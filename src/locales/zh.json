@@ -380,5 +380,13 @@
 
   "loading": "加载中...",
   "error.generic": "出错了，请重试。",
-  "error.network": "网络错误，请检查连接。"
+  "error.network": "网络错误，请检查连接。",
+
+  "dailyTasks.title": "今日学习计划",
+  "dailyTasks.completed": "已完成",
+  "dailyTasks.noTasks": "开始练习以获取个性化每日任务。",
+  "dailyTasks.typePractice": "练习",
+  "dailyTasks.typeShadowing": "跟读",
+  "dailyTasks.typeReview": "复习",
+  "dailyTasks.start": "开始"
 }
