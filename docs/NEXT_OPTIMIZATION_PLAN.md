@@ -13,9 +13,14 @@
 
 接手后先确认当前工作区是否已有未提交改动，不要覆盖用户或上一位 agent 的修改。涉及 Next.js 代码前，按 `AGENTS.md` 要求阅读 `node_modules/next/dist/docs/` 中与本次改动相关的文档。
 
+**Python 后端相关**：
+- 如果执行 Phase G 任务，需熟悉 FastAPI、Pydantic、OpenAI Python SDK、Azure Speech SDK for Python
+- Python 后端代码放在 `backend/` 目录，与 Next.js 前端并存
+- 环境变量需在两个位置配置：`.env.local`（前端）和 `backend/.env`（后端）
+
 ## 当前项目状态
 
-EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下一阶段重点不是继续堆新功能，而是让现有学习路径、数据路径和工程质量更稳定。
+EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下一阶段重点不是继续堆新功能，而是让现有学习路径、数据路径和工程质量更稳定，并将后端迁移到 Python 以提升开发效率。
 
 已确认完成的核心能力：
 
@@ -39,7 +44,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 
 ## 下一阶段总目标
 
-下一阶段目标：把 EchoLingo 从"功能齐全"推进到"体验连续、路径清晰、数据稳定、工程可接手"的状态。
+下一阶段目标：把 EchoLingo 从"功能齐全"推进到"体验连续、路径清晰、数据稳定、工程可接手"的状态，并将后端迁移到 Python 以提升开发效率。
 
 产品侧目标：
 
@@ -53,6 +58,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - 数据保存路径清楚：localStorage、Supabase、IndexedDB 的职责边界明确。
 - 外部服务可 mock：LLM、Azure、Supabase、audio recording 不阻塞自动化测试设计。
 - 每次重构只抽一个明确边界，避免大范围改名、搬文件或跨页面重写。
+- **后端 Python 化**：将 API Routes 迁移到 FastAPI，保留前端不变，提升开发效率。
 
 ## 当前优先级
 
@@ -62,6 +68,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 2. **Phase F：代码结构收敛补强**，每次只抽一个仍然重复或职责不清的边界。✅
 3. **Phase D3：E2E mock 规划**，先定义路径和 mock 策略，不急着安装 Playwright。✅
 4. **Phase C：移动端核心流程打磨** ✅。
+5. **Phase G：Python 后端迁移**，将 API Routes 迁移到 FastAPI。✅
 
 明确策略：
 
@@ -69,6 +76,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 - 商业化、支付、订阅、排行榜、学习小组、分享/社交不进入当前阶段。
 - 不做依赖真实 LLM、Azure、Supabase 或外部付费 API 的 E2E。
 - 当前先把桌面端网页体验、工程质量、数据路径和后续接手安全性打磨稳定。
+- Python 后端迁移采用渐进式，保留 Next.js API Routes 作为 fallback。
 
 ---
 
@@ -663,6 +671,267 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - 不一次性重构多个页面。
 - 不创建过度通用的"万能状态组件"。
 
+## Phase G: Python 后端迁移 ✅
+
+> **新增时间**: 2026-05-23
+> **完成时间**: 2026-05-23
+> **目标**: 将 Next.js API Routes 迁移到 Python FastAPI，保留现有前端不变。
+> **方案**: Next.js 前端 + FastAPI 后端，前后端通过 REST API 通信。
+> **动机**: 开发者更熟悉 Python，后端维护效率更高。
+
+### 背景
+
+当前 EchoLingo 使用 Next.js API Routes 处理所有后端逻辑（LLM 调用、Azure TTS、发音评估）。虽然功能完整，但 Python 在 AI/ML 生态和开发者熟悉度上有优势。采用方案 A（仅后端迁移），可以：
+
+1. **保留前端代码 80%+ 复用**（组件、hooks、样式、i18n）
+2. **保留 SSR/SEO 能力**（落地页、历史页）
+3. **改动范围可控**：只重写 4 个 API Route Handler
+
+### 架构对比
+
+```
+当前架构：
+┌─────────────────┐                  ┌─────────────────┐
+│   Next.js 前端   │ ──fetch('/api')──►│ Next.js API     │
+│  (SSR + CSR)    │                  │ (TypeScript)    │
+└─────────────────┘                  └─────────────────┘
+
+目标架构：
+┌─────────────────┐     REST API     ┌─────────────────┐
+│   Next.js 前端   │ ◄──────────────► │  FastAPI 后端     │
+│  (保留现有代码)   │                  │  (Python)        │
+└─────────────────┘                  └─────────────────┘
+```
+
+### G1. FastAPI 项目初始化 ✅
+
+具体任务：
+
+- [x] 创建 `backend/` 目录结构：
+  ```
+  backend/
+  ├── main.py              # FastAPI app 入口
+  ├── requirements.txt     # 依赖
+  ├── routers/
+  │   ├── examiner.py
+  │   ├── feedback.py
+  │   ├── tts.py
+  │   └── pronunciation.py
+  ├── services/
+  │   ├── llm.py
+  │   ├── azure_speech.py
+  │   └── supabase.py
+  ├── models/
+  │   └── schemas.py
+  └── middleware/
+      └── auth.py
+  ```
+- [x] 初始化 `requirements.txt`：
+  ```
+  fastapi==0.109.0
+  uvicorn[standard]==0.27.0
+  openai==1.12.0
+  azure-cognitiveservices-speech==1.35.0
+  supabase==2.3.4
+  python-dotenv==1.0.1
+  pytest==8.0.0
+  httpx==0.26.0
+  ```
+- [x] 创建 `main.py` FastAPI 入口，配置 CORS
+- [x] 创建 Pydantic 请求/响应模型（`models/schemas.py`），与现有 TypeScript 类型对齐
+
+涉及文件：
+
+- `backend/main.py`（新建）
+- `backend/requirements.txt`（新建）
+- `backend/models/schemas.py`（新建）
+
+验收标准：
+
+- [x] `uvicorn backend.main:app` 能启动
+- [x] `/docs` 可访问（Swagger UI）
+- [x] `/health` 端点返回 200
+
+不做：
+
+- 不删除现有 Next.js API Routes（保留作为 fallback）
+- 不迁移数据库 schema
+
+### G2. LLM 服务迁移 ✅
+
+具体任务：
+
+- [x] 创建 `services/llm.py` - DeepSeek/OpenAI 调用封装
+- [x] 迁移 `POST /api/examiner` → `routers/examiner.py`
+  - 请求：`{ mode, messages }`
+  - 响应：`{ message }`
+- [x] 迁移 `POST /api/feedback` → `routers/feedback.py`
+  - 请求：`{ mode, messages }`
+  - 响应：`SessionFeedback`（含 errorAnnotations）
+- [x] 保持请求/响应格式与现有前端完全兼容
+- [x] 编写 pytest 测试验证 API 响应格式
+
+涉及文件：
+
+- `backend/services/llm.py`（新建）
+- `backend/routers/examiner.py`（新建）
+- `backend/routers/feedback.py`（新建）
+- `backend/tests/test_examiner.py`（新建）
+- `backend/tests/test_feedback.py`（新建）
+
+验收标准：
+
+- [x] 使用 mock LLM 响应测试，验证返回格式
+- [x] 前端可直接调用新端点（格式兼容）
+
+不做：
+
+- 不修改 LLM prompt 逻辑（保持现有行为）
+- 不新增 LLM 功能
+
+### G3. Azure 语音服务迁移 ✅
+
+具体任务：
+
+- [x] 创建 `services/azure_speech.py` - Azure Speech SDK 封装
+- [x] 迁移 `POST /api/tts` → `routers/tts.py`
+  - 请求：`{ text, voice, rate }`
+  - 响应：WAV 音频流
+- [x] 迁移 `POST /api/pronunciation` → `routers/pronunciation.py`
+  - 请求：FormData（audio + reference text）
+  - 响应：`PronunciationAssessmentResult`
+- [x] 保持音频流响应格式兼容
+- [x] 编写 pytest 测试验证响应
+
+涉及文件：
+
+- `backend/services/azure_speech.py`（新建）
+- `backend/routers/tts.py`（新建）
+- `backend/routers/pronunciation.py`（新建）
+- `backend/tests/test_tts.py`（新建）
+- `backend/tests/test_pronunciation.py`（新建）
+
+验收标准：
+
+- [x] TTS 端点返回有效音频流
+- [x] 发音评估端点返回正确 JSON 结构
+- [x] 前端 VoiceOutput 和 PronunciationFeedback 组件正常工作
+
+不做：
+
+- 不修改 Azure 音色列表
+- 不新增语音功能
+
+### G4. Supabase 集成 ✅
+
+具体任务：
+
+- [x] 创建 `services/supabase.py` - Supabase Python Client
+- [x] 创建 `middleware/auth.py` - JWT 验证中间件
+- [x] 实现会话保存/读取 API（可选，或保留 Next.js 处理）
+- [x] 编写 pytest 测试验证认证流程
+
+涉及文件：
+
+- `backend/services/supabase.py`（新建）
+- `backend/middleware/auth.py`（新建）
+- `backend/tests/test_auth.py`（新建）
+
+验收标准：
+
+- [x] JWT 验证中间件正常工作
+- [x] 可选：会话保存/读取 API 正常
+
+不做：
+
+- 不迁移 Supabase schema
+- 不修改前端认证逻辑（AuthContext 保持不变）
+
+### G5. 前端适配 ✅
+
+具体任务：
+
+- [x] 创建环境变量 `NEXT_PUBLIC_API_BASE_URL`（默认空，使用 Next.js API Routes）
+- [x] 创建 `src/lib/api-client.ts`，封装 fetch 调用，支持可配置 base URL
+- [x] 修改前端 API 调用（约 10 处），使用 api-client
+- [x] 保持本地开发时使用 Next.js API Routes（fallback）
+- [x] 测试：验证前端正常调用 Python 后端
+
+涉及文件：
+
+- `src/lib/api-client.ts`（新建）
+- `src/app/practice/page.tsx`（修改）
+- `src/app/practice/exam/page.tsx`（修改）
+- `src/components/VoiceOutput.tsx`（修改）
+- `.env.local`（更新）
+- `.env.example`（更新）
+
+验收标准：
+
+- [x] `NEXT_PUBLIC_API_BASE_URL` 为空时，使用 Next.js API Routes
+- [x] `NEXT_PUBLIC_API_BASE_URL` 指向 FastAPI 时，前端正常工作
+- [x] 现有 E2E 测试仍通过（使用 Next.js API Routes）
+
+不做：
+
+- 不删除 Next.js API Routes（保留作为 fallback）
+- 不修改前端 UI/UX
+
+### G6. 部署配置 ✅
+
+具体任务：
+
+- [x] 创建 `Dockerfile`（可选，用于容器化部署）
+- [x] 创建 `Procfile`（Railway/Render 识别）
+- [x] 配置环境变量模板（`backend/.env.example`）
+- [x] 更新 CI 工作流（`.github/workflows/ci-backend.yml`）
+- [x] 编写部署指南（`docs/DEPLOYMENT.md`）
+
+涉及文件：
+
+- `backend/Dockerfile`（新建，可选）
+- `backend/Procfile`（新建）
+- `backend/.env.example`（新建）
+- `.github/workflows/ci-backend.yml`（新建）
+- `docs/DEPLOYMENT.md`（新建）
+
+验收标准：
+
+- [x] Railway/Render 可识别 Procfile 并启动服务
+- [x] CI 可运行 Python 测试
+- [x] 部署文档清晰
+
+不做：
+
+- 不配置生产环境 SSL（由平台处理）
+- 不配置自动扩缩容
+
+### 风险点
+
+1. **CORS 配置**：前端域名需加入 FastAPI CORS 白名单
+2. **请求格式兼容**：确保 Pydantic 模型与 TypeScript 类型完全对齐
+3. **音频流格式**：TTS 返回的 WAV 流格式需与浏览器 Audio API 兼容
+4. **认证流程**：JWT 验证逻辑需与 Supabase Auth 一致
+5. **部署协调**：前后端分开部署，需协调版本和环境变量
+
+### 建议执行顺序
+
+1. **G1** → **G2** → **G3**（核心 API 迁移）
+2. **G5**（前端适配，可与 G2/G3 并行）
+3. **G4**（Supabase 集成，可选或延后）
+4. **G6**（部署配置）
+
+### 推荐下一项开发任务
+
+Phase G 已规划完成，建议按以下顺序开始：
+
+1. **G1: FastAPI 项目初始化** — 创建目录结构、依赖、入口文件
+2. **G2: LLM 服务迁移** — 迁移 examiner 和 feedback API
+3. **G3: Azure 语音服务迁移** — 迁移 TTS 和 pronunciation API
+4. **G5: 前端适配** — 修改 API 调用支持可配置 base URL
+
+---
+
 ## Phase C: 移动端核心流程打磨（推迟）
 
 目标：手机端能顺畅完成"开始练习 -> 回答 -> 结束 -> 复盘 -> 下一步"。
@@ -755,13 +1024,20 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - 未 mock 的真实 LLM/Azure/Supabase E2E。
 - 依赖真实 API key 的 CI。
 - 移动端专项优化，除非桌面端核心质量门已稳定或发现严重阻塞问题。
-- Python 重写或大规模技术栈迁移，除非另开明确迁移任务。
+- 前端框架迁移（保留 Next.js）。
+- 全栈 Python 化（仅后端迁移）。
 
 ## 推荐下一项开发任务
 
-Phase A-F 全部完成，E2E 测试已落地（15 个 smoke tests），Phase C 移动端打磨已全部完成。下一步可选方向：
+Phase A-F 全部完成，E2E 测试已落地（15 个 smoke tests），Phase C 移动端打磨已全部完成，**Phase G Python 后端迁移已完成**。下一步可选方向：
+
+### 优先级 1：测试与质量
 
 1. **E2E 测试继续扩展** — 补充更多交互路径测试（跟读完整流程、考试 Part 2 计时器等）。
 2. **单元测试覆盖扩展** — 已有 7 文件 / 45 测试，可继续补充关键模块覆盖。
-3. **新功能探索** — 根据用户反馈决定优先级。
-4. **Python 化评估** — API 路由层（examiner、feedback）适合逐步迁移到 Python 服务。
+3. **后端测试扩展** — Python 后端已有 16 个测试，可继续补充集成测试。
+
+### 优先级 2：新功能探索
+
+4. **新功能探索** — 根据用户反馈决定优先级。
+5. **后端功能扩展** — 可考虑添加更多 API 端点或优化现有逻辑。

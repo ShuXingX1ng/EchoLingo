@@ -28,11 +28,22 @@
 
 ### 后端技术栈
 
+#### 当前（Next.js API Routes）
+
 - **API**: Next.js API Routes
 - **AI**: OpenAI 兼容 LLM API
 - **语音**: Azure Speech SDK (TTS + Pronunciation Assessment)
 - **存储**: Supabase (PostgreSQL) + 浏览器 localStorage
 - **认证**: Supabase Auth (邮箱 + Google OAuth)
+
+#### 目标（Python FastAPI）
+
+- **API**: FastAPI (Python)
+- **AI**: OpenAI Python SDK (DeepSeek)
+- **语音**: Azure Speech SDK for Python
+- **存储**: Supabase Python Client
+- **认证**: Supabase JWT 验证中间件
+- **部署**: Railway / Render / 自建服务器
 
 ### 部署
 
@@ -225,6 +236,9 @@ type PhonemeAssessment = {
 
 ## API 端点
 
+> **迁移计划**: 以下 4 个 API 端点将从 Next.js API Routes 迁移到 Python FastAPI 后端。
+> 前端调用方式不变，仅修改 base URL 配置。
+
 ### POST /api/examiner
 
 生成下一个 IELTS 考官问题。
@@ -391,6 +405,24 @@ src/
     ├── diagnose/             # 调试诊断流程
     ├── prototype/            # 逻辑/UI 原型
     └── ...
+
+# Python FastAPI 后端（目标结构）
+backend/
+├── main.py              # FastAPI app 入口
+├── requirements.txt     # openai, azure-cognitiveservices-speech, supabase
+├── routers/
+│   ├── examiner.py      # POST /api/examiner
+│   ├── feedback.py      # POST /api/feedback
+│   ├── tts.py           # POST /api/tts
+│   └── pronunciation.py # POST /api/pronunciation
+├── services/
+│   ├── llm.py           # DeepSeek/LLM 调用封装
+│   ├── azure_speech.py  # Azure TTS + Pronunciation
+│   └── supabase.py      # Supabase 客户端
+├── models/
+│   └── schemas.py       # Pydantic 请求/响应模型
+└── middleware/
+    └── auth.py          # Supabase JWT 验证
 ```
 
 ---
@@ -421,6 +453,14 @@ src/
 ### ❌ 待补齐内容
 
 > **当前策略**：优先做好网页端体验，移动端优化暂缓。
+
+**下一阶段优化（Python 后端迁移）**:
+
+- Python FastAPI 后端搭建（4 个 API 端点迁移）
+- 前端 API 调用适配（修改 base URL）
+- Supabase 集成迁移（Python Client）
+- 认证中间件实现
+- 部署配置（Railway / Render）
 
 **下一阶段优化（网页端优先）**:
 - ~~学习闭环统一：反馈建议联动下一次练习，发音队列联动跟读~~ ✅

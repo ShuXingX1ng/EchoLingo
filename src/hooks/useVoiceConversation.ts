@@ -34,24 +34,14 @@ export function useVoiceConversation({
       setState("processing");
 
       try {
-        const response = await fetch("/api/examiner", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode: "ielts_part_1",
-            messages: currentMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+        const { apiPost } = await import("@/lib/api-client");
+        const data = await apiPost<{ message: string }>("/api/examiner", {
+          mode: "ielts_part_1",
+          messages: currentMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
         });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "Failed to get examiner response");
-        }
-
-        const data = await response.json();
 
         const examinerMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -90,24 +80,15 @@ export function useVoiceConversation({
     setMessages(finalMessages);
 
     try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "ielts_part_1",
-          messages: finalMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
+      const { apiPost } = await import("@/lib/api-client");
+      const feedbackData = await apiPost<SessionFeedback>("/api/feedback", {
+        mode: "ielts_part_1",
+        messages: finalMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to generate feedback");
-      }
-
-      const feedbackData = await response.json();
       setState("idle");
       onFeedback(feedbackData);
       return feedbackData;

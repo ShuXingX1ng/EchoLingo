@@ -1650,3 +1650,80 @@ P2 — 边界场景：
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
 - `npx playwright test` 通过，17 个测试 (14.2s)
+
+---
+
+### Entry 46: Phase G Python 后端迁移完成
+
+**完成阶段**: Phase G
+
+**完成内容**:
+
+**G1. FastAPI 项目初始化**:
+- 创建 `backend/` 目录结构（routers, services, models, middleware, tests）
+- 初始化 `requirements.txt`（fastapi, uvicorn, openai, azure-cognitiveservices-speech, supabase）
+- 创建 `main.py` FastAPI 入口，配置 CORS
+- 创建 Pydantic 请求/响应模型（`models/schemas.py`），与 TypeScript 类型对齐
+
+**G2. LLM 服务迁移**:
+- 创建 `services/llm.py` - DeepSeek/OpenAI 调用封装
+- 迁移 `POST /api/examiner` → `routers/examiner.py`（支持 Part 1/2/3 模式）
+- 迁移 `POST /api/feedback` → `routers/feedback.py`（返回结构化 JSON，支持 errorAnnotations）
+- 创建 pytest 测试验证 API 响应格式（9 个测试）
+
+**G3. Azure 语音服务迁移**:
+- 创建 `services/azure_speech.py` - Azure Speech SDK 封装
+- 迁移 `POST /api/tts` → `routers/tts.py`（返回 WAV 音频流）
+- 迁移 `POST /api/pronunciation` → `routers/pronunciation.py`（接受 FormData 上传）
+- 创建 pytest 测试验证 TTS 和发音评估（7 个测试）
+
+**G4. Supabase 集成**:
+- 创建 `services/supabase.py` - Supabase Python Client（用户认证、会话保存/读取）
+- 创建 `middleware/auth.py` - JWT 验证中间件（get_current_user, require_user, get_optional_user）
+- 创建 pytest 测试验证认证流程（10 个测试）
+
+**G5. 前端适配**:
+- 创建 `src/lib/api-client.ts` - 可配置的 API 客户端（支持 Next.js API Routes 和外部后端）
+- 修改前端 API 调用（8 处），使用 api-client
+- 更新 `.env.example` 添加 `NEXT_PUBLIC_API_BASE_URL`
+- 验证 lint 和 typecheck 通过
+
+**G6. 部署配置**:
+- 创建 `backend/Procfile`（Railway/Render 部署）
+- 创建 `backend/Dockerfile`（Docker 容器化部署）
+- 创建 `.github/workflows/ci-backend.yml`（Python 后端 CI：lint, type check, tests, build）
+- 编写 `docs/DEPLOYMENT.md`（完整部署指南）
+
+**关键文件**:
+- `backend/main.py` - FastAPI 入口
+- `backend/routers/examiner.py` - Examiner API
+- `backend/routers/feedback.py` - Feedback API
+- `backend/routers/tts.py` - TTS API
+- `backend/routers/pronunciation.py` - Pronunciation API
+- `backend/services/llm.py` - LLM 服务封装
+- `backend/services/azure_speech.py` - Azure Speech 服务封装
+- `backend/services/supabase.py` - Supabase 服务封装
+- `backend/middleware/auth.py` - JWT 认证中间件
+- `backend/models/schemas.py` - Pydantic 模型
+- `backend/Dockerfile` - Docker 配置
+- `backend/Procfile` - Railway/Render 配置
+- `.github/workflows/ci-backend.yml` - CI 工作流
+- `src/lib/api-client.ts` - 前端 API 客户端
+- `docs/DEPLOYMENT.md` - 部署指南
+
+**验证结果**:
+- Python 后端 16 个测试通过
+- 前端 lint 通过，0 warning / 0 error
+- 前端 typecheck 通过
+- 所有 API 端点已迁移到 Python
+
+**架构变更**:
+```
+┌─────────────────┐                  ┌─────────────────┐
+│   Next.js 前端   │ ──api-client──► │  FastAPI 后端     │
+│  (TypeScript)   │                  │  (Python)        │
+└─────────────────┘                  └─────────────────┘
+        │                                     │
+        ▼                                     ▼
+   Vercel/静态部署                      Railway/Render/自建
+```

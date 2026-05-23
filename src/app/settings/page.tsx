@@ -94,19 +94,13 @@ export default function SettingsPage() {
   const handleTest = async () => {
     setIsTestPlaying(true);
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: "Hello, I am your IELTS speaking examiner. Let's begin the practice session.",
-          voice: selectedVoice,
-          rate,
-        }),
+      const { apiPostBlob } = await import("@/lib/api-client");
+      const audioBlob = await apiPostBlob("/api/tts", {
+        text: "Hello, I am your IELTS speaking examiner. Let's begin the practice session.",
+        voice: selectedVoice,
+        rate,
       });
 
-      if (!response.ok) throw new Error("TTS failed");
-
-      const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
 

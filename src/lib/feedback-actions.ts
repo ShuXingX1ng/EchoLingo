@@ -2,30 +2,20 @@ import type { ChatMessage, SessionFeedback } from "@/types";
 import { saveSession } from "./unified-history";
 import { updateErrorPatterns } from "./error-patterns";
 import { recordProgress } from "./supabase-progress";
+import { apiPost, apiPostForm } from "./api-client";
 
 // Fetch feedback from API
 export async function fetchFeedback(
   messages: ChatMessage[],
   mode: string = "ielts_part_1"
 ): Promise<SessionFeedback> {
-  const response = await fetch("/api/feedback", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mode,
-      messages: messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-    }),
+  return apiPost<SessionFeedback>("/api/feedback", {
+    mode,
+    messages: messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
   });
-
-  if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.error || "Failed to generate feedback.");
-  }
-
-  return response.json();
 }
 
 // Fetch pronunciation assessment
@@ -36,19 +26,12 @@ export async function fetchPronunciationAssessment(
   try {
     const formData = new FormData();
     formData.append("audio", audioBlob, "recording.webm");
-    formData.append("text", referenceText);
+    formData.append("referenceText", referenceText);
 
-    const response = await fetch("/api/pronunciation", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      console.error("Pronunciation assessment failed:", response.status);
-      return null;
-    }
-
-    return response.json();
+    return await apiPostForm<import("@/types").PronunciationAssessmentResult>(
+      "/api/pronunciation",
+      formData
+    );
   } catch (error) {
     console.error("Pronunciation assessment error:", error);
     return null;

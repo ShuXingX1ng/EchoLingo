@@ -114,26 +114,16 @@ function ExamPage() {
   );
 
   const fetchExaminerResponse = useCallback(async (currentMessages: ChatMessage[]) => {
-    const response = await fetch("/api/examiner", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "full",
-        topic: topicId,
-        messages: currentMessages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      }),
+    const { apiPost } = await import("@/lib/api-client");
+    const data = await apiPost<{ message: string }>("/api/examiner", {
+      mode: "full",
+      topic: topicId,
+      messages: currentMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
     });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Failed to get examiner response.");
-    }
-
-    const data = await response.json();
-    return data.message as string;
+    return data.message;
   }, [topicId]);
 
   const handleSend = async () => {

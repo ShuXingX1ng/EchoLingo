@@ -61,22 +61,17 @@ export default function VoiceOutput({ text, autoPlay = false }: VoiceOutputProps
     abortRef.current = controller;
 
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { apiPostBlob } = await import("@/lib/api-client");
+      const audioBlob = await apiPostBlob(
+        "/api/tts",
+        {
           text,
           voice: getVoice(),
           rate: getRate(),
-        }),
-        signal: controller.signal,
-      });
+        },
+        { signal: controller.signal }
+      );
 
-      if (!response.ok) {
-        throw new Error("TTS request failed");
-      }
-
-      const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;

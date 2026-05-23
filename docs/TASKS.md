@@ -179,6 +179,57 @@
 
 ## ❌ 待补齐内容 / Backlog
 
+### Phase G: Python 后端迁移 ✅
+
+> **目标**: 将 Next.js API Routes 迁移到 Python FastAPI，保留现有前端不变。
+> **方案**: Next.js 前端 + FastAPI 后端，前后端通过 REST API 通信。
+
+#### G1. FastAPI 项目初始化 ✅
+
+- [x] 创建 `backend/` 目录结构
+- [x] 初始化 `requirements.txt`（fastapi, uvicorn, openai, azure-cognitiveservices-speech, supabase）
+- [x] 创建 `main.py` FastAPI 入口
+- [x] 配置 CORS 中间件（允许前端域名）
+- [x] 创建 Pydantic 请求/响应模型（`models/schemas.py`）
+
+#### G2. LLM 服务迁移 ✅
+
+- [x] 创建 `services/llm.py` - DeepSeek/OpenAI 调用封装
+- [x] 迁移 `POST /api/examiner` → `routers/examiner.py`
+- [x] 迁移 `POST /api/feedback` → `routers/feedback.py`
+- [x] 保持请求/响应格式与现有前端兼容
+- [x] 测试：使用 pytest 验证 API 响应格式
+
+#### G3. Azure 语音服务迁移 ✅
+
+- [x] 创建 `services/azure_speech.py` - Azure Speech SDK 封装
+- [x] 迁移 `POST /api/tts` → `routers/tts.py`
+- [x] 迁移 `POST /api/pronunciation` → `routers/pronunciation.py`
+- [x] 保持音频流响应格式兼容
+- [x] 测试：验证 TTS 音频输出和发音评估 JSON
+
+#### G4. Supabase 集成 ✅
+
+- [x] 创建 `services/supabase.py` - Supabase Python Client
+- [x] 创建 `middleware/auth.py` - JWT 验证中间件
+- [x] 实现会话保存/读取 API（可选，或保留 Next.js 处理）
+- [x] 测试：验证认证流程
+
+#### G5. 前端适配 ✅
+
+- [x] 创建环境变量 `NEXT_PUBLIC_API_BASE_URL`
+- [x] 修改前端 API 调用，使用可配置 base URL
+- [x] 保持本地开发时使用 Next.js API Routes（fallback）
+- [x] 测试：验证前端正常调用 Python 后端
+
+#### G6. 部署配置 ✅
+
+- [x] 创建 `Dockerfile`（可选）
+- [x] 创建 `Procfile`（Railway/Render）
+- [x] 配置环境变量模板（`.env.example`）
+- [x] 更新 CI 工作流（添加 Python 后端测试）
+- [x] 文档：部署指南
+
 ### 下一阶段优化路线
 
 详见 `docs/NEXT_OPTIMIZATION_PLAN.md`。Phase E 当前清单已完成：反馈保存、历史页读取、统计页读取、Session ID 和备份范围均已收敛。下一步建议转向 Phase C 移动端核心流程打磨，或继续深化 error-patterns 云端同步。
