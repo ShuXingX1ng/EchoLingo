@@ -27,6 +27,7 @@ export default function HistoryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   const refreshSessions = useCallback(async () => {
     setIsLoading(true);
@@ -248,7 +249,7 @@ export default function HistoryPage() {
               </div>
 
               {/* 操作栏 */}
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap sm:gap-3">
                 <div className="flex items-center gap-2">
                   {/* 排序 */}
                   <select
@@ -278,7 +279,7 @@ export default function HistoryPage() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {/* 备份 */}
                   <button
                     onClick={() => setIsBackupModalOpen(true)}
@@ -288,24 +289,29 @@ export default function HistoryPage() {
                   </button>
 
                   {/* 导出 */}
-                  <div className="relative group">
-                    <button className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsExportOpen(!isExportOpen)}
+                      className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
                       {t("history.export")}
                     </button>
-                    <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                      <button
-                        onClick={() => handleExport("json")}
-                        className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-lg"
-                      >
-                        {t("history.exportJson")}
-                      </button>
-                      <button
-                        onClick={() => handleExport("csv")}
-                        className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-lg"
-                      >
-                        {t("history.exportCsv")}
-                      </button>
-                    </div>
+                    {isExportOpen && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10">
+                        <button
+                          onClick={() => { handleExport("json"); setIsExportOpen(false); }}
+                          className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-lg"
+                        >
+                          {t("history.exportJson")}
+                        </button>
+                        <button
+                          onClick={() => { handleExport("csv"); setIsExportOpen(false); }}
+                          className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-lg"
+                        >
+                          {t("history.exportCsv")}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* 清空 */}
@@ -451,7 +457,7 @@ export default function HistoryPage() {
                               e.stopPropagation();
                               handleDelete(session.id);
                             }}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                             title={t("history.confirmDelete")}
                           >
                             <svg

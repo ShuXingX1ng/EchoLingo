@@ -668,16 +668,16 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 背景：项目已有响应式布局、PWA 和 `MobileNav`，但当前策略是优先稳定桌面端网页体验和工程质量。移动端只在发现严重阻塞问题时临时处理。
 
-当前状态：**推迟**。
+当前状态：**进行中**（C1 已完成，C2 部分完成）。
 
-### C1. `/practice` 与 `/practice/exam` 小屏练习流程（推迟）
+### C1. `/practice` 与 `/practice/exam` 小屏练习流程 ✅
 
 具体任务：
 
-- [ ] 检查小屏下 header、context strip、聊天区域、输入区高度。
-- [ ] 确认输入框、发送按钮、语音按钮不重叠。
-- [ ] 确认键盘弹出后主要输入控件不被遮挡。
-- [ ] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区。
+- [x] 练习页上下文条手机端隐藏（`hidden sm:block`），节省 ~168px
+- [x] VoiceInput 临时文字溢出修复（`overflow-hidden min-w-0` + `shrink-0`）
+- [x] 考试页 Part 2 计时器移动端紧凑化（减少 padding/字号/进度条高度）
+- [x] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区
 
 候选文件：
 
@@ -707,8 +707,12 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 具体任务：
 
 - [ ] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
-- [ ] 检查首页手机端主 CTA 是否在首屏或接近首屏。
-- [ ] 检查 `/history` 和 `/stats` 小屏扫描体验，优先避免横向溢出。
+- [x] 首页 hero 缩小，CTA 更靠近首屏（`text-3xl` + 减少间距）
+- [x] 首页 Current Target 边框响应式（堆叠时用 `border-t`）
+- [x] 历史页工具栏 `flex-wrap` 防溢出
+- [x] 历史页导出下拉改为 `onClick` toggle（触屏可用）
+- [x] 历史页删除按钮手机端始终可见
+- [x] 统计页 QuickStat gap 缩小，ScoreCard 改为单列
 
 候选文件：
 
@@ -753,8 +757,8 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 ## 推荐下一项开发任务
 
-Phase A-D、E、F 已全部完成，E2E 测试已落地（10 smoke tests）。下一步可选方向：
+Phase A-F 已全部完成，E2E 测试已落地，Phase C 移动端打磨已完成 C1 和 C2 大部分。下一步可选方向：
 
-1. **Phase C 移动端核心流程打磨** — 当桌面端质量门稳定后启动。
-2. **E2E 测试扩展** — 补充更多交互路径测试（如 setup→practice 完整导航、考试 Part 2 计时器等）。
+1. **Phase C 收尾** — setup 页 sticky CTA 和 topic chip 可点区域优化。
+2. **E2E 测试扩展** — 补充更多交互路径测试。
 3. **新功能探索** — 根据用户反馈决定优先级。

@@ -437,7 +437,7 @@ function ExamPage() {
 
       {/* Part 2 Prominent Timer */}
       {(phase === "part2-prep" || phase === "part2-speak") && (
-        <div className={`border-b px-4 py-3 transition-colors duration-300 ${
+        <div className={`border-b px-3 py-2 sm:px-4 sm:py-3 transition-colors duration-300 ${
           phase === "part2-prep"
             ? getTimerUrgency(prepTimeLeft, PREP_TIME) === "critical"
               ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
@@ -452,7 +452,7 @@ function ExamPage() {
         }`}>
           <div className="max-w-4xl mx-auto">
             {/* Timer Header */}
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1 sm:mb-2">
               <div className="flex items-center gap-2">
                 <span className={`text-lg ${
                   phase === "part2-prep" ? "📝" : "🎤"
@@ -461,7 +461,7 @@ function ExamPage() {
                   {phase === "part2-prep" ? t("exam.prepTime") : t("exam.speakTime")}
                 </span>
               </div>
-              <div className={`text-2xl font-mono font-bold tabular-nums ${
+              <div className={`text-xl sm:text-2xl font-mono font-bold tabular-nums ${
                 phase === "part2-prep"
                   ? getTimerUrgency(prepTimeLeft, PREP_TIME) === "critical"
                     ? "text-red-600 dark:text-red-400 animate-pulse"
@@ -479,7 +479,7 @@ function ExamPage() {
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-1000 ease-linear ${
                   phase === "part2-prep"

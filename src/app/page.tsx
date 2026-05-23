@@ -71,20 +71,20 @@ export default function Home() {
       <main id="main-content" className="relative z-10 mx-auto max-w-7xl px-5 py-8 sm:py-12">
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
           <div className="border border-slate-900 bg-[#fffdf7] p-6 shadow-[10px_10px_0_rgba(15,23,42,0.10)] dark:border-white/15 dark:bg-slate-900 dark:shadow-[10px_10px_0_rgba(255,255,255,0.05)] sm:p-8 lg:p-10">
-            <div className="mb-10 grid gap-8 lg:grid-cols-[1fr_220px]">
+            <div className="mb-6 sm:mb-10 grid gap-6 sm:gap-8 lg:grid-cols-[1fr_220px]">
               <div>
                 <p className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-emerald-800 dark:text-emerald-300">
                   {t("home.dailyPlan")}
                 </p>
-                <h1 className="max-w-3xl text-4xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-5xl">
+                <h1 className="max-w-3xl text-3xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-5xl">
                   {t("home.dailyPlanDesc")}
                 </h1>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300">
+                <p className="mt-3 sm:mt-5 max-w-2xl text-sm sm:text-base leading-7 sm:leading-8 text-slate-600 dark:text-slate-300">
                   {t("home.description")}
                 </p>
               </div>
 
-              <div className="border-l border-slate-200 pl-6 dark:border-white/10">
+              <div className="border-t lg:border-t-0 lg:border-l border-slate-200 pt-4 lg:pt-0 pl-0 lg:pl-6 dark:border-white/10">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   {t("home.currentTarget")}
                 </p>

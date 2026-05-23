@@ -92,11 +92,11 @@ export default function VoiceInput({ onResult, disabled }: VoiceInputProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 overflow-hidden min-w-0">
       <button
         onClick={toggleListening}
         disabled={disabled}
-        className={`p-3 rounded-xl transition-all ${
+        className={`p-3 rounded-xl shrink-0 transition-all ${
           isListening
             ? "bg-red-500 text-white animate-pulse"
             : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"

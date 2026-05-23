@@ -273,11 +273,15 @@
 11. ~~**数据同步稳定性** - 审查 localStorage、Supabase、IndexedDB 职责边界~~ ✅
 12. **网页端交互打磨** - 练习流程、反馈展示、历史回看的桌面端体验优化
 
-### 第五阶段：移动端优化 (暂缓)
+### 第五阶段：移动端优化 (进行中)
 
-- `/practice` 和 `/practice/exam` 小屏输入区适配
+- ~~练习页上下文条手机端隐藏~~ ✅
+- ~~VoiceInput 临时文字溢出修复~~ ✅
+- ~~考试页 Part 2 计时器紧凑化~~ ✅
+- ~~历史页工具栏溢出、导出下拉、删除按钮可见性~~ ✅
+- ~~首页 hero 缩小、Current Target 边框响应式~~ ✅
+- ~~统计页网格手机端适配~~ ✅
 - `/practice/setup` sticky CTA 和 topic chip 可点区域优化
-- 首页手机端主 CTA 首屏位置
 
 ### Future / Backlog
 

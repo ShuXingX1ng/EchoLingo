@@ -133,7 +133,7 @@ export default function StatsPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                   <QuickStat label={t("stats.thisWeek")} value={stats.thisWeekSessions} />
                   <QuickStat label={t("stats.totalSessions")} value={stats.totalSessions} />
                   <QuickStat label={t("stats.practiceDays")} value={stats.practiceDays} />
@@ -263,7 +263,7 @@ export default function StatsPage() {
               </summary>
               <div className="space-y-6 px-5 pb-5 sm:px-6 sm:pb-6">
                 {/* Score Cards */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <ScoreCard label={t("stats.highest")} value={stats.highestBand} />
                   <ScoreCard label={t("stats.average")} value={stats.averageBand} />
                   <ScoreCard label={t("stats.lowest")} value={stats.lowestBand} />

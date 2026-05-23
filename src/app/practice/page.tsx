@@ -284,7 +284,7 @@ function PracticePage() {
         }
       />
 
-      <div className="border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
+      <div className="hidden sm:block border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
         <div className="mx-auto grid max-w-4xl gap-3 text-sm sm:grid-cols-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">

@@ -1552,3 +1552,39 @@ P2 — 边界场景：
 - `npm run lint` 通过，0 warning / 0 error
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
+
+---
+
+### Entry 43: Phase C — 移动端核心流程打磨
+
+**完成阶段**: Phase C 移动端核心流程打磨
+
+**完成内容**:
+
+**C1 — 练习页修复（3 项）**:
+
+1. **练习页上下文条隐藏** (`practice/page.tsx:287`): 添加 `hidden sm:block`，手机端隐藏上下文条（~168px），为聊天区域腾出空间。
+2. **VoiceInput 溢出修复** (`VoiceInput.tsx:95,99`): 容器添加 `overflow-hidden min-w-0`，按钮添加 `shrink-0`，防止临时文字推动其他元素溢出。
+3. **考试页计时器紧凑化** (`exam/page.tsx:440,455,464,482`): 移动端减少 padding、字号和进度条高度，节省 ~30px。
+
+**C2 — 其他页面修复（6 项）**:
+
+4. **历史页工具栏溢出** (`history/page.tsx:251,281`): 添加 `flex-wrap`，允许按钮在窄屏换行。
+5. **历史页导出下拉** (`history/page.tsx:291-309`): 从 `group-hover` 改为 `onClick` toggle，修复触屏设备无法使用。
+6. **历史页删除按钮** (`history/page.tsx:454`): `opacity-0 group-hover:opacity-100` 改为 `sm:opacity-0 sm:group-hover:opacity-100`，手机端始终可见。
+7. **首页 hero 缩小** (`page.tsx:74,79,82`): 移动端减小标题字号、描述文字和间距，CTA 更靠近首屏。
+8. **首页 Current Target 边框** (`page.tsx:87`): `border-l` 改为 `lg:border-l`，堆叠时改用 `border-t` 分隔。
+9. **统计页网格适配** (`stats/page.tsx:136,266`): QuickStat gap 缩小，ScoreCard 改为单列。
+
+**关键文件**:
+- `src/app/practice/page.tsx` — Fix 1
+- `src/components/VoiceInput.tsx` — Fix 2
+- `src/app/practice/exam/page.tsx` — Fix 3
+- `src/app/history/page.tsx` — Fix 4, 5, 6
+- `src/app/page.tsx` — Fix 7, 8
+- `src/app/stats/page.tsx` — Fix 9
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
