@@ -17,15 +17,20 @@ export async function saveSession(
   const isAuthed = await isAuthenticated();
 
   if (isAuthed) {
-    const cloudSession = await cloudHistory.saveSessionToCloud(
-      messages,
-      feedback,
-      mode
-    );
-    if (cloudSession) {
-      // Also save locally as backup
-      localHistory.saveSession(messages, feedback, mode);
-      return cloudSession;
+    try {
+      const cloudSession = await cloudHistory.saveSessionToCloud(
+        messages,
+        feedback,
+        mode
+      );
+      if (cloudSession) {
+        // Also save locally as backup
+        localHistory.saveSession(messages, feedback, mode);
+        return cloudSession;
+      }
+    } catch (error) {
+      // Cloud save failed, fall through to local storage
+      console.warn("Cloud save failed, falling back to local storage:", error);
     }
   }
 

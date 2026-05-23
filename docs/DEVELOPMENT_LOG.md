@@ -1727,3 +1727,51 @@ P2 — 边界场景：
         ▼                                     ▼
    Vercel/静态部署                      Railway/Render/自建
 ```
+
+---
+
+## 2026-05-23 (续)
+
+### Entry 38: 测试覆盖扩展
+
+**完成内容**:
+
+**前端单元测试扩展** (+41 个测试):
+- 创建 `src/lib/api-client.test.ts` - 17 个测试
+  - base URL 配置、apiRequest、apiPost、apiPostForm、apiPostBlob
+- 创建 `src/lib/unified-history.test.ts` - 16 个测试
+  - 已登录/未登录/离线三条路径、云端保存失败 fallback
+- 创建 `src/hooks/useAudioRecorder.test.ts` - 8 个测试
+  - 录音生命周期、状态管理、WAV 编码
+
+**E2E 测试扩展** (+3 个测试):
+- 完整用户路径：home → setup → practice → end → feedback → history
+- 练习页 text/voice 模式切换
+- setup 页 URL focus 参数显示
+
+**后端测试扩展** (+50 个测试):
+- 集成测试：examiner 多轮对话、Part 2/3 prompt 验证
+- 集成测试：feedback 结构化响应、Part 2 模式
+- 集成测试：pronunciation 评估流程
+- 错误处理测试：LLM 超时、Azure 降级、无效参数
+- 认证测试：JWT 验证、CORS 配置
+
+**代码改进**:
+- 修复 `unified-history.ts` 的 `saveSession` 添加 try-catch，云端保存失败时正确 fallback 到本地存储
+
+**关键文件**:
+- `src/lib/api-client.test.ts` (新增)
+- `src/lib/unified-history.test.ts` (新增)
+- `src/hooks/useAudioRecorder.test.ts` (新增)
+- `src/lib/unified-history.ts` (修改 - 添加错误处理)
+- `e2e/smoke.spec.ts` (扩展)
+- `backend/tests/test_integration_examiner.py` (新增)
+- `backend/tests/test_integration_feedback.py` (新增)
+- `backend/tests/test_integration_pronunciation.py` (新增)
+- `backend/tests/test_error_handling.py` (新增)
+
+**验证结果**:
+- 前端单元测试：10 文件 / 86 测试通过
+- E2E 测试：20 测试通过
+- 后端测试：86 测试通过
+- 质量门：lint 0 error、typecheck pass、build pass
