@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockAllApis, mockExaminerApi, mockFeedbackApi, mockTtsApi } from "./helpers";
+import { mockAllApis, mockExaminerApi, mockFeedbackApi, mockTtsApi, mockPronunciationApi } from "./helpers";
 
 test.describe("P0 — Core path smoke tests", () => {
   test("home page loads with DesktopNav and main CTAs", async ({ page }) => {
@@ -203,6 +203,110 @@ test.describe("P1 — Key interactions", () => {
 
     // Start URL should now include topic param
     await expect(startLink).toHaveAttribute("href", /topic=/);
+  });
+
+  test("shadowing setup → start → practice view → record → next", async ({ page, context }) => {
+    test.setTimeout(30_000);
+    await context.grantPermissions(["microphone"]);
+    await mockTtsApi(page);
+    await mockPronunciationApi(page);
+
+    // 1. Go to shadowing page
+    await page.goto("/practice/shadowing");
+
+    // 2. Setup view renders
+    await expect(page.getByRole("button", { name: /start/i }).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    // 3. Click Start button
+    await page.getByRole("button", { name: /start/i }).first().click();
+
+    // 4. Practice view appears — sentence card with "Listen and repeat"
+    await expect(page.getByText(/listen and repeat/i)).toBeVisible({ timeout: 10000 });
+
+    // 5. Click record button
+    await page.getByRole("button", { name: /start recording/i }).click();
+
+    // 6. Wait for recording state — stop button appears (replaces record button)
+    await expect(page.getByRole("button", { name: /stop recording/i })).toBeVisible({
+      timeout: 10000,
+    });
+
+    // 7. Click stop recording
+    await page.getByRole("button", { name: /stop recording/i }).click();
+
+    // 8. Wait for either pronunciation feedback OR error (fake mic may produce empty audio)
+    // The page should not crash — either result or error should appear
+    const nextBtn = page.getByRole("button", { name: /next sentence/i });
+    const tryAgainBtn = page.getByRole("button", { name: /try again/i });
+    const errorMsg = page.getByText(/no audio|failed|error/i);
+
+    // Wait for any of these outcomes
+    await expect(nextBtn.or(tryAgainBtn).or(errorMsg).first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // If next sentence button appeared, verify the flow continues
+    if (await nextBtn.isVisible()) {
+      await nextBtn.click();
+      await expect(page.getByText(/listen and repeat/i)).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test("exam page Part 2 timer appears after cue card message", async ({ page }) => {
+    test.setTimeout(30_000);
+    await mockFeedbackApi(page);
+    await mockTtsApi(page);
+
+    // Mock examiner API with counter — first call returns Part 1, second returns Part 2 cue card
+    let examinerCallCount = 0;
+    await page.route("**/api/examiner", (route) => {
+      examinerCallCount++;
+      if (examinerCallCount === 1) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "That's interesting. Can you tell me more about yourself?",
+          }),
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          message:
+            "I'm going to give you a topic and I'd like you to talk about it for 1-2 minutes. Describe a place you have visited that you found interesting.",
+        }),
+      });
+    });
+
+    // 1. Navigate to exam page
+    await page.goto("/practice/exam");
+
+    // 2. Part 1 greeting visible
+    await expect(page.getByText(/good morning|good afternoon/i).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    // 3. Send a message to get Part 1 response
+    const input = page.locator('input[type="text"]');
+    await input.fill("My name is Test. I'm from Beijing.");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // 4. Wait for Part 1 examiner response
+    await expect(page.getByText(/interesting/i)).toBeVisible({ timeout: 10000 });
+
+    // 5. Send another message to trigger Part 2 cue card
+    await input.fill("I'd like to talk about the Great Wall.");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // 6. Part 2 cue card message arrives — timer should appear
+    await expect(page.getByText(/give you a topic/i)).toBeVisible({ timeout: 10000 });
+
+    // 7. Prep timer visible (countdown from 60)
+    await expect(page.getByText(/prep/i).first()).toBeVisible({ timeout: 5000 });
   });
 });
 

@@ -524,6 +524,7 @@
 | 2026-05-22 | Session ID 与模式保存 | 本地会话改用 crypto.randomUUID，并保留 unified-history 传入的练习模式 |
 | 2026-05-22 | 备份错误模式 | backup.ts 导出/恢复 error-patterns，备份校验覆盖可选用户画像 |
 | 2026-05-23 | Phase C 收尾 + E2E 扩展 | setup 页 topic chip 触屏优化，E2E 从 10 扩展到 15 个测试 |
+| 2026-05-23 | E2E 扩展 | 跟读完整流程 + 考试 Part 2 计时器交互，E2E 从 15 扩展到 17 个测试 |
 
 ---
 
@@ -1620,3 +1621,32 @@ P2 — 边界场景：
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
 - `npx playwright test` 通过，15 个测试 (13.1s)
+
+---
+
+### Entry 45: E2E 测试扩展 — 跟读流程 + 考试计时器
+
+**完成阶段**: Phase D E2E 测试扩展
+
+**完成内容**:
+
+**Shadowing 完整流程测试**:
+- 新增 `shadowing setup → start → practice view → record → next` 测试
+- 覆盖：setup 视图 → 点击 Start → 练习视图出现 → 点击录音 → 录音状态 → 停止录音 → 评估结果或错误处理
+- 使用 `context.grantPermissions(["microphone"])` 授权麦克风
+- 容错设计：fake mic 可能产生空音频，测试兼容成功评估和错误两种路径
+
+**Exam Part 2 计时器测试**:
+- 新增 `exam page Part 2 timer appears after cue card message` 测试
+- 使用计数器 mock examiner API：第一次返回 Part 1 响应，第二次返回 Part 2 cue card
+- 覆盖：发送消息 → 考官回复 → 再次发送 → 收到 "give you a topic" → 准备计时器出现
+
+**关键文件**:
+- `e2e/smoke.spec.ts` — 新增 2 个测试（15 → 17）
+- `e2e/helpers.ts` — 已有 mock 工具，新增 `mockPronunciationApi` 导入
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
+- `npx playwright test` 通过，17 个测试 (14.2s)

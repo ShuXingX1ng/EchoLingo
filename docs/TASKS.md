@@ -293,7 +293,7 @@
 ## 技术债务
 
 - [ ] 单元测试覆盖持续扩展（已有 topics、backup、audio-utils、FeedbackPanel 发音队列、MobileNav、practice setup、error-patterns 覆盖）
-- [x] E2E 测试 — Playwright + 15 smoke tests (P0/P1/P2)
+- [x] E2E 测试 — Playwright + 17 smoke tests (P0/P1/P2)
 - [ ] 性能监控完善
 - [x] lint warnings 清零
 - [x] Next 16 构建提示清零（Turbopack root + Proxy 迁移）
