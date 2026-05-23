@@ -17,7 +17,7 @@ async def test_tts_missing_text():
             "/api/tts",
             json={"text": "", "voice": "en-US-AriaNeural", "rate": 1.0},
         )
-    assert response.status_code == 422  # Pydantic validation rejects empty string
+    assert response.status_code == 400  # Manual validation in route handler
 
 
 @pytest.mark.anyio

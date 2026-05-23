@@ -3,6 +3,7 @@ Tests for health check and root endpoints.
 """
 
 import pytest
+from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 from main import app
 
@@ -34,21 +35,22 @@ async def test_root():
 
 @pytest.mark.anyio
 async def test_examiner_not_implemented():
-    """Test examiner endpoint returns 501 (not yet implemented)."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            "/api/examiner",
-            json={
-                "mode": "ielts_part_1",
-                "messages": [
-                    {
-                        "id": "1",
-                        "role": "examiner",
-                        "content": "Hello, how are you?",
-                        "createdAt": "2024-01-01T00:00:00Z",
-                    }
-                ],
-            },
-        )
-    assert response.status_code == 501
+    """Test examiner endpoint returns 502 when LLM not configured."""
+    with patch("services.llm.llm_service.is_configured", return_value=False):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/examiner",
+                json={
+                    "mode": "ielts_part_1",
+                    "messages": [
+                        {
+                            "id": "1",
+                            "role": "examiner",
+                            "content": "Hello, how are you?",
+                            "createdAt": "2024-01-01T00:00:00Z",
+                        }
+                    ],
+                },
+            )
+    assert response.status_code == 502

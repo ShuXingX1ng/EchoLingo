@@ -136,11 +136,11 @@ def test_optional_route_with_auth():
 
 
 def test_auth_skipped_when_supabase_not_configured():
-    """Test authentication is skipped when Supabase is not configured."""
+    """Test authentication fails when Supabase is not configured (require_user always needs auth)."""
     with patch("services.supabase.supabase_service.is_configured", return_value=False):
         response = client.get(
             "/protected",
             headers={"Authorization": "Bearer some-token"}
         )
-    # Should pass through without auth when Supabase is not configured
-    assert response.status_code == 200
+    # require_user always requires authentication, returns 401 when user is None
+    assert response.status_code == 401

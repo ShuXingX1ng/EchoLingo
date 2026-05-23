@@ -17,7 +17,7 @@ async def test_examiner_missing_messages():
             "/api/examiner",
             json={"mode": "ielts_part_1", "messages": []},
         )
-    assert response.status_code == 422  # Pydantic validation error
+    assert response.status_code == 400  # Manual validation in route handler
 
 
 @pytest.mark.anyio

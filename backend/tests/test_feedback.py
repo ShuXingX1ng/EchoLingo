@@ -43,7 +43,7 @@ async def test_feedback_missing_messages():
             "/api/feedback",
             json={"mode": "ielts_part_1", "messages": []},
         )
-    assert response.status_code == 422
+    assert response.status_code == 400  # Manual validation in route handler
 
 
 @pytest.mark.anyio
