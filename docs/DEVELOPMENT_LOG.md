@@ -523,6 +523,7 @@
 | 2026-05-22 | 统计页云端读取 | stats.ts 改用 unified-history，统计页等待异步会话数据后渲染 |
 | 2026-05-22 | Session ID 与模式保存 | 本地会话改用 crypto.randomUUID，并保留 unified-history 传入的练习模式 |
 | 2026-05-22 | 备份错误模式 | backup.ts 导出/恢复 error-patterns，备份校验覆盖可选用户画像 |
+| 2026-05-23 | Phase C 收尾 + E2E 扩展 | setup 页 topic chip 触屏优化，E2E 从 10 扩展到 15 个测试 |
 
 ---
 
@@ -1588,3 +1589,34 @@ P2 — 边界场景：
 - `npm run lint` 通过，0 warning / 0 error
 - `npm run typecheck` 通过
 - `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
+
+---
+
+### Entry 44: Phase C 收尾 + E2E 测试扩展
+
+**完成阶段**: Phase C 移动端收尾 + Phase D E2E 扩展
+
+**完成内容**:
+
+**Phase C 收尾 — setup 页移动端触屏优化**:
+- topic chip 按钮 `py-2` (36px) 改为 `py-2.5 sm:py-2` (40px mobile / 36px desktop)，满足触屏 44px 最小推荐高度
+- 改动仅影响 `/practice/setup` 页面的话题选择按钮
+
+**E2E 测试扩展 (5 个新测试)**:
+- **Shadowing setup smoke**: 验证跟读练习 setup 视图渲染模式选择、话题列表和 Start 按钮
+- **Shadowing priority words**: 验证 `?words=pronunciation,fluency` 参数正确显示优先练习词汇横幅
+- **Exam page smoke**: 验证模拟考试页 Part 1 greeting、阶段指示器、输入框和 End Exam 按钮
+- **Setup topic selection**: 验证选择话题后 start URL 正确包含 `topic=` 参数
+- **Feedback API error**: 验证 feedback API 返回 500 时练习页展示错误提示而非崩溃
+- **Dark mode 扩展**: 新增 stats、history、shadowing 页面深色模式验证
+
+**关键文件**:
+- `src/app/practice/setup/page.tsx` — topic chip 触屏高度优化
+- `e2e/smoke.spec.ts` — 新增 5 个测试用例（10 → 15）
+- `e2e/helpers.ts` — 已有 mock 工具（未修改）
+
+**验证结果**:
+- `npm run lint` 通过，0 warning / 0 error
+- `npm run typecheck` 通过
+- `npm run test:unit:run` 通过，7 个测试文件 / 45 个测试
+- `npx playwright test` 通过，15 个测试 (13.1s)

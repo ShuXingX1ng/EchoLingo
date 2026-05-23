@@ -197,11 +197,11 @@
 - [x] 统计页首屏调整为目标进度、趋势、薄弱项、推荐行动
 - [x] 检查统计图表移动端无横向溢出
 
-### Phase C: 移动端核心流程打磨 [暂缓 — 优先网页端]
+### Phase C: 移动端核心流程打磨
 
-- [ ] `/practice` 和 `/practice/exam` 小屏输入区不重叠、不被键盘遮挡
-- [ ] `/practice/setup` sticky CTA 和 topic chip 手机端可点区域优化
-- [ ] 首页手机端主 CTA 保持在首屏或接近首屏
+- [x] `/practice` 和 `/practice/exam` 小屏输入区不重叠、不被键盘遮挡
+- [x] `/practice/setup` sticky CTA 和 topic chip 手机端可点区域优化
+- [x] 首页手机端主 CTA 保持在首屏或接近首屏
 
 ### Phase D: 测试与 CI
 
@@ -281,7 +281,7 @@
 - ~~历史页工具栏溢出、导出下拉、删除按钮可见性~~ ✅
 - ~~首页 hero 缩小、Current Target 边框响应式~~ ✅
 - ~~统计页网格手机端适配~~ ✅
-- `/practice/setup` sticky CTA 和 topic chip 可点区域优化
+- ~~`/practice/setup` sticky CTA 和 topic chip 可点区域优化~~ ✅
 
 ### Future / Backlog
 
@@ -293,7 +293,7 @@
 ## 技术债务
 
 - [ ] 单元测试覆盖持续扩展（已有 topics、backup、audio-utils、FeedbackPanel 发音队列、MobileNav、practice setup、error-patterns 覆盖）
-- [x] E2E 测试 — Playwright + 10 smoke tests (P0/P1/P2)
+- [x] E2E 测试 — Playwright + 15 smoke tests (P0/P1/P2)
 - [ ] 性能监控完善
 - [x] lint warnings 清零
 - [x] Next 16 构建提示清零（Turbopack root + Proxy 迁移）

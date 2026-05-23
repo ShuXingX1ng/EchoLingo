@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockAllApis, mockExaminerApi, mockTtsApi } from "./helpers";
+import { mockAllApis, mockExaminerApi, mockFeedbackApi, mockTtsApi } from "./helpers";
 
 test.describe("P0 — Core path smoke tests", () => {
   test("home page loads with DesktopNav and main CTAs", async ({ page }) => {
@@ -133,6 +133,77 @@ test.describe("P1 — Key interactions", () => {
     await page.getByText(/text mode/i).click();
     await expect(page.locator('input[type="text"]')).toBeVisible();
   });
+
+  test("shadowing setup page renders modes and topics", async ({ page }) => {
+    await page.goto("/practice/shadowing");
+
+    // Title visible
+    await expect(page.getByText(/shadowing/i).first()).toBeVisible({ timeout: 10000 });
+
+    // Mode selection buttons visible (Part 1, Part 2, Part 3)
+    await expect(page.getByRole("button", { name: /part 1/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /part 2/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /part 3/i }).first()).toBeVisible();
+
+    // Start button visible
+    await expect(page.getByRole("button", { name: /start/i }).first()).toBeVisible();
+
+    // Topic chips rendered (at least one visible)
+    const topicChips = page.locator("button").filter({ hasText: /\w{3,}/ });
+    await expect(topicChips.first()).toBeVisible();
+  });
+
+  test("shadowing setup shows priority words from URL param", async ({ page }) => {
+    await page.goto("/practice/shadowing?words=pronunciation,fluency");
+
+    // Priority words banner visible
+    await expect(page.getByText(/priority/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("pronunciation", { exact: true })).toBeVisible();
+    await expect(page.getByText("fluency", { exact: true })).toBeVisible();
+  });
+
+  test("exam page loads with Part 1 greeting and stage indicator", async ({ page }) => {
+    await mockExaminerApi(page);
+    await mockFeedbackApi(page);
+    await mockTtsApi(page);
+
+    await page.goto("/practice/exam");
+
+    // Part 1 examiner greeting visible — use .first() to handle multiple matches
+    await expect(page.getByText(/good morning|good afternoon/i).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Stage indicator shows Part 1
+    await expect(page.getByText("Part 1", { exact: false }).first()).toBeVisible();
+
+    // Input area visible
+    await expect(page.locator('input[type="text"]')).toBeVisible();
+
+    // End Exam button visible
+    await expect(page.getByText(/end exam/i)).toBeVisible();
+  });
+
+  test("setup page topic selection changes start link URL", async ({ page }) => {
+    await page.goto("/practice/setup");
+
+    // Wait for page to load
+    await expect(page.getByRole("link", { name: /start practice/i })).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Default start URL has no topic
+    const startLink = page.getByRole("link", { name: /start practice/i });
+    await expect(startLink).toHaveAttribute("href", /practice\?mode=part1/);
+
+    // Select a topic by name — topic chips are inside the topic selection section
+    // Use a known topic name from the topics library
+    const topicChip = page.locator("section").filter({ hasText: /choose a topic/i }).locator("button").first();
+    await topicChip.click();
+
+    // Start URL should now include topic param
+    await expect(startLink).toHaveAttribute("href", /topic=/);
+  });
 });
 
 test.describe("P2 — Edge cases", () => {
@@ -164,5 +235,45 @@ test.describe("P2 — Edge cases", () => {
 
     await page.goto("/practice/setup");
     await expect(page.getByText(/choose the kind of practice/i)).toBeVisible({ timeout: 10000 });
+
+    await page.goto("/stats");
+    await expect(page.locator("nav").first()).toBeVisible();
+
+    await page.goto("/history");
+    await expect(page.locator("nav").first()).toBeVisible();
+
+    await page.goto("/practice/shadowing");
+    await expect(page.locator("nav").first()).toBeVisible();
+  });
+
+  test("practice page handles feedback API error", async ({ page }) => {
+    await mockExaminerApi(page);
+    await mockTtsApi(page);
+
+    // Mock feedback API to return 500
+    await page.route("**/api/feedback", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Internal server error" }),
+      })
+    );
+
+    await page.goto("/practice?mode=part1");
+    await expect(page.getByText(/examiner/i).first()).toBeVisible({ timeout: 10000 });
+
+    // Send a message to get a response
+    const input = page.locator('input[type="text"]');
+    await input.fill("Test answer");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // Wait for examiner response
+    await expect(page.getByText(/interesting/i)).toBeVisible({ timeout: 10000 });
+
+    // End session — feedback will fail
+    await page.getByText(/end session/i).click();
+
+    // Should show error (not crash)
+    await expect(page.getByText(/failed|error/i).first()).toBeVisible({ timeout: 30000 });
   });
 });

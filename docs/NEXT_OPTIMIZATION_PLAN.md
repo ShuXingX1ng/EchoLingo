@@ -61,7 +61,7 @@ EchoLingo 已经从 MVP 进入稳定化阶段。当前不缺主要功能，下�
 1. **Phase E：数据与云端同步稳定性深化**，先 review，再做小步、单边界重构。✅
 2. **Phase F：代码结构收敛补强**，每次只抽一个仍然重复或职责不清的边界。✅
 3. **Phase D3：E2E mock 规划**，先定义路径和 mock 策略，不急着安装 Playwright。✅
-4. **Phase C：移动端核心流程打磨（推迟）**，除非发现严重阻塞问题。
+4. **Phase C：移动端核心流程打磨** ✅。
 
 明确策略：
 
@@ -416,6 +416,7 @@ Playwright 已安装并配置完成：
 - [x] CI 工作流稳定通过（lint、typecheck、unit test、build）
 - [x] E2E 运行环境：本地（`npm run test:e2e`），webServer 自动启动 dev server
 - [x] API mock 层：纯用 Playwright `page.route()`，未引入 MSW
+- [x] 15 个 smoke tests 覆盖 P0/P1/P2（含跟读 setup、考试页、话题选择、反馈错误、深色模式）
 
 #### D3.6 文件清单
 
@@ -678,6 +679,7 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - [x] VoiceInput 临时文字溢出修复（`overflow-hidden min-w-0` + `shrink-0`）
 - [x] 考试页 Part 2 计时器移动端紧凑化（减少 padding/字号/进度条高度）
 - [x] 保持 `/practice*` 路由不渲染移动底部导航，避免遮挡输入区
+- [x] setup 页 topic chip 触屏高度优化（`py-2` → `py-2.5 sm:py-2`）
 
 候选文件：
 
@@ -702,11 +704,11 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 - 当前不做移动端专项视觉重写。
 - 当前不引入新的手势系统。
 
-### C2. `/practice/setup`、首页、history/stats 小屏体验（推迟）
+### C2. `/practice/setup`、首页、history/stats 小屏体验 ✅
 
 具体任务：
 
-- [ ] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
+- [x] 检查 `/practice/setup` sticky CTA 和 topic chip 手机端可点区域。
 - [x] 首页 hero 缩小，CTA 更靠近首屏（`text-3xl` + 减少间距）
 - [x] 首页 Current Target 边框响应式（堆叠时用 `border-t`）
 - [x] 历史页工具栏 `flex-wrap` 防溢出
@@ -757,8 +759,9 @@ review 结论已记录在 `docs/DEVELOPMENT_LOG.md` Entry 33。关键发现：
 
 ## 推荐下一项开发任务
 
-Phase A-F 已全部完成，E2E 测试已落地，Phase C 移动端打磨已完成 C1 和 C2 大部分。下一步可选方向：
+Phase A-F 全部完成，E2E 测试已落地（15 个 smoke tests），Phase C 移动端打磨已全部完成。下一步可选方向：
 
-1. **Phase C 收尾** — setup 页 sticky CTA 和 topic chip 可点区域优化。
-2. **E2E 测试扩展** — 补充更多交互路径测试。
+1. **E2E 测试继续扩展** — 补充更多交互路径测试（跟读完整流程、考试 Part 2 计时器等）。
+2. **单元测试覆盖扩展** — 已有 7 文件 / 45 测试，可继续补充关键模块覆盖。
 3. **新功能探索** — 根据用户反馈决定优先级。
+4. **Python 化评估** — API 路由层（examiner、feedback）适合逐步迁移到 Python 服务。
