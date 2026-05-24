@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   getPersonalizedSuggestions,
   getErrorStats,
-} from "@/lib/error-patterns";
+} from "@/lib/supabase-error-patterns";
 import { useAuth } from "@/lib/auth-context";
 
 interface PersonalizedSuggestionsProps {
@@ -24,11 +24,14 @@ export default function PersonalizedSuggestions({
 
   useEffect(() => {
     if (user) {
-      const userSuggestions = getPersonalizedSuggestions(user.id);
-      setSuggestions(userSuggestions);
+      // Use Supabase as the authority for logged-in users
+      getPersonalizedSuggestions(user.id)
+        .then(setSuggestions)
+        .catch(console.error);
 
-      const userStats = getErrorStats(user.id);
-      setStats(userStats);
+      getErrorStats(user.id)
+        .then(setStats)
+        .catch(console.error);
     }
   }, [user]);
 

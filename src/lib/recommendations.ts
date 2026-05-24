@@ -1,6 +1,6 @@
 import { TOPICS, type Topic, getCategories } from "./topics";
 import { getUserProgress, type LearningProgress } from "./supabase-progress";
-import { getUserProfile } from "./error-patterns";
+import { getWeakSkills as getSupabaseWeakSkills, getTopErrorForSkill as getSupabaseTopError } from "./supabase-error-patterns";
 
 export interface Recommendation {
   topic: Topic;
@@ -9,36 +9,14 @@ export interface Recommendation {
   focusArea?: string;
 }
 
-// Analyze weak skill dimensions from error patterns
-function getWeakSkills(userId: string): string[] {
-  const profile = getUserProfile(userId);
-  if (!profile) return [];
-
-  const skillCounts: Record<string, number> = {
-    grammar: 0,
-    vocabulary: 0,
-    fluency: 0,
-    pronunciation: 0,
-  };
-
-  for (const error of profile.commonErrors) {
-    skillCounts[error.type] = (skillCounts[error.type] || 0) + error.frequency;
-  }
-
-  // Return skills sorted by weakness (most errors first)
-  return Object.entries(skillCounts)
-    .filter(([, count]) => count > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([skill]) => skill);
+// Get weak skill dimensions from Supabase error patterns
+async function getWeakSkills(userId: string): Promise<string[]> {
+  return getSupabaseWeakSkills(userId);
 }
 
-// Get a specific error pattern for a skill type to use in recommendation reasons
-function getTopErrorForSkill(userId: string, skill: string): string | null {
-  const profile = getUserProfile(userId);
-  if (!profile) return null;
-
-  const match = profile.commonErrors.find((e) => e.type === skill);
-  return match?.pattern ?? null;
+// Get a specific error pattern for a skill type from Supabase
+async function getTopErrorForSkill(userId: string, skill: string): Promise<string | null> {
+  return getSupabaseTopError(userId, skill);
 }
 
 // Get topics the user hasn't practiced yet
@@ -81,7 +59,7 @@ export async function getRecommendations(userId: string): Promise<Recommendation
   const recommendations: Recommendation[] = [];
   const usedTopicIds = new Set<string>();
 
-  const weakSkills = getWeakSkills(userId);
+  const weakSkills = await getWeakSkills(userId);
   const unpracticed = getUnpracticedTopics(progress);
   const lowScore = getLowScoreTopics(progress);
   const unexploredCategories = getUnexploredCategories(progress);
@@ -132,7 +110,7 @@ export async function getRecommendations(userId: string): Promise<Recommendation
         break;
     }
 
-    const topError = getTopErrorForSkill(userId, topWeakSkill);
+    const topError = await getTopErrorForSkill(userId, topWeakSkill);
 
     for (const topic of targetTopics) {
       if (!usedTopicIds.has(topic.id)) {

@@ -19,6 +19,7 @@ This is a compressed project timeline. Older blow-by-blow entries were intention
 | 2026-05-24 | Product roadmap | Added long-term phases H-M and removed redundant legacy doc | `git diff --check` |
 | 2026-05-24 | H1 review | Reviewed learning plan data sources and degradation strategy | lint/typecheck/unit (86 tests) |
 | 2026-05-24 | H2 task reasons | Added reason field to DailyTask with real data | lint/typecheck/unit (86 tests) |
+| 2026-05-24 | H2a personalization authority | Moved error pattern storage to Supabase for logged-in users, localStorage as backup | lint/typecheck/unit (86 tests)/build |
 
 ## Major Completed Capabilities
 
@@ -119,6 +120,34 @@ Follow-up decision:
 - Product direction was corrected after review: logged-in personalization should treat Supabase as the authority.
 - localStorage should remain migration/backup/temporary/fallback data, not the primary source for logged-in recommendations.
 - `recommendations.ts` currently mixes Supabase progress with localStorage error patterns, so the next pass should align it before expanding personalized recommendation behavior.
+
+### 2026-05-24: H2a — Align Personalization Data Authority
+
+Scope: data authority alignment for personalized recommendations.
+
+Changed files:
+
+- `supabase-migration-002.sql` — created `user_error_patterns` and `user_weak_areas` tables with RLS policies and auto-update trigger
+- `src/lib/supabase-error-patterns.ts` — new Supabase service for error pattern CRUD operations and weak areas queries
+- `src/lib/recommendations.ts` — updated to use Supabase error patterns via async `getWeakSkills()` and `getTopErrorForSkill()` functions
+- `src/lib/error-patterns.ts` — updated `updateErrorPatterns()` to sync with Supabase for logged-in users while keeping localStorage as backup
+- `src/components/PersonalizedSuggestions.tsx` — updated to use Supabase error patterns for logged-in users
+- `src/lib/feedback-actions.ts` — added `await` to async `updateErrorPatterns()` call
+- `src/lib/error-patterns.test.ts` — updated tests to handle async function and mock Supabase calls
+
+Data authority rules implemented:
+
+- Logged-in users: Supabase is the authority for personalized recommendations and error patterns
+- Logged-out users: localStorage only (no personalization shown)
+- Supabase failure: graceful degradation, no localStorage fallback for personalization
+- localStorage: backup, migration, temporary local state only
+
+Validation:
+
+- `npm run lint` — passed
+- `npm run typecheck` — passed
+- `npm run test:unit:run` — 10 files, 86 tests passed
+- `npm run build` — passed
 
 ### 2026-05-24: Product Roadmap
 

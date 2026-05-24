@@ -1,6 +1,9 @@
 // User error pattern analysis and storage for personalized learning
+// For logged-in users: Supabase is the authority (via supabase-error-patterns.ts)
+// For logged-out users: localStorage only
 
 import type { ErrorAnnotation } from "@/types";
+import { updateErrorPatternsFromFeedback } from "./supabase-error-patterns";
 
 export interface ErrorPattern {
   id: string;
@@ -86,7 +89,7 @@ export function restoreUserProfiles(profiles: UserProfile[]): number {
 }
 
 // Update error patterns based on feedback
-export function updateErrorPatterns(
+export async function updateErrorPatterns(
   userId: string,
   feedback: {
     grammarRangeAndAccuracy: string;
@@ -97,7 +100,12 @@ export function updateErrorPatterns(
     errorAnnotations?: ErrorAnnotation[];
     improvementSuggestions?: string[];
   }
-): UserProfile {
+): Promise<UserProfile> {
+  // For logged-in users, update Supabase (authority)
+  // This will also trigger the weak areas summary update via database trigger
+  await updateErrorPatternsFromFeedback(userId, feedback);
+
+  // Also update localStorage as backup/migration support
   const existing = getUserProfile(userId) || {
     userId,
     commonErrors: [],
@@ -228,6 +236,8 @@ function inferTypeFromText(text: string): ErrorPattern["type"] {
 }
 
 // Get personalized suggestions based on error patterns
+// For logged-in users, this should use Supabase data (via supabase-error-patterns.ts)
+// For logged-out users, use localStorage
 export function getPersonalizedSuggestions(userId: string): string[] {
   const profile = getUserProfile(userId);
   if (!profile || profile.commonErrors.length === 0) {
@@ -266,6 +276,8 @@ export function getPersonalizedSuggestions(userId: string): string[] {
 }
 
 // Get error statistics
+// For logged-in users, this should use Supabase data (via supabase-error-patterns.ts)
+// For logged-out users, use localStorage
 export function getErrorStats(userId: string): {
   totalErrors: number;
   byType: Record<string, number>;

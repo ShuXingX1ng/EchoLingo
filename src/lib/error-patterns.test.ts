@@ -29,6 +29,11 @@ const localStorageMock = {
 
 Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
 
+// Mock Supabase error patterns module
+vi.mock("./supabase-error-patterns", () => ({
+  updateErrorPatternsFromFeedback: vi.fn().mockResolvedValue(undefined),
+}));
+
 const USER_ID = "test-user-1";
 
 const baseFeedback = {
@@ -45,8 +50,8 @@ describe("updateErrorPatterns", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a profile from weaknesses when none exists", () => {
-    const profile = updateErrorPatterns(USER_ID, baseFeedback);
+  it("creates a profile from weaknesses when none exists", async () => {
+    const profile = await updateErrorPatterns(USER_ID, baseFeedback);
 
     expect(profile.userId).toBe(USER_ID);
     expect(profile.practiceCount).toBe(1);
@@ -56,17 +61,17 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].frequency).toBe(1);
   });
 
-  it("increments frequency for duplicate weaknesses", () => {
-    updateErrorPatterns(USER_ID, baseFeedback);
-    const profile = updateErrorPatterns(USER_ID, baseFeedback);
+  it("increments frequency for duplicate weaknesses", async () => {
+    await updateErrorPatterns(USER_ID, baseFeedback);
+    const profile = await updateErrorPatterns(USER_ID, baseFeedback);
 
     expect(profile.commonErrors).toHaveLength(1);
     expect(profile.commonErrors[0].frequency).toBe(2);
     expect(profile.practiceCount).toBe(2);
   });
 
-  it("infers grammar type from weakness text", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("infers grammar type from weakness text", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses: ["Grammar errors with tense usage"],
     });
@@ -74,8 +79,8 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].type).toBe("grammar");
   });
 
-  it("infers pronunciation type from weakness text", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("infers pronunciation type from weakness text", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses: ["Pronunciation of certain sounds"],
     });
@@ -83,8 +88,8 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].type).toBe("pronunciation");
   });
 
-  it("defaults to fluency type when no keywords match", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("defaults to fluency type when no keywords match", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses: ["Hesitation and long pauses"],
     });
@@ -92,7 +97,7 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].type).toBe("fluency");
   });
 
-  it("extracts patterns from errorAnnotations", () => {
+  it("extracts patterns from errorAnnotations", async () => {
     const annotations: ErrorAnnotation[] = [
       {
         original: "I goed to school",
@@ -108,7 +113,7 @@ describe("updateErrorPatterns", () => {
       },
     ];
 
-    const profile = updateErrorPatterns(USER_ID, {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       errorAnnotations: annotations,
     });
@@ -124,7 +129,7 @@ describe("updateErrorPatterns", () => {
     expect(grammarPattern!.improvement).toBe("Past tense irregular verb");
   });
 
-  it("merges duplicate annotation patterns and accumulates examples", () => {
+  it("merges duplicate annotation patterns and accumulates examples", async () => {
     const feedback1 = {
       ...baseFeedback,
       errorAnnotations: [
@@ -149,8 +154,8 @@ describe("updateErrorPatterns", () => {
       ],
     };
 
-    updateErrorPatterns(USER_ID, feedback1);
-    const profile = updateErrorPatterns(USER_ID, feedback2);
+    await updateErrorPatterns(USER_ID, feedback1);
+    const profile = await updateErrorPatterns(USER_ID, feedback2);
 
     const grammarPattern = profile.commonErrors.find(
       (p) => p.type === "grammar" && p.pattern === "went"
@@ -161,8 +166,8 @@ describe("updateErrorPatterns", () => {
     expect(grammarPattern!.examples).toContain("she goed");
   });
 
-  it("enriches patterns with improvementSuggestions", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("enriches patterns with improvementSuggestions", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       improvementSuggestions: [
         "Practice using more advanced vocabulary",
@@ -179,8 +184,8 @@ describe("updateErrorPatterns", () => {
     );
   });
 
-  it("does not overwrite existing improvement from annotations", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("does not overwrite existing improvement from annotations", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses: [],
       errorAnnotations: [
@@ -201,8 +206,8 @@ describe("updateErrorPatterns", () => {
     expect(grammarPattern!.improvement).toBe("Irregular verb form");
   });
 
-  it("handles missing errorAnnotations gracefully (backward compat)", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("handles missing errorAnnotations gracefully (backward compat)", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       // no errorAnnotations field
     });
@@ -211,8 +216,8 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].pattern).toBe("Limited complex vocabulary");
   });
 
-  it("handles missing improvementSuggestions gracefully (backward compat)", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("handles missing improvementSuggestions gracefully (backward compat)", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       // no improvementSuggestions field
     });
@@ -221,8 +226,8 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors[0].improvement).toBeUndefined();
   });
 
-  it("handles empty errorAnnotations array", () => {
-    const profile = updateErrorPatterns(USER_ID, {
+  it("handles empty errorAnnotations array", async () => {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       errorAnnotations: [],
     });
@@ -230,8 +235,8 @@ describe("updateErrorPatterns", () => {
     expect(profile.commonErrors).toHaveLength(1);
   });
 
-  it("limits examples to 5 per pattern", () => {
-    let profile = updateErrorPatterns(USER_ID, {
+  it("limits examples to 5 per pattern", async () => {
+    let profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses: [],
       errorAnnotations: [
@@ -240,7 +245,7 @@ describe("updateErrorPatterns", () => {
     });
 
     for (let i = 2; i <= 7; i++) {
-      profile = updateErrorPatterns(USER_ID, {
+      profile = await updateErrorPatterns(USER_ID, {
         ...baseFeedback,
         weaknesses: [],
         errorAnnotations: [
@@ -258,10 +263,10 @@ describe("updateErrorPatterns", () => {
     expect(pattern!.examples.length).toBeLessThanOrEqual(5);
   });
 
-  it("caps commonErrors at 20 entries", () => {
+  it("caps commonErrors at 20 entries", async () => {
     const weaknesses = Array.from({ length: 25 }, (_, i) => `Weakness ${i}`);
 
-    const profile = updateErrorPatterns(USER_ID, {
+    const profile = await updateErrorPatterns(USER_ID, {
       ...baseFeedback,
       weaknesses,
     });
@@ -280,8 +285,8 @@ describe("getUserProfile", () => {
     expect(getUserProfile("nonexistent")).toBeNull();
   });
 
-  it("returns saved profile", () => {
-    updateErrorPatterns(USER_ID, baseFeedback);
+  it("returns saved profile", async () => {
+    await updateErrorPatterns(USER_ID, baseFeedback);
     const profile = getUserProfile(USER_ID);
 
     expect(profile).toBeTruthy();
@@ -299,8 +304,8 @@ describe("getPersonalizedSuggestions", () => {
     expect(getPersonalizedSuggestions("nonexistent")).toEqual([]);
   });
 
-  it("returns suggestions based on error types", () => {
-    updateErrorPatterns(USER_ID, baseFeedback);
+  it("returns suggestions based on error types", async () => {
+    await updateErrorPatterns(USER_ID, baseFeedback);
     const suggestions = getPersonalizedSuggestions(USER_ID);
 
     expect(suggestions.length).toBeGreaterThan(0);
@@ -320,8 +325,8 @@ describe("getErrorStats", () => {
     expect(stats.mostFrequent).toBeNull();
   });
 
-  it("counts errors by type", () => {
-    updateErrorPatterns(USER_ID, baseFeedback);
+  it("counts errors by type", async () => {
+    await updateErrorPatterns(USER_ID, baseFeedback);
     const stats = getErrorStats(USER_ID);
 
     expect(stats.totalErrors).toBe(1);

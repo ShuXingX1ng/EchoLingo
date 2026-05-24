@@ -45,18 +45,35 @@ Review findings:
 - `recommendations.ts` still mixes Supabase progress with localStorage error patterns; this should be corrected before relying on it for logged-in personalization
 - Decision: no localStorage-backed personalization should be added in H2/H3
 
-### H2a. Align Personalization Data Authority
+### H2a. Align Personalization Data Authority ✅
 
-- [ ] Review `src/lib/recommendations.ts` and remove or isolate localStorage error profile as a primary logged-in recommendation source
-- [ ] Decide where feedback-derived weak areas should live in Supabase
-- [ ] For logged-out users, keep recommendation UI generic or ask the user to log in
-- [ ] For Supabase errors, show a generic/unavailable state instead of localStorage-personalized output
+- [x] Review `src/lib/recommendations.ts` and remove or isolate localStorage error profile as a primary logged-in recommendation source
+- [x] Decide where feedback-derived weak areas should live in Supabase
+- [x] For logged-out users, keep recommendation UI generic or ask the user to log in
+- [x] For Supabase errors, show a generic/unavailable state instead of localStorage-personalized output
 
 Acceptance:
 
-- Logged-in personalized recommendations are based on Supabase-backed data
-- localStorage is documented and treated as non-authoritative
-- No new real LLM call is introduced
+- Logged-in personalized recommendations are based on Supabase-backed data ✅
+- localStorage is documented and treated as non-authoritative ✅
+- No new real LLM call is introduced ✅
+
+Changes:
+
+- Created `supabase-migration-002.sql` with `user_error_patterns` and `user_weak_areas` tables
+- Created `src/lib/supabase-error-patterns.ts` for Supabase error pattern operations
+- Updated `src/lib/recommendations.ts` to use Supabase error patterns via `getWeakSkills()` and `getTopErrorForSkill()`
+- Updated `src/lib/error-patterns.ts` to sync with Supabase for logged-in users while keeping localStorage as backup
+- Updated `src/components/PersonalizedSuggestions.tsx` to use Supabase error patterns
+- Updated `src/lib/feedback-actions.ts` to await async `updateErrorPatterns()`
+- Updated `src/lib/error-patterns.test.ts` with async tests and Supabase mock
+
+Validation:
+
+- `npm run lint` — passed
+- `npm run typecheck` — passed
+- `npm run test:unit:run` — 10 files, 86 tests passed
+- `npm run build` — passed
 
 ### H2. Make Task Reasons Specific ✅
 

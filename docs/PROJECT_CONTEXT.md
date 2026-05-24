@@ -104,8 +104,9 @@ Key domain types:
 | `src/lib/unified-history.ts` | Main session read/write entry | Supabase + local fallback |
 | `src/lib/history.ts` | Local session storage | localStorage |
 | `src/lib/supabase-history.ts` | Cloud session storage | Supabase |
-| `src/lib/error-patterns.ts` | Weakness/error profile | localStorage today; should not be the authority for logged-in personalization |
-| `src/lib/recommendations.ts` | Learning recommendations | Supabase progress plus legacy local error patterns today |
+| `src/lib/error-patterns.ts` | Weakness/error profile | localStorage (backup/migration); syncs with Supabase for logged-in users |
+| `src/lib/supabase-error-patterns.ts` | Cloud error pattern storage | Supabase (authority for logged-in users) |
+| `src/lib/recommendations.ts` | Learning recommendations | Supabase progress + Supabase error patterns |
 | `src/lib/supabase-progress.ts` | Progress records | Supabase |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
 | `src/lib/backup.ts` | Export/import | local JSON/CSV backup |
@@ -115,7 +116,7 @@ Current save/read strategy:
 - Logged in: cloud first, local backup, local fallback on cloud failure
 - Logged out: local storage
 - Recordings: IndexedDB keyed to session/recording metadata
-- Error patterns: local, included in backup/restore
+- Error patterns: Supabase (authority for logged-in), localStorage (backup/migration)
 - Session IDs: `crypto.randomUUID()` with fallback where needed
 
 Personalization policy:

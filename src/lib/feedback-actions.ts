@@ -81,7 +81,7 @@ export async function saveSessionAndUpdateLearning(
       }
     }
 
-    updateErrorPatterns(userId, feedbackForPatterns);
+    await updateErrorPatterns(userId, feedbackForPatterns);
 
     // Record learning progress
     if (topicId && feedbackData.estimatedBand) {
