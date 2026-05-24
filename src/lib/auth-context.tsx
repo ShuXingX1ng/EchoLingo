@@ -86,34 +86,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log("[Auth] signOut called");
-    console.log("[Auth] supabase client:", supabase);
-    console.log("[Auth] supabase.auth:", supabase.auth);
-    console.log("[Auth] calling supabase.auth.signOut()...");
-    try {
-      // Add timeout to detect hanging requests
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("signOut timeout after 5s")), 5000)
-      );
+    console.log("[Auth] signOut called - clearing all auth data");
 
-      const signOutPromise = supabase.auth.signOut();
-      console.log("[Auth] signOut promise created");
-
-      const result = await Promise.race([signOutPromise, timeoutPromise]);
-      console.log("[Auth] signOut result:", result);
-
-      const { error } = result as { error: unknown };
-      console.log("[Auth] signOut response:", { error });
-      if (error) {
-        console.error("[Auth] Sign out error:", error);
+    // Clear all localStorage keys related to Supabase
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        keysToRemove.push(key);
       }
-    } catch (err) {
-      console.error("[Auth] signOut exception:", err);
     }
-    console.log("[Auth] clearing local state...");
+    console.log("[Auth] all localStorage keys:", keysToRemove);
+
+    // Remove keys that look like Supabase auth tokens
+    keysToRemove.forEach((key) => {
+      if (key.startsWith("sb-") || key.includes("supabase") || key.includes("auth")) {
+        console.log("[Auth] removing:", key);
+        localStorage.removeItem(key);
+      }
+    });
+
+    // Clear all cookies
+    document.cookie.split(";").forEach((c) => {
+      const name = c.trim().split("=")[0];
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      console.log("[Auth] clearing cookie:", name);
+    });
+
+    // Clear state and redirect
     setUser(null);
     setProfile(null);
-    console.log("[Auth] redirecting to /...");
     window.location.href = "/";
   };
 

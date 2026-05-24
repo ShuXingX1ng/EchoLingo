@@ -168,6 +168,20 @@ Validation:
 - `git diff --check` passed
 - No code changes, so lint/typecheck/tests were not run
 
+### 2026-05-24: CI Lockfile Sync Fix
+
+Scope: dependency lockfile maintenance.
+
+Completed:
+
+- Regenerated `package-lock.json` metadata so GitHub Actions `npm ci` can install from a synchronized lockfile
+- Added the missing bundled optional dependency records required by Tailwind's wasm oxide package
+
+Validation:
+
+- `npm ci --dry-run --cache ./.npm-cache` passed after the lockfile update
+- Previous local quality checks in this session passed: `npm run lint`, `npm run typecheck`, `npm run test:unit:run`, `npm run build`
+
 ## Documentation Policy
 
 After meaningful development work, update:

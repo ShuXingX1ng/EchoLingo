@@ -163,8 +163,10 @@ pytest
 
 CI:
 
-- `.github/workflows/ci.yml`: frontend lint, typecheck, unit tests, build
+- `.github/workflows/ci.yml`: `npm ci`, frontend lint, typecheck, unit tests, build
 - `.github/workflows/ci-backend.yml`: backend lint, typecheck, pytest, Docker build
+
+Frontend CI depends on `package.json` and `package-lock.json` staying synchronized; update and commit the lockfile whenever npm dependency resolution changes.
 
 ## Project Conventions
 

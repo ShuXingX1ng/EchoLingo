@@ -153,7 +153,7 @@ Use `docs/PRODUCT_ROADMAP.md` as the source of truth for later phases:
 | Frontend unit | 10 files / 86 tests |
 | E2E | 20 tests |
 | Backend | 86 tests |
-| Quality gate | lint 0, typecheck pass, build pass |
+| Quality gate | npm ci dry-run pass, lint 0, typecheck pass, build pass |
 
 ## Future / Backlog
 
@@ -174,5 +174,6 @@ Keep these out of the current phase unless explicitly requested:
 
 - Continue expanding focused unit tests as new behavior lands
 - Performance monitoring can be improved
+- Keep `package-lock.json` synchronized with `package.json` so frontend CI can pass `npm ci`
 - Local native binding signing issue may still affect some startup paths: Next SWC / Vitest Rolldown can be rejected by macOS `dlopen`
 - Project docs should stay concise; put long implementation history in development-log summaries, not active plans

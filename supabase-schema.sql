@@ -1,69 +1,76 @@
--- EchoLingo Supabase Database Schema
--- Run this SQL in your Supabase SQL Editor to create the required tables
+-- EchoLingo Database Schema
+-- Run this in Supabase SQL Editor
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Sessions table
-CREATE TABLE IF NOT EXISTS sessions (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  mode TEXT NOT NULL,
-  messages JSONB NOT NULL DEFAULT '[]',
-  feedback JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ended_at TIMESTAMPTZ,
-  topic TEXT
+-- 1. Create profiles table
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Goals table
-CREATE TABLE IF NOT EXISTS goals (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
-  weekly_target INTEGER DEFAULT 5,
-  target_band DECIMAL(2,1) DEFAULT 7.0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- 2. Create index on email for faster lookups
+CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
+-- 3. Enable Row Level Security
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Enable Row Level Security (RLS)
-ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+-- 4. Create RLS policies
+-- Users can read their own profile
+CREATE POLICY "Users can view own profile"
+  ON public.profiles FOR SELECT
+  USING (auth.uid() = id);
 
--- Create policies for sessions table
-CREATE POLICY "Users can view their own sessions"
-  ON sessions FOR SELECT
-  USING (auth.uid() = user_id);
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id);
 
-CREATE POLICY "Users can insert their own sessions"
-  ON sessions FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+-- Admin can view all profiles
+CREATE POLICY "Admin can view all profiles"
+  ON public.profiles FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'admin'
+    )
+  );
 
-CREATE POLICY "Users can update their own sessions"
-  ON sessions FOR UPDATE
-  USING (auth.uid() = user_id);
+-- 5. Create function to handle new user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE POLICY "Users can delete their own sessions"
-  ON sessions FOR DELETE
-  USING (auth.uid() = user_id);
+-- 6. Create trigger on auth.users
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
 
--- Create policies for goals table
-CREATE POLICY "Users can view their own goals"
-  ON goals FOR SELECT
-  USING (auth.uid() = user_id);
+-- 7. Create function to update updated_at
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE POLICY "Users can insert their own goals"
-  ON goals FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own goals"
-  ON goals FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own goals"
-  ON goals FOR DELETE
-  USING (auth.uid() = user_id);
+-- 8. Create trigger to auto-update updated_at
+CREATE OR REPLACE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
