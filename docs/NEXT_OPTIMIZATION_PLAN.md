@@ -7,9 +7,10 @@
 1. `AGENTS.md`
 2. `docs/PROJECT_CONTEXT.md`
 3. `docs/TASKS.md`
-4. `docs/DEVELOPMENT_LOG.md`
-5. `docs/NEXT_OPTIMIZATION_PLAN.md`
-6. 当前 `git diff`
+4. `docs/PRODUCT_ROADMAP.md`
+5. `docs/DEVELOPMENT_LOG.md`
+6. `docs/NEXT_OPTIMIZATION_PLAN.md`
+7. 当前 `git diff`
 
 接手后先确认当前工作区是否已有未提交改动，不要覆盖用户或上一位 agent 的修改。涉及 Next.js 代码前，按 `AGENTS.md` 要求阅读 `node_modules/next/dist/docs/` 中与本次改动相关的文档。
 
@@ -111,27 +112,40 @@ FastAPI 后端已完成，包含 examiner、feedback、tts、pronunciation、Sup
 
 ### Phase H: 个性化学习计划深化（推荐优先）
 
-目标：把首页每日学习计划从“任务列表”推进到“可解释、可完成、可复盘”的学习路径，让用户知道今天练什么、为什么练、完成后有什么反馈。
+目标：把登录后的首页每日学习计划从“任务列表”推进到“可解释、可完成、可复盘”的学习路径，让用户知道今天练什么、为什么练、完成后有什么反馈。
 
-背景：每日学习计划功能已经出现，但还可以继续和历史反馈、错误模式、推荐系统、跟读练习、统计页形成闭环。这个方向复用现有能力最多，风险低于全新功能。
+背景：每日学习计划功能已经出现，但个性化推荐的数据权威需要收敛到 Supabase。localStorage 可以作为迁移、备份、临时状态或非权威 fallback，但不应作为登录后个性化推荐的主数据源。
+
+数据源原则：
+
+- 已登录：Supabase 是个性化推荐和学习计划的权威数据源。
+- 未登录：显示通用练习入口或登录引导，不生成“个性化推荐”。
+- Supabase 失败：显示通用/暂不可用状态，不用 localStorage 冒充完整个性化。
+- localStorage：只用于未登录临时数据、迁移、备份和非权威 fallback。
 
 建议拆分：
 
 1. **H1. 学习计划数据来源 review**
-   - 检查 `learning-plan.ts` 如何消费 progress、sessions、error-patterns 和 recommendations。
+   - 检查 `learning-plan.ts` 如何消费 Supabase progress 和 sessions。
    - 明确已登录、未登录、云端失败时的计划生成降级策略。
    - 先产出 review 结论，再决定是否改代码。
 
-2. **H2. 任务理由可解释化**
-   - 每个任务展示一句来自真实数据的理由，例如最近低分话题、反复出现的错误类型、发音低分词。
+2. **H2. 推荐数据权威收敛**
+   - 检查 `recommendations.ts` 当前混用 Supabase progress 和 localStorage error profile 的路径。
+   - 设计 Supabase-backed weak areas / error patterns 的最小迁移或读取方案。
+   - 未登录保持通用推荐或登录引导。
+   - Supabase 失败时不返回伪个性化推荐。
+
+3. **H3. 任务理由可解释化**
+   - 每个任务展示一句来自 Supabase-backed 数据的理由，例如最近低分话题、弱项、最近 session 信号。
    - 兼容旧数据和空数据，避免泛化文案过多。
    - 不新增真实 LLM 调用。
 
-3. **H3. 任务完成反馈**
+4. **H4. 任务完成反馈**
    - 用户完成普通练习、模拟考试或跟读后，首页任务状态应能反映完成情况。
    - 保持保存入口统一，不新增第二套任务状态存储，除非 review 证明有必要。
 
-4. **H4. 测试补强**
+5. **H5. 测试补强**
    - 为学习计划生成逻辑补单元测试。
    - 对首页任务渲染补组件测试或 E2E smoke。
    - 不依赖真实 Supabase 或真实 LLM。
@@ -150,6 +164,7 @@ FastAPI 后端已完成，包含 examiner、feedback、tts、pronunciation、Sup
 
 - 首页每日任务能解释推荐原因。
 - 空历史、旧数据、未登录、云端失败时页面不崩溃。
+- 登录后个性化推荐不以 localStorage 为权威数据源。
 - 完成任务后，任务状态和现有历史/统计数据保持一致。
 - 至少通过 `npm run lint && npm run typecheck && npm run test:unit:run`。
 - 涉及首页或跨页行为时，补跑相关 E2E smoke。
@@ -158,12 +173,13 @@ FastAPI 后端已完成，包含 examiner、feedback、tts、pronunciation、Sup
 
 - 不新增商业化、订阅、排行榜或社交能力。
 - 不让学习计划依赖真实 LLM 在线生成。
+- 不用 localStorage 冒充登录后的完整个性化推荐。
 - 不新增复杂日历系统。
 - 不大改首页视觉结构。
 
 ## 备选方向
 
-如果暂不做 Phase H，可从以下方向选一个单独开 Phase。
+如果暂不做 Phase H，可从以下方向选一个单独开 Phase。长期路线图详见 `docs/PRODUCT_ROADMAP.md`。
 
 ### 发音练习增强
 

@@ -16,6 +16,9 @@ This is a compressed project timeline. Older blow-by-blow entries were intention
 | 2026-05-23 | Python backend | FastAPI backend, LLM/Azure/Supabase services, frontend `api-client`, backend CI, deployment guide | 86 backend tests, frontend quality gates |
 | 2026-05-23 | Learning plan v1 | Daily learning plan added to the home page | lint/typecheck/build/unit/E2E recorded in earlier work |
 | 2026-05-24 | Docs compaction | Active docs compressed and reorganized around current state and Phase H | `git diff --check` |
+| 2026-05-24 | Product roadmap | Added long-term phases H-M and removed redundant legacy doc | `git diff --check` |
+| 2026-05-24 | H1 review | Reviewed learning plan data sources and degradation strategy | lint/typecheck/unit (86 tests) |
+| 2026-05-24 | H2 task reasons | Added reason field to DailyTask with real data | lint/typecheck/unit (86 tests) |
 
 ## Major Completed Capabilities
 
@@ -49,13 +52,105 @@ Completed:
 - Rewrote `docs/TASKS.md` around Phase H and active backlog
 - Compressed `docs/DEVELOPMENT_LOG.md` from long-form history into a timeline
 - Kept `docs/NEXT_OPTIMIZATION_PLAN.md` as the handoff and next-phase plan
-- Reduced `docs/dev-log.md` to a legacy pointer
+- Removed redundant legacy `docs/dev-log.md`
 - Shortened `docs/DEPLOYMENT.md` to current deployment essentials
 
 Validation:
 
 - `git diff --check` passed
 - No code changes, so lint/typecheck/tests were not run
+
+### 2026-05-24: H1 — Learning Plan Data Source Review
+
+Scope: Phase H1 code review, no code changes.
+
+Reviewed files:
+
+- `src/lib/learning-plan.ts`
+- `src/components/DailyTasks.tsx`
+- `src/app/page.tsx`
+- `src/lib/recommendations.ts`
+- `src/lib/error-patterns.ts`
+- `src/lib/unified-history.ts`
+- `src/lib/supabase-progress.ts`
+- `src/lib/reminders.ts`
+
+Findings:
+
+1. **Data source**: `learning-plan.ts` queries Supabase directly (`learning_progress` + `sessions` tables) via its own `getUserProgress`/`getRecentSessions` functions. It does NOT use `unified-history.ts` or `supabase-progress.ts`.
+2. **Logged-in, cloud works**: Two Supabase queries feed `generateDailyTasks()`. Progress determines unpracticed/low-score topics; sessions (last 7 days) determine today's completion.
+3. **Logged-out**: `DailyTasks` checks `useAuth()`, returns null if no user. No plan shown, no crash.
+4. **Empty history**: Both queries return `[]`. `getUnpracticedTopics([])` returns all topics → 2 practice tasks + 1 shadowing task. Correct behavior.
+5. **Cloud failure**: Supabase errors are caught and return `[]`. Function treats it as a new user — generic tasks shown. Graceful degradation but loses personalization. No local fallback (unlike `unified-history.ts` which falls back to localStorage).
+6. **Old/missing data**: `getRecentSessions` only looks at last 7 days. `learning_progress` is cumulative. Old progress still drives topic selection; old sessions don't affect completion.
+7. **Completion matching**: `s.mode.includes(task.part!)` is loose but safe with current mode strings (`ielts_part_1`, `ielts_part_2`, `ielts_part_3`, `shadowing`).
+8. **Separation from recommendations.ts**: The learning plan and recommendation engine are independent. `recommendations.ts` uses `supabase-progress.ts` + `error-patterns.ts`; `learning-plan.ts` has its own Supabase queries. No shared data path.
+9. **No existing tests** for `learning-plan.ts` or `DailyTasks.tsx`.
+
+Decision:
+
+- No code change in H1. The cloud-fallback gap is a known limitation but not a crash-risk boundary problem.
+- The gap should be addressed in H2/H3 if task reasons or completion state need local data.
+
+Validation:
+
+- `npm run lint` — passed
+- `npm run typecheck` — passed
+- `npm run test:unit:run` — 10 files, 86 tests passed
+
+### 2026-05-24: H2 — Task Reasons Specific
+
+Scope: minor feature addition.
+
+Changed files:
+
+- `src/lib/learning-plan.ts` — added `reason: string` to `DailyTask` interface; populated in `createPracticeTask`, `createShadowingTask`, `createReviewTask`
+- `src/components/DailyTasks.tsx` — renders `task.reason` as italic text below description
+
+Reason content by task type:
+
+- Unpracticed topic: "You haven't practiced this topic yet — give it a try"
+- Random variety: "Review for variety — keep your skills fresh"
+- Shadowing: "Build fluency and natural rhythm through repetition"
+- Review low-score: "Your best score here is Band X.Y — targeted practice can help raise it"
+
+Follow-up decision:
+
+- Product direction was corrected after review: logged-in personalization should treat Supabase as the authority.
+- localStorage should remain migration/backup/temporary/fallback data, not the primary source for logged-in recommendations.
+- `recommendations.ts` currently mixes Supabase progress with localStorage error patterns, so the next pass should align it before expanding personalized recommendation behavior.
+
+### 2026-05-24: Product Roadmap
+
+Scope: documentation planning.
+
+Completed:
+
+- Added `docs/PRODUCT_ROADMAP.md`
+- Defined long-term phases H-M:
+  - Personalized Learning Plan
+  - Learner Profile
+  - Pronunciation Intelligence
+  - Vocabulary Notebook
+  - Learning Reports
+  - Backend Product APIs
+- Updated docs entry points to include the roadmap
+- Removed the legacy `docs/dev-log.md` pointer because it duplicated `DEVELOPMENT_LOG.md`
+
+Validation:
+
+- `git diff --check` passed
+
+Notes:
+
+- Reasons use hardcoded English (consistent with existing description pattern). i18n keys can be added in a follow-up if needed.
+- Empty/old data: reasons are always set — no blank or missing state possible.
+
+Validation:
+
+- `npm run lint` — passed
+- `npm run typecheck` — passed
+- `npm run test:unit:run` — 10 files, 86 tests passed
 
 ### 2026-05-24: NEXT_OPTIMIZATION_PLAN Compaction
 

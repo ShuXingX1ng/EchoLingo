@@ -8,6 +8,7 @@ export interface DailyTask {
   type: "practice" | "shadowing" | "review";
   title: string;
   description: string;
+  reason: string;
   topicId?: string;
   part?: "part1" | "part2" | "part3";
   targetCount?: number;
@@ -108,7 +109,7 @@ function hasShadowedToday(sessions: SessionRecord[]): boolean {
 }
 
 // Generate practice task for a topic
-function createPracticeTask(topicId: string, part: "part1" | "part2" | "part3"): DailyTask {
+function createPracticeTask(topicId: string, part: "part1" | "part2" | "part3", reason: string): DailyTask {
   const topic = TOPICS.find((t) => t.id === topicId);
   const partLabel = part.replace("part", "Part ");
 
@@ -121,6 +122,7 @@ function createPracticeTask(topicId: string, part: "part1" | "part2" | "part3"):
       : part === "part2"
         ? "Prepare and deliver a 2-minute response"
         : `Discuss ${Math.min(2, topic?.part3Questions.length || 2)} questions in depth`,
+    reason,
     topicId,
     part,
     status: "pending",
@@ -135,6 +137,7 @@ function createShadowingTask(): DailyTask {
     type: "shadowing",
     title: "Pronunciation Practice",
     description: "Shadow 5 sentences to improve pronunciation",
+    reason: "Build fluency and natural rhythm through repetition",
     targetCount: 5,
     status: "pending",
     link: "/practice/shadowing",
@@ -151,6 +154,7 @@ function createReviewTask(topicId: string, part: string, band: number): DailyTas
     type: "review",
     title: `Review: ${partLabel} - ${topic?.name || topicId}`,
     description: `Current score: Band ${band.toFixed(1)}. Try to improve!`,
+    reason: `Your best score here is Band ${band.toFixed(1)} — targeted practice can help raise it`,
     topicId,
     part: part as "part1" | "part2" | "part3",
     status: "pending",
@@ -176,13 +180,13 @@ export async function generateDailyTasks(userId: string): Promise<DailyTask[]> {
     // Add 2 unpracticed topics
     const topicsToAdd = unpracticed.slice(0, 2);
     for (const topicId of topicsToAdd) {
-      tasks.push(createPracticeTask(topicId, "part1"));
+      tasks.push(createPracticeTask(topicId, "part1", "You haven't practiced this topic yet — give it a try"));
     }
   } else if (progress.length > 0) {
     // All topics practiced - pick random topics for variety
     const randomTopics = TOPICS.sort(() => Math.random() - 0.5).slice(0, 2);
     for (const topic of randomTopics) {
-      tasks.push(createPracticeTask(topic.id, "part1"));
+      tasks.push(createPracticeTask(topic.id, "part1", "Review for variety — keep your skills fresh"));
     }
   }
 

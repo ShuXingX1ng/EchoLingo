@@ -2,41 +2,86 @@
 
 ## Current Recommendation
 
-Proceed with **Phase H: personalized learning plan deepening**.
+Proceed with **Phase H: personalized learning plan deepening**, with one corrected product rule:
+
+> Personalized recommendations should be generated after login from Supabase-backed user data. localStorage is not the authority for logged-in recommendations.
 
 Why this first:
 
 - The app already has a daily learning plan on the home page.
-- Existing history, feedback, error patterns, recommendations, and stats can make the plan more useful without a large new subsystem.
+- Existing Supabase history, progress, sessions, feedback-derived signals, recommendations, and stats can make the plan more useful without a large new subsystem.
 - It keeps the next phase focused on learning value instead of more infrastructure.
 
 ## Phase H: Personalized Learning Plan Deepening
 
-Goal: make the daily plan explainable, completable, and connected to review/history/stats.
+Goal: make the logged-in daily plan explainable, completable, and connected to Supabase-backed review/history/stats.
 
-### H1. Review Plan Data Sources
+Personalization source rules:
 
-- [ ] Read `src/lib/learning-plan.ts`
-- [ ] Check how it consumes progress, sessions, error patterns, and recommendations
-- [ ] Document logged-in, logged-out, empty-history, and cloud-failure behavior
-- [ ] Decide whether any data boundary needs a small refactor
+- Logged-in: Supabase is the authority for personalized plan and recommendation decisions.
+- Logged-out: show general practice entry points or login prompt; do not present localStorage as personalized recommendation data.
+- Supabase failure: show generic/unavailable fallback; do not silently treat localStorage as complete personalization.
+- localStorage: only migration, backup, temporary local state, or non-authoritative fallback.
 
-Acceptance:
+### H1. Review Plan Data Sources ✅
 
-- Review conclusion recorded in `docs/DEVELOPMENT_LOG.md`
-- No behavior change unless a clear boundary problem is found
-
-### H2. Make Task Reasons Specific
-
-- [ ] Add a short reason for each daily task
-- [ ] Prefer real data: recent low score, repeated error type, weak topic, low pronunciation word
-- [ ] Keep fallback copy for empty or old data
-- [ ] Do not call a real LLM to generate reasons
+- [x] Read `src/lib/learning-plan.ts`
+- [x] Check how it consumes progress, sessions, error patterns, and recommendations
+- [x] Document logged-in, logged-out, empty-history, and cloud-failure behavior
+- [x] Decide whether any data boundary needs a small refactor
 
 Acceptance:
 
-- Home page tasks explain why they were recommended
-- Old/empty data does not crash or show awkward blanks
+- Review conclusion recorded in `docs/DEVELOPMENT_LOG.md` ✅
+- No behavior change unless a clear boundary problem is found ✅
+
+Review findings:
+
+- `learning-plan.ts` queries Supabase directly, bypassing `unified-history.ts` — no local fallback on cloud failure
+- Logged-out users see no DailyTasks (returns null)
+- Empty history → generic tasks for all topics (correct)
+- Cloud failure → generic tasks (acceptable fallback only if clearly non-personalized)
+- Completion matching uses `mode.includes(part)` — loose but safe with current mode values
+- `recommendations.ts` still mixes Supabase progress with localStorage error patterns; this should be corrected before relying on it for logged-in personalization
+- Decision: no localStorage-backed personalization should be added in H2/H3
+
+### H2a. Align Personalization Data Authority
+
+- [ ] Review `src/lib/recommendations.ts` and remove or isolate localStorage error profile as a primary logged-in recommendation source
+- [ ] Decide where feedback-derived weak areas should live in Supabase
+- [ ] For logged-out users, keep recommendation UI generic or ask the user to log in
+- [ ] For Supabase errors, show a generic/unavailable state instead of localStorage-personalized output
+
+Acceptance:
+
+- Logged-in personalized recommendations are based on Supabase-backed data
+- localStorage is documented and treated as non-authoritative
+- No new real LLM call is introduced
+
+### H2. Make Task Reasons Specific ✅
+
+- [x] Add a short reason for each daily task
+- [x] Prefer real Supabase-backed data where available: recent low score, weak topic, recent session signal
+- [x] Keep fallback copy for empty or old data
+- [x] Do not call a real LLM to generate reasons
+
+Acceptance:
+
+- Home page tasks explain why they were recommended ✅
+- Old/empty data does not crash or show awkward blanks ✅
+
+Changes:
+
+- Added `reason` field to `DailyTask` interface
+- Unpracticed topic: "You haven't practiced this topic yet — give it a try"
+- Random variety: "Review for variety — keep your skills fresh"
+- Shadowing: "Build fluency and natural rhythm through repetition"
+- Review low-score: "Your best score here is Band X.Y — targeted practice can help raise it"
+- Rendered in `DailyTasks.tsx` as italic text below description
+
+Follow-up:
+
+- Current reasons are useful but still generic. Next iteration should avoid presenting localStorage-only error patterns as logged-in personalization.
 
 ### H3. Tighten Completion State
 
@@ -64,7 +109,7 @@ Acceptance:
 
 ## Alternative Next Phases
 
-Choose only one if Phase H is intentionally paused.
+Choose only one if Phase H is intentionally paused. The full long-term roadmap lives in `docs/PRODUCT_ROADMAP.md`.
 
 | Phase | Scope | Boundary |
 |-------|-------|----------|
@@ -72,6 +117,16 @@ Choose only one if Phase H is intentionally paused.
 | Vocabulary notebook | Extract useful vocabulary from feedback/sample answers | Start local-first, no spaced repetition system |
 | History analytics | Clearer trend/weakness review | No admin/operations analytics |
 | Export reports | PDF/Markdown learning report | No social sharing |
+
+## Roadmap After Phase H
+
+Use `docs/PRODUCT_ROADMAP.md` as the source of truth for later phases:
+
+- Phase I: Learner Profile
+- Phase J: Pronunciation Intelligence
+- Phase K: Vocabulary Notebook
+- Phase L: Learning Reports
+- Phase M: Backend Product APIs
 
 ## Completed Phase Summary
 

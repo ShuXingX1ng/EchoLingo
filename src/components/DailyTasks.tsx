@@ -121,6 +121,11 @@ function TaskItem({ task }: { task: DailyTask }) {
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {task.description}
         </p>
+        {task.reason && (
+          <p className="mt-1 text-xs italic text-slate-400 dark:text-slate-500">
+            {task.reason}
+          </p>
+        )}
       </div>
 
       {/* Action button */}

@@ -104,8 +104,8 @@ Key domain types:
 | `src/lib/unified-history.ts` | Main session read/write entry | Supabase + local fallback |
 | `src/lib/history.ts` | Local session storage | localStorage |
 | `src/lib/supabase-history.ts` | Cloud session storage | Supabase |
-| `src/lib/error-patterns.ts` | Weakness/error profile | localStorage |
-| `src/lib/recommendations.ts` | Learning recommendations | progress + error patterns |
+| `src/lib/error-patterns.ts` | Weakness/error profile | localStorage today; should not be the authority for logged-in personalization |
+| `src/lib/recommendations.ts` | Learning recommendations | Supabase progress plus legacy local error patterns today |
 | `src/lib/supabase-progress.ts` | Progress records | Supabase |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
 | `src/lib/backup.ts` | Export/import | local JSON/CSV backup |
@@ -117,6 +117,14 @@ Current save/read strategy:
 - Recordings: IndexedDB keyed to session/recording metadata
 - Error patterns: local, included in backup/restore
 - Session IDs: `crypto.randomUUID()` with fallback where needed
+
+Personalization policy:
+
+- Logged-in personalized recommendations and daily plans should treat Supabase as the authority.
+- Logged-out users should see general entry points or a login prompt, not personalized recommendations.
+- localStorage can support migration, backups, temporary local state, and graceful UI fallback.
+- localStorage should not be used as the primary source for logged-in recommendation decisions.
+- If Supabase fails, show generic or temporarily unavailable recommendation UI instead of pretending local data is complete personalization.
 
 ## API Endpoints
 
@@ -171,6 +179,8 @@ CI:
 
 ## Next Step
 
-Recommended next phase: **Phase H: personalized learning plan deepening**.
+Recommended next phase: **Phase H: personalized learning plan deepening with Supabase-authoritative personalization**.
 
 Start with a review of `src/lib/learning-plan.ts`, `src/components/DailyTasks.tsx`, `src/app/page.tsx`, `src/lib/recommendations.ts`, and `src/lib/error-patterns.ts`.
+
+Longer-term product phases are documented in `docs/PRODUCT_ROADMAP.md`.
