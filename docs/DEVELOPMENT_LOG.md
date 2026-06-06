@@ -20,6 +20,7 @@ This is a compressed project timeline. Older blow-by-blow entries were intention
 | 2026-05-24 | H1 review | Reviewed learning plan data sources and degradation strategy | lint/typecheck/unit (86 tests) |
 | 2026-05-24 | H2 task reasons | Added reason field to DailyTask with real data | lint/typecheck/unit (86 tests) |
 | 2026-05-24 | H2a personalization authority | Moved error pattern storage to Supabase for logged-in users, localStorage as backup | lint/typecheck/unit (86 tests)/build |
+| 2026-06-06 | Architecture deepening (C1–C4) | Eliminated error-pattern dual-storage schism, deduplicated learning plan data source, lifted data fetching out of DailyTasks/LearningPath, replaced 7-arg god function with CompletionInput object | lint/typecheck/unit (82 tests)/build |
 
 ## Major Completed Capabilities
 

@@ -1,9 +1,9 @@
-// User error pattern analysis and storage for personalized learning
-// For logged-in users: Supabase is the authority (via supabase-error-patterns.ts)
-// For logged-out users: localStorage only
+// localStorage-only error pattern storage.
+// Responsibilities: backup export/import (backup.ts), migration, offline UserProfile cache.
+// For recommendations and suggestions, callers must use supabase-error-patterns.ts directly.
 
 import type { ErrorAnnotation } from "@/types";
-import { updateErrorPatternsFromFeedback } from "./supabase-error-patterns";
+import { updateErrorPatternsFromFeedback, inferTypeFromText } from "./supabase-error-patterns";
 
 export interface ErrorPattern {
   id: string;
@@ -208,104 +208,3 @@ export async function updateErrorPatterns(
   return existing;
 }
 
-function inferTypeFromText(text: string): ErrorPattern["type"] {
-  const lower = text.toLowerCase();
-
-  if (
-    lower.includes("grammar") ||
-    lower.includes("tense") ||
-    lower.includes("sentence structure")
-  ) {
-    return "grammar";
-  }
-  if (
-    lower.includes("vocabulary") ||
-    lower.includes("word") ||
-    lower.includes("lexical")
-  ) {
-    return "vocabulary";
-  }
-  if (
-    lower.includes("pronunciation") ||
-    lower.includes("accent") ||
-    lower.includes("sound")
-  ) {
-    return "pronunciation";
-  }
-  return "fluency";
-}
-
-// Get personalized suggestions based on error patterns
-// For logged-in users, this should use Supabase data (via supabase-error-patterns.ts)
-// For logged-out users, use localStorage
-export function getPersonalizedSuggestions(userId: string): string[] {
-  const profile = getUserProfile(userId);
-  if (!profile || profile.commonErrors.length === 0) {
-    return [];
-  }
-
-  const suggestions: string[] = [];
-  const topErrors = profile.commonErrors.slice(0, 5);
-
-  topErrors.forEach((error) => {
-    switch (error.type) {
-      case "grammar":
-        suggestions.push(
-          `Focus on improving: ${error.pattern}. Try practicing grammar exercises related to this.`
-        );
-        break;
-      case "vocabulary":
-        suggestions.push(
-          `Expand your vocabulary around: ${error.pattern}. Try learning synonyms and related words.`
-        );
-        break;
-      case "fluency":
-        suggestions.push(
-          `Work on fluency by practicing: ${error.pattern}. Try speaking more smoothly without long pauses.`
-        );
-        break;
-      case "pronunciation":
-        suggestions.push(
-          `Practice pronunciation of: ${error.pattern}. Try listening to native speakers and mimicking.`
-        );
-        break;
-    }
-  });
-
-  return suggestions;
-}
-
-// Get error statistics
-// For logged-in users, this should use Supabase data (via supabase-error-patterns.ts)
-// For logged-out users, use localStorage
-export function getErrorStats(userId: string): {
-  totalErrors: number;
-  byType: Record<string, number>;
-  mostFrequent: ErrorPattern | null;
-} {
-  const profile = getUserProfile(userId);
-  if (!profile) {
-    return { totalErrors: 0, byType: {}, mostFrequent: null };
-  }
-
-  const byType: Record<string, number> = {
-    grammar: 0,
-    vocabulary: 0,
-    fluency: 0,
-    pronunciation: 0,
-  };
-
-  profile.commonErrors.forEach((error) => {
-    byType[error.type] = (byType[error.type] || 0) + error.frequency;
-  });
-
-  return {
-    totalErrors: profile.commonErrors.reduce(
-      (sum, e) => sum + e.frequency,
-      0
-    ),
-    byType,
-    mostFrequent:
-      profile.commonErrors.length > 0 ? profile.commonErrors[0] : null,
-  };
-}

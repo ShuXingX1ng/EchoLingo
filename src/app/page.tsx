@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav";
 import DailyTasks from "@/components/DailyTasks";
 import LearningPath from "@/components/LearningPath";
 import { useTranslation } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
 import {
   getDaysUntilExam,
   getReminderSettings,
@@ -13,6 +14,8 @@ import {
   hasPracticedToday,
   type ReminderSettings,
 } from "@/lib/reminders";
+import { generateDailyTasks, type DailyTask } from "@/lib/learning-plan";
+import { getRecommendations, type Recommendation } from "@/lib/recommendations";
 
 type HomeStudyState = {
   reminderSettings: ReminderSettings | null;
@@ -37,7 +40,10 @@ const rubricRows = [
 
 export default function Home() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [studyState, setStudyState] = useState<HomeStudyState>(EMPTY_STUDY_STATE);
+  const [tasks, setTasks] = useState<DailyTask[] | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -51,6 +57,24 @@ export default function Home() {
 
     return () => window.clearTimeout(id);
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setTasks(null);
+      setRecommendations(null);
+      return;
+    }
+
+    Promise.all([
+      generateDailyTasks(user.id),
+      getRecommendations(user.id),
+    ])
+      .then(([t, r]) => {
+        setTasks(t);
+        setRecommendations(r);
+      })
+      .catch(console.error);
+  }, [user]);
 
   const { daysUntilExam, practicedToday, reminderSettings, streakDays } = studyState;
   const hasReminderPanel =
@@ -218,8 +242,8 @@ export default function Home() {
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
-            <DailyTasks />
-            <LearningPath />
+            {tasks !== null && <DailyTasks tasks={tasks} />}
+            {recommendations !== null && <LearningPath recommendations={recommendations} />}
           </div>
 
           <div className="border border-slate-300 bg-white p-6 dark:border-white/10 dark:bg-slate-900/80">

@@ -38,17 +38,24 @@ export async function fetchPronunciationAssessment(
   }
 }
 
+export interface CompletionInput {
+  messages: ChatMessage[];
+  feedback: SessionFeedback;
+  userId?: string;
+  topicId?: string;
+  mode: string;
+  audioBlob?: Blob | null;
+  lastUserMessage?: string;
+}
+
 // Save session and update user learning data
 export async function saveSessionAndUpdateLearning(
-  messages: ChatMessage[],
-  feedbackData: SessionFeedback,
-  userId: string | undefined,
-  topicId: string | undefined,
-  practiceMode: string,
-  audioBlob?: Blob | null,
-  lastUserMessage?: string
+  input: CompletionInput
 ): Promise<SessionFeedback> {
-  // Perform pronunciation assessment if audio is available
+  const { messages, feedback, userId, topicId, mode, audioBlob, lastUserMessage } = input;
+
+  // Enrich feedback with pronunciation assessment if audio is available
+  let finalFeedback = feedback;
   if (audioBlob && lastUserMessage) {
     const pronunciationResult = await fetchPronunciationAssessment(
       audioBlob,
@@ -56,45 +63,51 @@ export async function saveSessionAndUpdateLearning(
     );
 
     if (pronunciationResult) {
-      feedbackData.pronunciationAssessment = pronunciationResult;
-      feedbackData.pronunciation = pronunciationResult.summary;
+      finalFeedback = {
+        ...feedback,
+        pronunciationAssessment: pronunciationResult,
+        pronunciation: pronunciationResult.summary,
+      };
     }
   }
 
   // Save session (unified: cloud + local backup for authenticated, local-only fallback)
-  await saveSession(messages, feedbackData, practiceMode);
+  await saveSession(messages, finalFeedback, mode);
 
   // Update error patterns for personalized learning
   if (userId) {
-    const feedbackForPatterns = { ...feedbackData };
+    let feedbackForPatterns = finalFeedback;
 
-    if (feedbackData.pronunciationAssessment) {
-      const mispronounced = feedbackData.pronunciationAssessment.words.filter(
+    if (finalFeedback.pronunciationAssessment) {
+      const mispronounced = finalFeedback.pronunciationAssessment.words.filter(
         (w) => w.errorType === "Mispronunciation" && w.score < 70
       );
 
       if (mispronounced.length > 0) {
-        feedbackForPatterns.weaknesses = [
-          ...feedbackData.weaknesses,
-          `Pronunciation: ${mispronounced.map((w) => w.word).join(", ")}`,
-        ];
+        feedbackForPatterns = {
+          ...finalFeedback,
+          weaknesses: [
+            ...finalFeedback.weaknesses,
+            `Pronunciation: ${mispronounced.map((w) => w.word).join(", ")}`,
+          ],
+        };
       }
     }
 
     await updateErrorPatterns(userId, feedbackForPatterns);
 
     // Record learning progress
-    if (topicId && feedbackData.estimatedBand) {
-      if (practiceMode === "full") {
+    if (topicId && finalFeedback.estimatedBand) {
+      if (mode === "full") {
         // Exam mode: record for all parts
-        recordProgress(userId, topicId, "part1", feedbackData.estimatedBand);
-        recordProgress(userId, topicId, "part2", feedbackData.estimatedBand);
-        recordProgress(userId, topicId, "part3", feedbackData.estimatedBand);
+        recordProgress(userId, topicId, "part1", finalFeedback.estimatedBand);
+        recordProgress(userId, topicId, "part2", finalFeedback.estimatedBand);
+        recordProgress(userId, topicId, "part3", finalFeedback.estimatedBand);
       } else {
-        recordProgress(userId, topicId, practiceMode, feedbackData.estimatedBand);
+        recordProgress(userId, topicId, mode, finalFeedback.estimatedBand);
       }
     }
   }
 
-  return feedbackData;
+  return finalFeedback;
 }

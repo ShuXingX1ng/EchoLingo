@@ -132,17 +132,17 @@ function PracticePage() {
     try {
       const feedbackData = await fetchFeedback(finalMessages, practiceMode === "full" ? "full" : "ielts_part_1");
 
-      await saveSessionAndUpdateLearning(
-        finalMessages,
-        feedbackData,
-        user?.id,
+      const finalFeedback = await saveSessionAndUpdateLearning({
+        messages: finalMessages,
+        feedback: feedbackData,
+        userId: user?.id,
         topicId,
-        practiceMode,
-        lastAudioBlobRef.current,
-        lastUserMessageRef.current
-      );
+        mode: practiceMode,
+        audioBlob: lastAudioBlobRef.current,
+        lastUserMessage: lastUserMessageRef.current,
+      });
 
-      setFeedback(feedbackData);
+      setFeedback(finalFeedback);
     } catch (err) {
       setError(
         err instanceof Error

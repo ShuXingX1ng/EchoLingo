@@ -162,8 +162,8 @@ async function supabaseUpdateImprovement(patternId: string, improvement: string)
     .eq("id", patternId);
 }
 
-// Infer error type from text
-function inferTypeFromText(text: string): "grammar" | "vocabulary" | "fluency" | "pronunciation" {
+// Infer error type from text (shared with error-patterns.ts)
+export function inferTypeFromText(text: string): "grammar" | "vocabulary" | "fluency" | "pronunciation" {
   const lower = text.toLowerCase();
 
   if (

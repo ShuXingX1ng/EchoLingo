@@ -1,30 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
 import { useTranslation } from "@/lib/i18n";
-import { getRecommendations, type Recommendation } from "@/lib/recommendations";
+import type { Recommendation } from "@/lib/recommendations";
 
-export default function LearningPath() {
-  const { user } = useAuth();
+export default function LearningPath({ recommendations }: { recommendations: Recommendation[] }) {
   const { t } = useTranslation();
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    getRecommendations(user.id)
-      .then(setRecommendations)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  if (!user || loading) return null;
 
   if (recommendations.length === 0) {
     return (

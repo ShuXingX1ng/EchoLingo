@@ -2,8 +2,6 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
   updateErrorPatterns,
   getUserProfile,
-  getPersonalizedSuggestions,
-  getErrorStats,
 } from "./error-patterns";
 import type { ErrorAnnotation } from "@/types";
 
@@ -29,10 +27,14 @@ const localStorageMock = {
 
 Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
 
-// Mock Supabase error patterns module
-vi.mock("./supabase-error-patterns", () => ({
-  updateErrorPatternsFromFeedback: vi.fn().mockResolvedValue(undefined),
-}));
+// Mock Supabase error patterns module — keep inferTypeFromText real so localStorage logic works
+vi.mock("./supabase-error-patterns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./supabase-error-patterns")>();
+  return {
+    ...actual,
+    updateErrorPatternsFromFeedback: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 const USER_ID = "test-user-1";
 
@@ -294,43 +296,3 @@ describe("getUserProfile", () => {
   });
 });
 
-describe("getPersonalizedSuggestions", () => {
-  beforeEach(() => {
-    localStorageMock.clear();
-    vi.clearAllMocks();
-  });
-
-  it("returns empty array when no profile", () => {
-    expect(getPersonalizedSuggestions("nonexistent")).toEqual([]);
-  });
-
-  it("returns suggestions based on error types", async () => {
-    await updateErrorPatterns(USER_ID, baseFeedback);
-    const suggestions = getPersonalizedSuggestions(USER_ID);
-
-    expect(suggestions.length).toBeGreaterThan(0);
-    expect(suggestions[0]).toContain("vocabulary");
-  });
-});
-
-describe("getErrorStats", () => {
-  beforeEach(() => {
-    localStorageMock.clear();
-    vi.clearAllMocks();
-  });
-
-  it("returns zero stats when no profile", () => {
-    const stats = getErrorStats("nonexistent");
-    expect(stats.totalErrors).toBe(0);
-    expect(stats.mostFrequent).toBeNull();
-  });
-
-  it("counts errors by type", async () => {
-    await updateErrorPatterns(USER_ID, baseFeedback);
-    const stats = getErrorStats(USER_ID);
-
-    expect(stats.totalErrors).toBe(1);
-    expect(stats.byType.vocabulary).toBe(1);
-    expect(stats.mostFrequent).toBeTruthy();
-  });
-});

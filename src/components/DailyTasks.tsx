@@ -1,30 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
 import { useTranslation } from "@/lib/i18n";
-import { generateDailyTasks, getTaskStats, type DailyTask } from "@/lib/learning-plan";
+import { getTaskStats, type DailyTask } from "@/lib/learning-plan";
 
-export default function DailyTasks() {
-  const { user } = useAuth();
+export default function DailyTasks({ tasks }: { tasks: DailyTask[] }) {
   const { t } = useTranslation();
-  const [tasks, setTasks] = useState<DailyTask[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    generateDailyTasks(user.id)
-      .then(setTasks)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  if (!user || loading) return null;
 
   const stats = getTaskStats(tasks);
 

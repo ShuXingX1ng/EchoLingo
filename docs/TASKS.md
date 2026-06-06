@@ -187,6 +187,17 @@ Keep these out of the current phase unless explicitly requested:
 - Frontend framework migration
 - Removing Next.js API Routes fallback
 
+## Architecture Improvements (2026-06-06) ✅
+
+Four codebase deepening tasks completed:
+
+- **C1 — Error pattern dual-storage schism**: `inferTypeFromText` deduplicated (now exported from `supabase-error-patterns.ts`); misleading sync `getPersonalizedSuggestions` / `getErrorStats` removed from `error-patterns.ts`; file header clarifies localStorage-only responsibility
+- **C2 — Learning plan data source duplication**: `learning-plan.ts` now imports `getUserProgress` and `LearningProgress` from `supabase-progress.ts` instead of defining its own copies
+- **C3 — Scattered component-level data fetching**: `DailyTasks` and `LearningPath` are now pure render components accepting props; `page.tsx` owns auth + parallel fetch + loading state
+- **C4 — Session completion god function**: `saveSessionAndUpdateLearning` now accepts a single `CompletionInput` object (was 7 positional args); internal mutation replaced with immutable spread; callers use the return value
+
+Validation: lint 0, typecheck pass, 82 unit tests pass, build pass.
+
 ## Known Technical Debt
 
 - Continue expanding focused unit tests as new behavior lands

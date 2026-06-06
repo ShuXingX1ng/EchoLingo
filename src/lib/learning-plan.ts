@@ -2,6 +2,7 @@
 
 import { createClient } from "./supabase";
 import { TOPICS } from "./topics";
+import { getUserProgress, type LearningProgress } from "./supabase-progress";
 
 export interface DailyTask {
   id: string;
@@ -14,13 +15,6 @@ export interface DailyTask {
   targetCount?: number;
   status: "pending" | "completed";
   link: string;
-}
-
-interface LearningProgress {
-  topic_id: string;
-  part: string;
-  best_band: number;
-  attempt_count: number;
 }
 
 interface SessionRecord {
@@ -39,18 +33,6 @@ function getTodayString(): string {
 // Check if a session happened today
 function isSessionToday(createdAt: string): boolean {
   return createdAt.startsWith(getTodayString());
-}
-
-// Get user's learning progress from Supabase
-async function getUserProgress(userId: string): Promise<LearningProgress[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("learning_progress")
-    .select("topic_id, part, best_band, attempt_count")
-    .eq("user_id", userId);
-
-  if (error || !data) return [];
-  return data;
 }
 
 // Get user's recent sessions from Supabase

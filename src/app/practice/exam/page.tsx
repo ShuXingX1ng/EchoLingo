@@ -271,17 +271,17 @@ function ExamPage() {
     try {
       const feedbackData = await fetchFeedback(finalMessages, "full");
 
-      await saveSessionAndUpdateLearning(
-        finalMessages,
-        feedbackData,
-        user?.id,
+      const finalFeedback = await saveSessionAndUpdateLearning({
+        messages: finalMessages,
+        feedback: feedbackData,
+        userId: user?.id,
         topicId,
-        "full",
-        lastAudioBlobRef.current,
-        lastUserMessageRef.current
-      );
+        mode: "full",
+        audioBlob: lastAudioBlobRef.current,
+        lastUserMessage: lastUserMessageRef.current,
+      });
 
-      setFeedback(feedbackData);
+      setFeedback(finalFeedback);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to generate feedback."
