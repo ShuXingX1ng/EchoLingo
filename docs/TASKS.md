@@ -98,12 +98,12 @@ Each slice: stimulus display → timed response → AI feedback → save → his
 - [x] Task Bank wired into all 6 generating task pages (personal-intro skipped — fixed prompt)
 - [x] Timing enforcement — `MIN_REC_SECONDS = 5` guard on all 4 spoken task pages; Stop/Done button disabled + countdown label for first 5s
 
-### Phase 4 — Mock exam
+### Phase 4 — Mock exam ✅
 
-- [ ] `/mock` entry point
-- [ ] Full task sequence following PTE Academic order
-- [ ] Strict timing mode
-- [ ] End-of-exam summary report
+- [x] `/mock` entry point — intro screen, 7-task PTE sequence, progress bar, sessionStorage handoff to summary
+- [x] Full task sequence following PTE Academic order — 7 `MockXxx` components in `src/components/mock/`
+- [x] Strict timing mode — no stop button on speaking tasks; writing tasks auto-submit on timeout, allow early submit
+- [x] End-of-exam summary report — `/mock/summary`: per-task feedback, top weaknesses, avg pronunciation score, practice links
 
 ### Phase 5 — Deferred task types ✅
 
@@ -125,7 +125,6 @@ Design complete (see `docs/agent-architecture.md` and `docs/PROJECT_CONTEXT.md`)
 
 - [ ] Reading section: Fill in the Blanks, Re-order Paragraphs, Multiple Choice
 - [ ] Listening section: Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary
-- [ ] Speaking section: Describe Image (requires image stimulus library), Re-tell Lecture (requires audio lecture library)
 
 ## Future / Backlog
 
