@@ -1,151 +1,6 @@
 # EchoLingo Tasks
 
-## Current Recommendation
-
-Proceed with **Phase H: personalized learning plan deepening**, with one corrected product rule:
-
-> Personalized recommendations should be generated after login from Supabase-backed user data. localStorage is not the authority for logged-in recommendations.
-
-Why this first:
-
-- The app already has a daily learning plan on the home page.
-- Existing Supabase history, progress, sessions, feedback-derived signals, recommendations, and stats can make the plan more useful without a large new subsystem.
-- It keeps the next phase focused on learning value instead of more infrastructure.
-
-## Phase H: Personalized Learning Plan Deepening
-
-Goal: make the logged-in daily plan explainable, completable, and connected to Supabase-backed review/history/stats.
-
-Personalization source rules:
-
-- Logged-in: Supabase is the authority for personalized plan and recommendation decisions.
-- Logged-out: show general practice entry points or login prompt; do not present localStorage as personalized recommendation data.
-- Supabase failure: show generic/unavailable fallback; do not silently treat localStorage as complete personalization.
-- localStorage: only migration, backup, temporary local state, or non-authoritative fallback.
-
-### H1. Review Plan Data Sources ✅
-
-- [x] Read `src/lib/learning-plan.ts`
-- [x] Check how it consumes progress, sessions, error patterns, and recommendations
-- [x] Document logged-in, logged-out, empty-history, and cloud-failure behavior
-- [x] Decide whether any data boundary needs a small refactor
-
-Acceptance:
-
-- Review conclusion recorded in `docs/DEVELOPMENT_LOG.md` ✅
-- No behavior change unless a clear boundary problem is found ✅
-
-Review findings:
-
-- `learning-plan.ts` queries Supabase directly, bypassing `unified-history.ts` — no local fallback on cloud failure
-- Logged-out users see no DailyTasks (returns null)
-- Empty history → generic tasks for all topics (correct)
-- Cloud failure → generic tasks (acceptable fallback only if clearly non-personalized)
-- Completion matching uses `mode.includes(part)` — loose but safe with current mode values
-- `recommendations.ts` still mixes Supabase progress with localStorage error patterns; this should be corrected before relying on it for logged-in personalization
-- Decision: no localStorage-backed personalization should be added in H2/H3
-
-### H2a. Align Personalization Data Authority ✅
-
-- [x] Review `src/lib/recommendations.ts` and remove or isolate localStorage error profile as a primary logged-in recommendation source
-- [x] Decide where feedback-derived weak areas should live in Supabase
-- [x] For logged-out users, keep recommendation UI generic or ask the user to log in
-- [x] For Supabase errors, show a generic/unavailable state instead of localStorage-personalized output
-
-Acceptance:
-
-- Logged-in personalized recommendations are based on Supabase-backed data ✅
-- localStorage is documented and treated as non-authoritative ✅
-- No new real LLM call is introduced ✅
-
-Changes:
-
-- Created `supabase-migration-002.sql` with `user_error_patterns` and `user_weak_areas` tables
-- Created `src/lib/supabase-error-patterns.ts` for Supabase error pattern operations
-- Updated `src/lib/recommendations.ts` to use Supabase error patterns via `getWeakSkills()` and `getTopErrorForSkill()`
-- Updated `src/lib/error-patterns.ts` to sync with Supabase for logged-in users while keeping localStorage as backup
-- Updated `src/components/PersonalizedSuggestions.tsx` to use Supabase error patterns
-- Updated `src/lib/feedback-actions.ts` to await async `updateErrorPatterns()`
-- Updated `src/lib/error-patterns.test.ts` with async tests and Supabase mock
-
-Validation:
-
-- `npm run lint` — passed
-- `npm run typecheck` — passed
-- `npm run test:unit:run` — 10 files, 86 tests passed
-- `npm run build` — passed
-
-### H2. Make Task Reasons Specific ✅
-
-- [x] Add a short reason for each daily task
-- [x] Prefer real Supabase-backed data where available: recent low score, weak topic, recent session signal
-- [x] Keep fallback copy for empty or old data
-- [x] Do not call a real LLM to generate reasons
-
-Acceptance:
-
-- Home page tasks explain why they were recommended ✅
-- Old/empty data does not crash or show awkward blanks ✅
-
-Changes:
-
-- Added `reason` field to `DailyTask` interface
-- Unpracticed topic: "You haven't practiced this topic yet — give it a try"
-- Random variety: "Review for variety — keep your skills fresh"
-- Shadowing: "Build fluency and natural rhythm through repetition"
-- Review low-score: "Your best score here is Band X.Y — targeted practice can help raise it"
-- Rendered in `DailyTasks.tsx` as italic text below description
-
-Follow-up:
-
-- Current reasons are useful but still generic. Next iteration should avoid presenting localStorage-only error patterns as logged-in personalization.
-
-### H3. Tighten Completion State
-
-- [ ] Check how practice, exam, and shadowing completion map to daily tasks
-- [ ] Keep completion derived from existing sessions/progress where possible
-- [ ] Avoid adding a second task-status store unless review proves it is needed
-
-Acceptance:
-
-- Completing a relevant activity updates the daily plan consistently
-- History/stats and plan state do not disagree
-
-### H4. Test Coverage
-
-- [ ] Unit tests for learning plan generation
-- [ ] Component test for `DailyTasks`
-- [ ] E2E smoke only if cross-page behavior changes
-
-Acceptance:
-
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test:unit:run`
-- Relevant E2E smoke if the home/practice flow changes
-
-## Alternative Next Phases
-
-Choose only one if Phase H is intentionally paused. The full long-term roadmap lives in `docs/PRODUCT_ROADMAP.md`.
-
-| Phase | Scope | Boundary |
-|-------|-------|----------|
-| Pronunciation enhancement | Better phoneme/word feedback and next shadowing queue | Consume existing Azure assessment data only |
-| Vocabulary notebook | Extract useful vocabulary from feedback/sample answers | Start local-first, no spaced repetition system |
-| History analytics | Clearer trend/weakness review | No admin/operations analytics |
-| Export reports | PDF/Markdown learning report | No social sharing |
-
-## Roadmap After Phase H
-
-Use `docs/PRODUCT_ROADMAP.md` as the source of truth for later phases:
-
-- Phase I: Learner Profile
-- Phase J: Pronunciation Intelligence
-- Phase K: Vocabulary Notebook
-- Phase L: Learning Reports
-- Phase M: Backend Product APIs
-
-## Completed Phase Summary
+## Completed Phases
 
 | Phase | Status | Notes |
 |-------|--------|-------|
@@ -153,7 +8,7 @@ Use `docs/PRODUCT_ROADMAP.md` as the source of truth for later phases:
 | Voice | Done | STT, Azure TTS, voice conversation |
 | Pronunciation | Done | Azure assessment, word/phoneme scoring |
 | Shadowing | Done | Listen, record, assess, summarize |
-| Mock exam | Done | Part 1 -> Part 2 -> Part 3 |
+| Mock exam | Done | IELTS Part 1 → Part 2 → Part 3 |
 | Learning review | Done | Shared `FeedbackPanel` / `FeedbackReview` |
 | History/stats learning UX | Done | History and stats guide next action |
 | Desktop consistency | Done | Shared nav, slate palette, i18n cleanup |
@@ -162,46 +17,122 @@ Use `docs/PRODUCT_ROADMAP.md` as the source of truth for later phases:
 | CI/E2E | Done | Frontend CI, backend CI, 20 Playwright smoke tests |
 | Mobile blockers | Done | Current small-screen blockers addressed |
 | Python backend | Done | FastAPI backend + frontend API client + deployment docs |
+| Phase H: Personalized Plan | Done | Supabase-authoritative error patterns, task reasons, architecture deepening (C1–C4) |
+| PTE pivot planning | Done | Domain glossary (CONTEXT.md), ADRs 0001–0003, all architectural decisions resolved |
+| Phase 1: PTE data model skeleton | Done | PTE types, 4 new storage/weakness modules, `getPteRecommendations`, shadowing deleted |
+| Phase 2a: Read Aloud vertical slice | Done | `/practice/read-aloud`, `/api/read-aloud/stimulus`, `/api/read-aloud/feedback`, WAV conversion, parallel Azure + AI, saveTask |
+| Phase 2b: All remaining task slices | Done | All 7 task routes live; shared `/api/pte/stimulus` + `/api/pte/feedback`; `TaskFeedbackDisplay`; `wav-encoder`; `/practice` hub page |
+| Phase 3: Practice infrastructure | Done | `/history` + `/stats` rewritten for PTE; `task-bank.ts` wired into all 6 task pages; 5s min-recording guard on all spoken tasks |
 
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
-| Frontend unit | 10 files / 86 tests |
+| Frontend unit | 10 files / 82 tests |
 | E2E | 20 tests |
 | Backend | 86 tests |
-| Quality gate | npm ci dry-run pass, lint 0, typecheck pass, build pass |
+| Quality gate | lint 0, typecheck pass, build pass |
+
+## Active: PTE Pivot
+
+### Phase 1 — Data model skeleton ✅
+
+- [x] Replace `SpeakingSession` / `ChatMessage` with `PracticeTask` in `src/types/index.ts`
+- [x] Replace `SessionFeedback` with `TaskFeedback` (generic envelope + `details`)
+- [x] Update Supabase schema: `practice_tasks` table SQL documented in `supabase-task-history.ts`; apply via Supabase SQL editor
+- [x] New storage modules: `task-history.ts`, `supabase-task-history.ts`, `unified-task-history.ts`
+- [x] New `task-weakness.ts` — derives `TaskTypeWeakness` from `PracticeTask` history
+- [x] Update `recommendations.ts` — added `getPteRecommendations` using task-type weakness
+- [x] Delete `/shadowing` route and all shadowing components/hooks
+
+## Next Phase
+
+**Resume point (2026-06-07):** Phase 3 fully complete. Phase 4 (Mock Exam) is next — `/mock` entry point and orchestrator are not yet built.
+
+What's done (Phase 3):
+- `/history` rewritten — `PracticeTask` records, task-type filter, search, detail view, CSV/JSON export
+- `/stats` rewritten — task-type weakness `WeaknessBar` rows, practice distribution, weekly activity
+- `src/lib/task-bank.ts` created and wired into all 6 generating task pages
+- 5s min-recording guard on all 4 spoken task pages (Stop/Done button disabled + countdown label)
+- `clearAllTasksLocal` added to `src/lib/unified-task-history.ts`
+- Supabase `practice_tasks` SQL documented in `src/lib/supabase-task-history.ts` — **must be applied manually via Supabase SQL editor before cloud save works**
+
+What's next (Phase 4):
+- [ ] Apply `practice_tasks` Supabase SQL (top of `src/lib/supabase-task-history.ts`) — prerequisite for cloud save on all tasks
+- [ ] `src/app/mock/page.tsx` — mock exam entry and task orchestrator; sequences all 7 task types in PTE order
+- [ ] Strict timing in mock mode: auto-submit response when window expires; no stop button
+- [ ] `src/app/mock/summary/page.tsx` — end-of-exam summary aggregating feedback across all task types
+
+Key files to open first:
+- `src/types/index.ts` — `PteTaskType`, `PracticeTask` (task sequence and data shape)
+- `src/app/practice/read-aloud/page.tsx` — reference state machine for spoken tasks
+- `src/app/practice/write-essay/page.tsx` — reference state machine for written tasks
+- `src/lib/unified-task-history.ts` — `saveTask`, `getTasks` for collecting mock exam results
+
+---
+
+### Phase 2 — Task type implementations (vertical slices)
+
+Each slice: stimulus display → timed response → AI feedback → save → history entry
+
+- [x] Read Aloud (AI text + Azure Pronunciation Assessment) — `/practice/read-aloud`
+- [x] Repeat Sentence (Azure TTS audio + Azure Pronunciation Assessment) — `/practice/repeat-sentence`
+- [x] Answer Short Question (AI question + spoken response) — `/practice/answer-short-question`
+- [x] Summarize Written Text (AI passage + typed response) — `/practice/summarize-written-text`
+- [x] Write Essay (AI prompt + typed response) — `/practice/write-essay`
+- [x] Personal Introduction (fixed prompt + spoken response, unscored) — `/practice/personal-intro`
+- [x] Write from Dictation (Azure TTS audio + typed response) — `/practice/write-from-dictation`
+
+### Phase 3 — Practice infrastructure
+
+- [x] `/practice` task-type selection page — hub grid live
+- [x] History page updated for `PracticeTask` records — task-type filter, search, detail view, export
+- [x] Stats page updated for task-type weakness dimensions — ranked `WeaknessBar` rows, distribution chart
+- [x] Task Bank module created — `src/lib/task-bank.ts`
+- [x] Task Bank wired into all 6 generating task pages (personal-intro skipped — fixed prompt)
+- [x] Timing enforcement — `MIN_REC_SECONDS = 5` guard on all 4 spoken task pages; Stop/Done button disabled + countdown label for first 5s
+
+### Phase 4 — Mock exam
+
+- [ ] `/mock` entry point
+- [ ] Full task sequence following PTE Academic order
+- [ ] Strict timing mode
+- [ ] End-of-exam summary report
+
+### Phase 5 — Deferred task types
+
+- [ ] Describe Image (requires image stimulus library)
+- [ ] Re-tell Lecture (requires audio lecture library)
+
+### Phase 6 — Agent Architecture (Portfolio Design)
+
+Design complete (see `docs/agent-architecture.md` and `docs/PROJECT_CONTEXT.md`). Implementation pending.
+
+- [ ] Scoring Agent — per-dimension scores (10–90, PTE-aligned); Speaking scores labelled "for reference only"
+- [ ] Diagnosis Agent — Task-Type Weakness derivation (already partially implemented in `task-weakness.ts`)
+- [ ] Coach Agent — targeted suggestions per weak Task Type
+- [ ] LLM-as-Judge — independent re-evaluation; trigger when any dimension diverges > 15 points; log disagreement cases
+- [ ] Learner profile — Task-Type-keyed weakness profile driving adaptive task selection
+- [ ] Learning trajectory visualisation — radar chart, progress curve, gap analysis vs. target score
+
+### Phase 7 — Extended Task Types (Planned)
+
+- [ ] Reading section: Fill in the Blanks, Re-order Paragraphs, Multiple Choice
+- [ ] Listening section: Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary
+- [ ] Speaking section: Describe Image (requires image stimulus library), Re-tell Lecture (requires audio lecture library)
 
 ## Future / Backlog
 
-Keep these out of the current phase unless explicitly requested:
-
-- Payment
-- Subscriptions
-- Commercial operations
-- Leaderboards
-- Learning groups
-- Social sharing
+- Payment / subscriptions / commercial operations
+- Leaderboards / learning groups / social sharing
 - Full mobile redesign
 - Real API E2E in CI
 - Frontend framework migration
 - Removing Next.js API Routes fallback
 
-## Architecture Improvements (2026-06-06) ✅
-
-Four codebase deepening tasks completed:
-
-- **C1 — Error pattern dual-storage schism**: `inferTypeFromText` deduplicated (now exported from `supabase-error-patterns.ts`); misleading sync `getPersonalizedSuggestions` / `getErrorStats` removed from `error-patterns.ts`; file header clarifies localStorage-only responsibility
-- **C2 — Learning plan data source duplication**: `learning-plan.ts` now imports `getUserProgress` and `LearningProgress` from `supabase-progress.ts` instead of defining its own copies
-- **C3 — Scattered component-level data fetching**: `DailyTasks` and `LearningPath` are now pure render components accepting props; `page.tsx` owns auth + parallel fetch + loading state
-- **C4 — Session completion god function**: `saveSessionAndUpdateLearning` now accepts a single `CompletionInput` object (was 7 positional args); internal mutation replaced with immutable spread; callers use the return value
-
-Validation: lint 0, typecheck pass, 82 unit tests pass, build pass.
-
 ## Known Technical Debt
 
-- Continue expanding focused unit tests as new behavior lands
-- Performance monitoring can be improved
-- Keep `package-lock.json` synchronized with `package.json` so frontend CI can pass `npm ci`
-- Local native binding signing issue may still affect some startup paths: Next SWC / Vitest Rolldown can be rejected by macOS `dlopen`
-- Project docs should stay concise; put long implementation history in development-log summaries, not active plans
+- Expand focused unit tests as new behaviour lands
+- Keep `package-lock.json` synchronized with `package.json` for CI
+- Local native binding signing issue may affect some startup paths (Next SWC / Vitest Rolldown)
+- IELTS session data remains in Supabase — not surfaced in UI, no migration needed at current scale

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EchoLingo — Agent Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; padding: 40px 24px; }
+  h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 40px; }
+
+  .pipeline { display: flex; flex-direction: column; align-items: center; gap: 0; max-width: 900px; margin: 0 auto; }
+
+  /* Input */
+  .node-input {
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    padding: 14px 32px; text-align: center; font-size: 13px; color: #94a3b8;
+    width: 340px;
+  }
+  .node-input strong { display: block; color: #e2e8f0; font-size: 14px; margin-bottom: 4px; }
+
+  /* Arrow */
+  .arrow { width: 2px; height: 24px; background: #334155; position: relative; }
+  .arrow::after { content: '▼'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); color: #475569; font-size: 10px; }
+
+  /* Section agents row */
+  .agents-row { display: flex; gap: 16px; width: 100%; justify-content: center; }
+
+  .agent-box {
+    flex: 1; max-width: 210px; border-radius: 10px; padding: 14px 12px;
+    font-size: 12px; line-height: 1.5;
+  }
+  .agent-box .agent-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .agent-box .tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 6px; }
+  .agent-box .sub { color: #94a3b8; margin-top: 4px; }
+
+  .speaking { background: #1a2535; border: 1px solid #1d4ed8; }
+  .speaking .agent-title { color: #60a5fa; }
+  .speaking .tag { background: #1e3a8a; color: #93c5fd; }
+
+  .writing { background: #1a2535; border: 1px solid #7c3aed; }
+  .writing .agent-title { color: #a78bfa; }
+  .writing .tag { background: #4c1d95; color: #c4b5fd; }
+
+  .reading { background: #1a2535; border: 1px dashed #374151; }
+  .reading .agent-title { color: #9ca3af; }
+  .reading .tag { background: #1f2937; color: #6b7280; }
+
+  .listening { background: #1a2535; border: 1px solid #0f766e; }
+  .listening .agent-title { color: #2dd4bf; }
+  .listening .tag { background: #134e4a; color: #5eead4; }
+
+  /* Converge arrow */
+  .converge { display: flex; align-items: flex-start; justify-content: center; width: 100%; position: relative; height: 40px; }
+  .converge::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 15%; right: 15%;
+    height: 1px; background: #334155;
+  }
+  .converge::after {
+    content: '▼';
+    position: absolute;
+    bottom: 0; left: 50%; transform: translateX(-50%);
+    color: #475569; font-size: 10px;
+  }
+  .converge-line { position: absolute; top: 0; width: 2px; background: #334155; height: 40px; }
+
+  /* Core pipeline nodes */
+  .core-node {
+    border-radius: 10px; padding: 16px 24px; text-align: center;
+    width: 420px; position: relative;
+  }
+  .core-node .node-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .core-node .node-desc { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+  .core-node .node-detail { font-size: 11px; color: #64748b; margin-top: 6px; }
+
+  .score-node { background: #1a2535; border: 1px solid #1d4ed8; }
+  .score-node .node-title { color: #60a5fa; }
+
+  .judge-node { background: #1f1a2e; border: 1px solid #7c3aed; }
+  .judge-node .node-title { color: #a78bfa; }
+
+  .diag-node { background: #1a2535; border: 1px solid #0f766e; }
+  .diag-node .node-title { color: #2dd4bf; }
+
+  .coach-node { background: #1a2535; border: 1px solid #d97706; }
+  .coach-node .node-title { color: #fbbf24; }
+
+  .output-node { background: #14532d; border: 1px solid #16a34a; }
+  .output-node .node-title { color: #4ade80; }
+
+  /* Judge retry annotation */
+  .judge-wrapper { position: relative; width: 420px; }
+  .retry-label {
+    position: absolute; right: -120px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; color: #7c3aed; text-align: center; width: 110px;
+    border: 1px dashed #4c1d95; border-radius: 6px; padding: 6px 8px;
+    background: #1f1a2e;
+  }
+  .retry-label::before {
+    content: '↩ 分歧 > 15分';
+    display: block; font-weight: 600; margin-bottom: 2px;
+  }
+
+  /* Decision table */
+  .decisions { max-width: 900px; margin: 48px auto 0; }
+  .decisions h2 { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 12px; color: #64748b; font-weight: 600; border-bottom: 1px solid #1e293b; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e293b; color: #94a3b8; vertical-align: top; }
+  td:first-child { color: #e2e8f0; font-weight: 500; }
+  tr:hover td { background: #1e293b; }
+
+  /* Status legend */
+  .legend { display: flex; gap: 20px; margin-bottom: 16px; font-size: 12px; color: #64748b; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-green { background: #16a34a; }
+  .dot-blue { background: #1d4ed8; }
+</style>
+</head>
+<body>
+
+<h1>EchoLingo — AI Agent Architecture</h1>
+<p class="subtitle">PTE Academic Practice Platform · Portfolio Design</p>
+
+<div class="pipeline">
+
+  <!-- Input -->
+  <div class="node-input">
+    <strong>用户输入</strong>
+    taskType · stimulus · response · audio?
+  </div>
+
+  <!-- Converge to agents -->
+  <div class="arrow"></div>
+
+  <!-- 4 Section Agents -->
+  <div class="agents-row">
+
+    <div class="agent-box speaking">
+      <div class="agent-title">🎤 Speaking Agent</div>
+      <div>Azure Pronunciation Assessment</div>
+      <div class="sub">Read Aloud · Repeat Sentence<br>词 + 音素级别评分</div>
+      <br>
+      <div>Whisper 转录</div>
+      <div class="sub">Answer Short Question<br>Describe Image</div>
+      <br>
+      <div><strong>维度：</strong>Fluency · Pronunciation · Content</div>
+      <span class="tag">口语分加注仅供参考</span>
+    </div>
+
+    <div class="agent-box writing">
+      <div class="agent-title">✍️ Writing Agent</div>
+      <div>RAGAS Faithfulness + Relevancy</div>
+      <div class="sub">Summarize Written Text</div>
+      <br>
+      <div>LLM Rubric 评分</div>
+      <div class="sub">Write Essay</div>
+      <br>
+      <div><strong>维度：</strong>Content · Form · Grammar · Vocabulary</div>
+    </div>
+
+    <div class="agent-box reading">
+      <div class="agent-title">📖 Reading Agent</div>
+      <div class="sub">对错评分<br>Fill in the Blanks<br>Multiple Choice</div>
+      <br>
+      <div class="sub">序列分析<br>Re-order Paragraphs</div>
+      <span class="tag">⚠ 设计态，待实现</span>
+    </div>
+
+    <div class="agent-box listening">
+      <div class="agent-title">🎧 Listening Agent</div>
+      <div>Whisper 转录 + 时间戳</div>
+      <div class="sub">关键信息提取<br>Write from Dictation ✅</div>
+      <br>
+      <div class="sub">Summarize Spoken Text<br>Highlight Correct Summary</div>
+      <span class="tag">部分待实现</span>
+    </div>
+
+  </div>
+
+  <!-- Converge lines -->
+  <div style="width:100%;max-width:900px;height:36px;position:relative;display:flex;justify-content:center;">
+    <svg width="100%" height="36" style="position:absolute;top:0;left:0;">
+      <line x1="11.5%" y1="0" x2="50%" y2="36" stroke="#334155" stroke-width="1.5"/>
+      <line x1="33.5%" y1="0" x2="50%" y2="36" stroke="#334155" stroke-width="1.5"/>
+      <line x1="66.5%" y1="0" x2="50%" y2="36" stroke="#334155" stroke-width="1.5"/>
+      <line x1="88.5%" y1="0" x2="50%" y2="36" stroke="#334155" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <!-- Scoring Agent -->
+  <div class="core-node score-node">
+    <div class="node-title">Scoring Agent</div>
+    <div class="node-desc">10–90 分值 · 对齐 PTE 官方评分维度<br>每维度独立评分，分差可量化</div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- LLM-as-Judge -->
+  <div class="judge-wrapper">
+    <div class="core-node judge-node">
+      <div class="node-title">LLM-as-Judge</div>
+      <div class="node-desc">独立模型重评 Scoring Agent 输出<br>任意维度分差 &gt; 15 → 触发重评 + 记录分歧案例</div>
+      <div class="node-detail">Judge 一致率可量化 · 分歧案例驱动 prompt 迭代</div>
+    </div>
+    <div class="retry-label">重评触发<br><span style="color:#6b7280;font-size:10px">回到 Scoring Agent</span></div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- Diagnosis Agent -->
+  <div class="core-node diag-node">
+    <div class="node-title">Diagnosis Agent</div>
+    <div class="node-desc">推导 Task-Type Weakness<br>以 Task Type 为粒度 · 近期记录滚动加权</div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- Coach Agent -->
+  <div class="core-node coach-node">
+    <div class="node-title">Coach Agent</div>
+    <div class="node-desc">针对薄弱维度生成可操作建议<br>Daily Plan 优先推弱 Task Type</div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- Output -->
+  <div class="core-node output-node">
+    <div class="node-title">输出</div>
+    <div class="node-desc">
+      Feedback Details &nbsp;·&nbsp; 维度缺口分析（对比用户目标分）<br>
+      Daily Plan 更新 &nbsp;·&nbsp; 学习轨迹可视化（雷达图 + 进步曲线）
+    </div>
+  </div>
+
+</div>
+
+<!-- Decision table -->
+<div class="decisions">
+  <h2>关键设计决策</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>决策</th>
+        <th>选择</th>
+        <th>面试时的理由</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>无 Router Agent</td>
+        <td>题型由调用方直接传入</td>
+        <td>taskType 始终已知，路由层没有实际判断价值，增加无意义复杂度</td>
+      </tr>
+      <tr>
+        <td>Azure PA vs Whisper</td>
+        <td>Azure 做发音评分，Whisper 做转录</td>
+        <td>Azure 提供音素级别数据；Whisper 只有时间戳，发音准确度无法从时间戳推断</td>
+      </tr>
+      <tr>
+        <td>评分范围</td>
+        <td>10–90，对齐 PTE 官方维度</td>
+        <td>Reading/Writing 维度客观可测；Speaking 加「仅供参考」标注因 Pearson 权重不公开</td>
+      </tr>
+      <tr>
+        <td>RAGAS 适用范围</td>
+        <td>仅 Summarize Written Text</td>
+        <td>RAGAS 需要 context；Write Essay 是开放写作，无 context 可算 Faithfulness</td>
+      </tr>
+      <tr>
+        <td>LLM-as-Judge 阈值</td>
+        <td>任意维度差值 &gt; 15 分触发重评</td>
+        <td>规则简单可解释；分歧率从 XX% → XX% 是可量化的 prompt 优化指标</td>
+      </tr>
+      <tr>
+        <td>用户画像粒度</td>
+        <td>Task Type 级别</td>
+        <td>Section 级别聚合会丢失诊断信息：同一 Section 内不同 Task Type 考察完全不同能力</td>
+      </tr>
+      <tr>
+        <td>学习轨迹</td>
+        <td>缺口分析（对比用户目标分）</td>
+        <td>不预测绝对考试分数；用户设目标，系统显示各维度差距，更可操作</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
