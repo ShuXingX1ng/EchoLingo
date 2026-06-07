@@ -10,6 +10,12 @@ type LlmResponse = {
   message?: string
 }
 
+const JSON_TASK_TYPES = new Set<PteTaskType>([
+  "fill_in_the_blanks_reading",
+  "re_order_paragraphs",
+  "multiple_choice_reading",
+])
+
 const PROMPTS: Partial<Record<PteTaskType, string>> = {
   repeat_sentence:
     "Generate one clear, natural-sounding sentence (12–16 words) from an academic or professional context. " +
@@ -37,6 +43,29 @@ const PROMPTS: Partial<Record<PteTaskType, string>> = {
     "Respond with ONLY the sentence.",
 
   personal_intro: "",
+
+  fill_in_the_blanks_reading:
+    'Generate a PTE Academic Fill in the Blanks (Reading) task. ' +
+    'Create an academic passage of 80–100 words with exactly 5 blanks marked as [BLANK_0], [BLANK_1], [BLANK_2], [BLANK_3], [BLANK_4]. ' +
+    'For each blank provide 4 options where exactly one is correct. ' +
+    'Return ONLY valid JSON, no other text:\n' +
+    '{"passage":"...text with [BLANK_0] markers...","blanks":[{"options":["opt1","opt2","opt3","opt4"],"correct":0}]}\n' +
+    'The passage must read naturally with the correct options filled in. Topic: science, technology, environment, or society.',
+
+  re_order_paragraphs:
+    'Generate a PTE Academic Re-order Paragraphs task. ' +
+    'Create 4 short paragraphs (2–3 sentences each) on an academic topic that form a coherent argument or explanation when read in order. ' +
+    'Use discourse markers (Firstly, However, Therefore, etc.) to make ordering cues realistic but not trivial. ' +
+    'Return ONLY valid JSON, no other text:\n' +
+    '{"paragraphs":[{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}]}\n' +
+    'The array is in CORRECT reading order. Topics: science, technology, environment, society, or history.',
+
+  multiple_choice_reading:
+    'Generate a PTE Academic Multiple Choice (Reading) task. ' +
+    'Create a reading passage of 80–100 words followed by one comprehension question with exactly 5 options (A–E), one correct. ' +
+    'Return ONLY valid JSON, no other text:\n' +
+    '{"passage":"...","question":"...","options":["A. ...","B. ...","C. ...","D. ...","E. ..."],"correct":2}\n' +
+    'The "correct" field is the 0-based index of the correct option. Test main idea, specific detail, or inference.',
 
   re_tell_lecture:
     "Generate a short academic lecture excerpt (110–130 words) on a topic from science, technology, environment, health, or society. " +
@@ -91,7 +120,8 @@ export async function POST(request: Request) {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.85,
-        max_tokens: 300,
+        max_tokens: JSON_TASK_TYPES.has(taskType) ? 800 : 300,
+        ...(JSON_TASK_TYPES.has(taskType) ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: controller.signal,
     })

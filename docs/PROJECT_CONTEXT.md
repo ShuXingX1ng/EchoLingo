@@ -20,7 +20,7 @@ Target users:
 | Auth | Supabase email + Google OAuth |
 | Tests | 82 frontend unit tests, 20 E2E tests, 86 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
-| Pivot status | Phase 5 complete — Phase 6 (Agent Architecture) next |
+| Pivot status | Phase 7 (Reading section) complete — Listening extended types next |
 
 ## Architecture
 
@@ -61,31 +61,31 @@ FastAPI files: `backend/main.py`, `backend/routers/`, `backend/services/`, `back
 | Write from Dictation | Listening | Azure TTS audio | Typed text | No |
 | Describe Image | Speaking & Writing | Hardcoded image bank (5 public-domain charts/maps) | Spoken audio | No |
 | Re-tell Lecture | Speaking & Writing | AI-generated text → Azure TTS audio | Spoken audio | No |
+| Fill in the Blanks (Reading) | Reading | AI-generated passage with blanks (JSON) | Dropdown selection | No |
+| Re-order Paragraphs | Reading | AI-generated shuffled paragraphs (JSON) | Drag-and-drop order | No |
+| Multiple Choice (Reading) | Reading | AI-generated passage + question (JSON) | Radio button selection | No |
 
 Deferred / planned task types (not yet implemented):
 
 | Task Type | Section | Blocker |
 |---|---|---|
-| Fill in the Blanks (Reading) | Reading | Reading section not yet built |
-| Re-order Paragraphs | Reading | Reading section not yet built |
-| Multiple Choice (Reading) | Reading | Reading section not yet built |
 | Summarize Spoken Text | Listening | Extended Listening section not yet built |
 | Fill in the Blanks (Listening) | Listening | Extended Listening section not yet built |
 | Highlight Correct Summary | Listening | Extended Listening section not yet built |
 
 ## Core Features (Target State)
 
-- **All 9 PTE task types live**: Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction, Describe Image, Re-tell Lecture (Speaking); Summarize Written Text, Write Essay (Writing); Write from Dictation (Listening) — each with stimulus, timed response, AI feedback, `saveTask`
+- **All 12 PTE task types live**: Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction, Describe Image, Re-tell Lecture (Speaking); Summarize Written Text, Write Essay (Writing); Write from Dictation (Listening); Fill in the Blanks, Re-order Paragraphs, Multiple Choice (Reading) — each with stimulus, timed response, AI feedback, `saveTask`
 - **`/practice` hub page** — task-type grid linking all 9 task routes, with Mock Exam CTA
 - **`/mock` page** — full mock exam orchestrator: intro screen → 7-task PTE sequence (strict timing, no early stop on speaking tasks) → `/mock/summary`
 - **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
-- **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows), practice distribution, weekly activity
+- **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity
 - **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
 - **Min recording guard** — Stop/Done button disabled for first 5s on all 4 spoken task pages (Read Aloud, Repeat Sentence, Answer Short Question, Personal Intro)
 - PTE task-type practice with timed exercises
 - Full mock exam flow covering all supported task types
-- AI-generated feedback: generic envelope (summary, strengths, weaknesses, suggestions) + task-specific details
+- AI-generated feedback: generic envelope (summary, strengths, weaknesses, suggestions) + task-specific details + per-dimension scores (0–100 internal scale) + targeted coaching suggestions via Coach Agent + LLM-as-Judge (independent parallel call; >15-point divergence triggers retry and `judgeLog`)
 - Azure Neural TTS for stimulus audio generation and caching
 - Azure Pronunciation Assessment for Read Aloud and Repeat Sentence
 - History page with Practice Task records, search/filter/export
@@ -176,7 +176,7 @@ LLM-as-Judge  ← independent model re-evaluates Coach output; disagreement trig
 |---|---|---|
 | Speaking Agent | Implemented | Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction |
 | Writing Agent | Implemented | Summarize Written Text, Write Essay |
-| Reading Agent | Designed, not implemented | Fill in the Blanks, Re-order Paragraphs, Multiple Choice |
+| Reading Agent | Implemented | Fill in the Blanks (Reading), Re-order Paragraphs, Multiple Choice (Reading) |
 | Listening Agent | Partially implemented | Write from Dictation (implemented); Summarize Spoken Text, FitB, Highlight Correct Summary (designed) |
 
 ### Speaking Agent — key design decisions
@@ -196,17 +196,21 @@ Scoring dimensions and evaluation method differ by task type:
 
 RAGAS applies only to Summarize Written Text because it requires a source context (the original passage). Write Essay has no retrievable context — RAGAS metrics are not applicable there.
 
-### Scoring Agent
+### Scoring Agent — implemented
 
-Produces per-dimension qualitative scores (0–100% internal scale) for each Feedback dimension. Does not simulate or imply PTE 10–90 scores. Each score has an explicit calculation basis (Azure data, keyword coverage rate, etc.) so learners understand what the number means.
+Produces per-dimension qualitative scores (0–100 internal scale, for reference only) for each Feedback dimension. Speaking: fluency, pronunciation, content. Writing: grammar, vocabulary, form, content. Entry point: `src/app/api/pte/feedback/route.ts`.
 
-### Diagnosis Agent
+### Diagnosis Agent — implemented
 
-Maps to the existing Task-Type Weakness concept. Derives a weakness profile from recent Feedback history, weighted toward recent Practice Tasks (rolling signal, not lifetime average).
+Extends `src/lib/task-weakness.ts`: `aggregateDimensions` computes per-dimension weighted averages from `PracticeTask` history; `scoreFromTask` uses actual dimension scores when available, falling back to the strengths/weaknesses heuristic. Results stored in `TaskTypeWeakness.dimensions`.
 
-### LLM-as-Judge
+### Coach Agent — implemented
 
-An independent LLM re-evaluates the Scoring Agent's per-dimension scores. Trigger rule: if any single PTE-aligned scoring dimension diverges by more than 15 points (on the 10–90 scale) between the primary model and the Judge, the system triggers a re-evaluation and logs the disagreement case.
+Generates targeted coaching tips per weak dimension. Returned in `TaskFeedback.coachSuggestions[]`. Produced inline by the primary LLM call as part of the same JSON response.
+
+### LLM-as-Judge — implemented
+
+An independent LLM call runs in parallel with the primary Scoring Agent call. Trigger rule: if any single dimension diverges by more than 15 points between the two calls, the system retries the primary call and attaches a `JudgeLog` record to `TaskFeedback.judgeLog`. Disagreement rate is a quantifiable quality metric for prompt iteration.
 
 Disagreement rate is a quantifiable quality metric for prompt iteration — e.g. "Judge agreement rate improved from 71% to 89% after prompt revision." Logged disagreement cases form a test set for ongoing prompt improvement.
 
@@ -230,11 +234,12 @@ Weakness profile keyed by Task Type (not Section), consistent with the Task-Type
 
 Daily Plan prioritises weak Task Types. This is the primary personalization signal for logged-in learners.
 
-### Learning Trajectory Visualisation (planned)
+### Learning Trajectory Visualisation — implemented
 
-- Per-dimension radar chart (one axis per PTE scoring dimension)
-- Daily progress curve per Task Type
-- **Gap analysis against target score** — user sets a target band (e.g. 79); system shows per-dimension shortfall ("Write Essay Grammar: 12 points below target"). No absolute exam score prediction — gap analysis is more actionable and more defensible.
+- SVG radar chart overlaying actual vs target dimension scores (speaking: fluency/pronunciation/content; writing: grammar/vocabulary/form/content)
+- Target score slider (40–95) with live gap analysis bars per dimension
+- Score trajectory line chart per task type (weekly average, last 8 weeks), selectable via task-type pill buttons
+- All implemented in `src/app/stats/page.tsx`
 
 No absolute exam score prediction is made. Predicting a real PTE score from practice data is unverifiable and would conflict with ADR 0003's principle of not misleading learners with unvalidated numbers.
 

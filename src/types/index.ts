@@ -10,6 +10,9 @@ export type PteTaskType =
   | "write_from_dictation"
   | "describe_image"
   | "re_tell_lecture"
+  | "fill_in_the_blanks_reading"
+  | "re_order_paragraphs"
+  | "multiple_choice_reading"
 
 export type TaskStimulus = {
   kind: "text" | "audio" | "image"
@@ -22,6 +25,43 @@ export type TaskResponse = {
   audioUrl?: string
 }
 
+// Per-dimension scores (0–100 internal scale, for reference only — not official PTE scores)
+export type SpeakingDimensionScores = {
+  section: "speaking"
+  fluency: number
+  pronunciation: number
+  content: number
+}
+
+export type WritingDimensionScores = {
+  section: "writing"
+  grammar: number
+  vocabulary: number
+  form: number
+  content: number
+}
+
+export type ReadingDimensionScores = {
+  section: "reading"
+  vocabulary: number
+  comprehension: number
+}
+
+export type DimensionScores = SpeakingDimensionScores | WritingDimensionScores | ReadingDimensionScores
+
+// LLM-as-Judge disagreement record
+export type JudgeLog = {
+  taskType: PteTaskType
+  divergedDimensions: Array<{ dimension: string; primaryScore: number; judgeScore: number }>
+  timestamp: string
+}
+
+// Per-dimension weakness entry (used in TaskTypeWeakness breakdown)
+export type DimensionWeakness = {
+  dimension: string
+  score: number  // 0–100, lower is weaker
+}
+
 // Generic Feedback Envelope — drives shared UI (history, stats, daily plan)
 export type TaskFeedback = {
   summary: string
@@ -30,6 +70,9 @@ export type TaskFeedback = {
   suggestions: string[]
   details?: TaskFeedbackDetails
   pronunciationAssessment?: PronunciationAssessmentResult
+  dimensionScores?: DimensionScores
+  coachSuggestions?: string[]
+  judgeLog?: JudgeLog
 }
 
 // Task-specific Feedback Details — narrowed by taskType inside each task component
@@ -75,6 +118,24 @@ export type ReTellLectureDetails = {
   fluency: string
 }
 
+export type FillInTheBlanksReadingDetails = {
+  taskType: "fill_in_the_blanks_reading"
+  accuracy: string
+  vocabulary: string
+}
+
+export type ReOrderParagraphsDetails = {
+  taskType: "re_order_paragraphs"
+  orderAccuracy: string
+  logicFeedback: string
+}
+
+export type MultipleChoiceReadingDetails = {
+  taskType: "multiple_choice_reading"
+  answerAccuracy: string
+  readingComprehension: string
+}
+
 export type TaskFeedbackDetails =
   | ReadAloudDetails
   | RepeatSentenceDetails
@@ -83,6 +144,9 @@ export type TaskFeedbackDetails =
   | DictationDetails
   | DescribeImageDetails
   | ReTellLectureDetails
+  | FillInTheBlanksReadingDetails
+  | ReOrderParagraphsDetails
+  | MultipleChoiceReadingDetails
 
 export type PracticeTask = {
   id: string
@@ -101,6 +165,7 @@ export type TaskTypeWeakness = {
   score: number        // 0–100, lower is weaker
   recentCount: number
   lastPracticed?: string
+  dimensions?: DimensionWeakness[]
 }
 
 // ── Legacy IELTS types (retained for backup compatibility) ────────────────────

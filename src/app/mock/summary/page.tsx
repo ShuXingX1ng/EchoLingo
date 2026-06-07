@@ -17,6 +17,9 @@ const TASK_LABELS: Record<PteTaskType, string> = {
   write_from_dictation: "Write from Dictation",
   describe_image: "Describe Image",
   re_tell_lecture: "Re-tell Lecture",
+  fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
+  re_order_paragraphs: "Re-order Paragraphs",
+  multiple_choice_reading: "Multiple Choice (Reading)",
 }
 
 const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
@@ -29,6 +32,9 @@ const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
   write_from_dictation: "/practice/write-from-dictation",
   describe_image: "/practice/describe-image",
   re_tell_lecture: "/practice/re-tell-lecture",
+  fill_in_the_blanks_reading: "/practice/fill-in-the-blanks",
+  re_order_paragraphs: "/practice/re-order-paragraphs",
+  multiple_choice_reading: "/practice/multiple-choice",
 }
 
 function formatDuration(seconds: number): string {

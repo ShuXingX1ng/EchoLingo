@@ -25,6 +25,8 @@
 | Phase 3: Practice infrastructure | Done | `/history` + `/stats` rewritten for PTE; `task-bank.ts` wired into all 6 task pages; 5s min-recording guard on all spoken tasks |
 | Phase 4: Mock exam | Done | `/mock` orchestrator (7-task PTE sequence, strict timing); `/mock/summary` (per-task breakdown, weaknesses, pronunciation avg); 7 `MockXxx` components in `src/components/mock/` |
 | Phase 5: Deferred task types | Done | `/practice/describe-image` (image bank, 25s prep, 40s record); `/practice/re-tell-lecture` (AI text → Azure TTS, play → 10s prep → 40s record); `src/lib/image-bank.ts`; API extended; `PteTaskType` + all lookup tables updated |
+| Phase 6: Agent Architecture (core pipeline) | Done | Scoring Agent + Coach Agent + LLM-as-Judge in `feedback/route.ts`; Diagnosis Agent (per-dimension) in `task-weakness.ts`; new types in `src/types/index.ts`; `TaskFeedbackDisplay` updated |
+| Phase 7: Reading section (3 task types) | Done | Fill in the Blanks, Re-order Paragraphs, Multiple Choice (Reading); `ReadingDimensionScores`; reading scoring in feedback pipeline; all lookup tables updated |
 
 ## Current Test Baseline
 
@@ -49,31 +51,31 @@
 
 ## Next Phase
 
-**Resume point (2026-06-07):** Phase 5 complete — Describe Image and Re-tell Lecture are live. Phase 6 (Agent Architecture) is next.
+**Resume point (2026-06-07):** Phase 7 (Reading section) fully complete. Phase 8 (Listening extended types) is next.
 
-What's done (Phase 5):
-- `src/app/practice/describe-image/page.tsx` — image bank stimulus, 25s prep timer, 40s recording, Web Speech transcript, AI feedback via `/api/pte/feedback`, `saveTask`
-- `src/app/practice/re-tell-lecture/page.tsx` — AI lecture text via `/api/pte/stimulus`, Azure TTS synthesis, play → 10s prep countdown → 40s recording, AI feedback, Task Bank caching
-- `src/lib/image-bank.ts` — 5 hardcoded public-domain image URLs (charts, maps) with topic/description metadata
-- `src/app/api/pte/stimulus/route.ts` — added `re_tell_lecture` prompt (110–130 word lecture excerpt)
-- `src/app/api/pte/feedback/route.ts` — added `describe_image` and `re_tell_lecture` system prompts and details schemas
-- `src/types/index.ts` — `PteTaskType` extended with `describe_image` and `re_tell_lecture`; `TaskStimulus.kind` extended with `"image"`; `DescribeImageDetails` and `ReTellLectureDetails` types added
-- All `Record<PteTaskType, string>` lookup tables updated in `history/page.tsx`, `stats/page.tsx`, `mock/summary/page.tsx`, `recommendations.ts`, `task-weakness.ts`
-- `/practice` hub: two new task cards added, "coming soon" note removed
+What's done (Phase 7 — full):
+- `src/types/index.ts` — `fill_in_the_blanks_reading`, `re_order_paragraphs`, `multiple_choice_reading` added to `PteTaskType`; `ReadingDimensionScores`; 3 new `TaskFeedbackDetails` subtypes
+- `src/app/api/pte/stimulus/route.ts` — JSON prompts + `response_format: json_object` + 800-token limit for reading task types
+- `src/app/api/pte/feedback/route.ts` — `SCORED_READING` set; reading system prompts, detail schemas, Judge prompt, score extraction, divergence check
+- `src/lib/task-weakness.ts` — `ALL_TASK_TYPES`, `scoreFromTask`, `aggregateDimensions` extended for reading
+- All `Record<PteTaskType, string>` lookups updated: `history/page.tsx`, `stats/page.tsx`, `mock/summary/page.tsx`, `recommendations.ts`
+- `src/components/TaskFeedbackDisplay.tsx` — `DimensionScoresBlock` + `DetailsBlock` extended for reading types
+- `src/app/practice/fill-in-the-blanks/page.tsx` — inline dropdown blanks, 7 min timer, task bank, saveTask
+- `src/app/practice/re-order-paragraphs/page.tsx` — HTML5 drag-and-drop + arrow button fallback, 3 min timer, task bank, saveTask
+- `src/app/practice/multiple-choice/page.tsx` — radio buttons, 5 options, 4 min timer, task bank, saveTask
+- `src/app/practice/page.tsx` — "Reading" section added with 3 task cards
 
-What's next (Phase 6 — Agent Architecture):
-- [ ] Scoring Agent — per-dimension scores (10–90, PTE-aligned); key file: `src/app/api/pte/feedback/route.ts`
-- [ ] Diagnosis Agent — Task-Type Weakness derivation; key file: `src/lib/task-weakness.ts`
-- [ ] Coach Agent — targeted suggestions per weak Task Type
-- [ ] LLM-as-Judge — independent re-evaluation; trigger when any dimension diverges > 15 points
-- [ ] Learner profile — Task-Type-keyed weakness profile driving adaptive task selection
+What's next (Phase 8 — Listening extended types):
+- [ ] Summarize Spoken Text — key file: `src/app/practice/summarize-spoken-text/page.tsx` (new); needs Azure TTS audio + transcript → written summary
+- [ ] Fill in the Blanks (Listening) — key file: `src/app/practice/fill-in-the-blanks-listening/page.tsx` (new); audio playback + dropdown blanks
+- [ ] Highlight Correct Summary — key file: `src/app/practice/highlight-correct-summary/page.tsx` (new); audio + select best summary from options
 
-Key files to open first:
-- `src/app/api/pte/feedback/route.ts` — feedback generation (Phase 6 Scoring Agent entry point)
-- `src/lib/task-weakness.ts` — existing weakness derivation logic (Phase 6 Diagnosis Agent entry point)
-- `src/app/practice/describe-image/page.tsx` — new Describe Image page
-- `src/app/practice/re-tell-lecture/page.tsx` — new Re-tell Lecture page
-- `src/lib/image-bank.ts` — image stimulus bank (expand URLs here when real assets are available)
+Key files to open first for Phase 8:
+- `src/types/index.ts` — extend `PteTaskType` and add new `TaskFeedbackDetails` subtypes
+- `src/app/api/pte/stimulus/route.ts` — add listening stimulus prompts
+- `src/app/api/pte/feedback/route.ts` — add listening system prompts + detail schemas
+- `src/app/practice/re-tell-lecture/page.tsx` — reference for Azure TTS + listen → respond pattern
+- `src/app/practice/fill-in-the-blanks/page.tsx` — reference for JSON stimulus parsing pattern
 
 ---
 
@@ -112,19 +114,24 @@ Each slice: stimulus display → timed response → AI feedback → save → his
 
 ### Phase 6 — Agent Architecture (Portfolio Design)
 
-Design complete (see `docs/agent-architecture.md` and `docs/PROJECT_CONTEXT.md`). Implementation pending.
+- [x] Scoring Agent — per-dimension scores (0–100 internal scale, for reference only); speaking: fluency/pronunciation/content; writing: grammar/vocabulary/form/content
+- [x] Diagnosis Agent — `aggregateDimensions` in `task-weakness.ts`; `TaskTypeWeakness.dimensions` populated
+- [x] Coach Agent — `coachSuggestions` in feedback response; targeted per-dimension tips
+- [x] LLM-as-Judge — independent parallel call; >15-point divergence triggers retry + `judgeLog`
+- [x] Learner profile — `WeaknessBar` expandable sub-dimension bars; "Learner Profile" section with SVG radar + speaking/writing tab; target slider + gap analysis
+- [x] Learning trajectory visualisation — radar chart overlay (actual vs target); score trajectory line chart per task type with pill selector
 
-- [ ] Scoring Agent — per-dimension scores (10–90, PTE-aligned); Speaking scores labelled "for reference only"
-- [ ] Diagnosis Agent — Task-Type Weakness derivation (already partially implemented in `task-weakness.ts`)
-- [ ] Coach Agent — targeted suggestions per weak Task Type
-- [ ] LLM-as-Judge — independent re-evaluation; trigger when any dimension diverges > 15 points; log disagreement cases
-- [ ] Learner profile — Task-Type-keyed weakness profile driving adaptive task selection
-- [ ] Learning trajectory visualisation — radar chart, progress curve, gap analysis vs. target score
+### Phase 7 — Extended Task Types (Reading) ✅
 
-### Phase 7 — Extended Task Types (Planned)
+- [x] Reading section: Fill in the Blanks — `/practice/fill-in-the-blanks`
+- [x] Reading section: Re-order Paragraphs — `/practice/re-order-paragraphs`
+- [x] Reading section: Multiple Choice — `/practice/multiple-choice`
 
-- [ ] Reading section: Fill in the Blanks, Re-order Paragraphs, Multiple Choice
-- [ ] Listening section: Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary
+### Phase 8 — Extended Task Types (Listening, Planned)
+
+- [ ] Summarize Spoken Text — `/practice/summarize-spoken-text`
+- [ ] Fill in the Blanks (Listening) — `/practice/fill-in-the-blanks-listening`
+- [ ] Highlight Correct Summary — `/practice/highlight-correct-summary`
 
 ## Future / Backlog
 

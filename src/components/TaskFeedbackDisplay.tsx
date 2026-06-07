@@ -1,7 +1,7 @@
 "use client"
 
 import PronunciationFeedback from "@/components/PronunciationFeedback"
-import type { TaskFeedback } from "@/types"
+import type { TaskFeedback, DimensionScores } from "@/types"
 
 interface Props {
   feedback: TaskFeedback
@@ -58,6 +58,10 @@ export default function TaskFeedbackDisplay({
         </div>
       )}
 
+      {feedback.dimensionScores && (
+        <DimensionScoresBlock scores={feedback.dimensionScores} />
+      )}
+
       <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">AI Feedback</p>
 
@@ -103,6 +107,21 @@ export default function TaskFeedbackDisplay({
             </ul>
           </div>
         )}
+
+        {feedback.coachSuggestions && feedback.coachSuggestions.length > 0 && (
+          <div className="border-t border-slate-100 dark:border-white/10 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600 dark:text-blue-400 mb-2">
+              Targeted Coaching
+            </p>
+            <ul className="space-y-1">
+              {feedback.coachSuggestions.map((s, i) => (
+                <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <span className="text-blue-400 shrink-0">→</span>{s}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -121,17 +140,66 @@ function ScoreBadge({ score }: { score: number }) {
   )
 }
 
+function DimensionScoresBlock({ scores }: { scores: DimensionScores }) {
+  let dims: Array<{ label: string; score: number }> = []
+  if (scores.section === "speaking") {
+    dims = [
+      { label: "Fluency", score: scores.fluency },
+      { label: "Pronunciation", score: scores.pronunciation },
+      { label: "Content", score: scores.content },
+    ]
+  } else if (scores.section === "writing") {
+    dims = [
+      { label: "Grammar", score: scores.grammar },
+      { label: "Vocabulary", score: scores.vocabulary },
+      { label: "Form", score: scores.form },
+      { label: "Content", score: scores.content },
+    ]
+  } else if (scores.section === "reading") {
+    dims = [
+      { label: "Vocabulary", score: scores.vocabulary },
+      { label: "Comprehension", score: scores.comprehension },
+    ]
+  }
+
+  return (
+    <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+      <div className="flex items-baseline justify-between mb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Dimension Scores
+        </p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">for reference only</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        {dims.map(({ label, score }) => (
+          <div key={label} className="text-center">
+            <ScoreBadge score={score} />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function DetailsBlock({ details }: { details: NonNullable<TaskFeedback["details"]> }) {
   const rows: Array<{ label: string; value: string }> = []
 
   if ("oralFluency" in details) rows.push({ label: "Oral Fluency", value: details.oralFluency })
   if ("pronunciation" in details) rows.push({ label: "Pronunciation", value: details.pronunciation })
   if ("contentAccuracy" in details) rows.push({ label: "Content Accuracy", value: details.contentAccuracy })
+  if ("contentCoverage" in details) rows.push({ label: "Content Coverage", value: details.contentCoverage })
+  if ("fluency" in details) rows.push({ label: "Fluency", value: details.fluency })
   if ("wordAccuracy" in details && details.wordAccuracy) rows.push({ label: "Word Accuracy", value: details.wordAccuracy })
   if ("content" in details && details.content) rows.push({ label: "Content", value: details.content })
   if ("grammar" in details && details.grammar) rows.push({ label: "Grammar", value: details.grammar })
   if ("vocabulary" in details && details.vocabulary) rows.push({ label: "Vocabulary", value: details.vocabulary })
   if ("structure" in details && details.structure) rows.push({ label: "Structure", value: details.structure })
+  if ("accuracy" in details) rows.push({ label: "Accuracy", value: details.accuracy })
+  if ("orderAccuracy" in details) rows.push({ label: "Order Accuracy", value: details.orderAccuracy })
+  if ("logicFeedback" in details) rows.push({ label: "Text Logic", value: details.logicFeedback })
+  if ("answerAccuracy" in details) rows.push({ label: "Answer Accuracy", value: details.answerAccuracy })
+  if ("readingComprehension" in details) rows.push({ label: "Reading Comprehension", value: details.readingComprehension })
 
   if (rows.length === 0) return null
 

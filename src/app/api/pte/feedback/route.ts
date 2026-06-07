@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server"
-import type { PteTaskType, TaskFeedback, PronunciationAssessmentResult } from "@/types"
+import type {
+  PteTaskType,
+  TaskFeedback,
+  PronunciationAssessmentResult,
+  DimensionScores,
+  ReadingDimensionScores,
+  JudgeLog,
+} from "@/types"
 
 const API_TIMEOUT = 60000
+const JUDGE_TIMEOUT = 30000
 
 type LlmResponse = {
   choices?: Array<{ message?: { content?: string } }>
@@ -10,7 +18,29 @@ type LlmResponse = {
   message?: string
 }
 
-// PTE-specific system prompts per task type
+// Speaking task types that receive per-dimension scoring
+const SCORED_SPEAKING = new Set<PteTaskType>([
+  "read_aloud",
+  "repeat_sentence",
+  "answer_short_question",
+  "describe_image",
+  "re_tell_lecture",
+])
+
+// Writing task types that receive per-dimension scoring
+const SCORED_WRITING = new Set<PteTaskType>([
+  "summarize_written_text",
+  "write_essay",
+])
+
+// Reading task types that receive per-dimension scoring
+const SCORED_READING = new Set<PteTaskType>([
+  "fill_in_the_blanks_reading",
+  "re_order_paragraphs",
+  "multiple_choice_reading",
+])
+
+// PTE-specific examiner prompts per task type
 const SYSTEM_PROMPTS: Record<PteTaskType, string> = {
   repeat_sentence: `You are a PTE Academic examiner evaluating a Repeat Sentence response.
 The candidate listened to a sentence once and attempted to repeat it verbatim.
@@ -51,19 +81,21 @@ A strong response names the image type, identifies the main subject, highlights 
 The candidate listened to a short lecture (~60 seconds), had 10 seconds to prepare, then had 40 seconds to re-tell it aloud.
 Criteria: Content Accuracy (did they capture the main points and key details from the lecture?), Oral Fluency, Pronunciation.
 A strong response identifies the topic, covers the main argument and supporting points in sequence, and uses appropriate academic language.`,
+
+  fill_in_the_blanks_reading: `You are a PTE Academic examiner evaluating a Fill in the Blanks (Reading) response.
+The stimulus shows the passage with the correct answers marked. The response shows which options the learner selected and whether each was correct.
+Focus on: accuracy (which blanks were correct and which were wrong), vocabulary understanding in context, and patterns in errors.`,
+
+  re_order_paragraphs: `You are a PTE Academic examiner evaluating a Re-order Paragraphs response.
+The stimulus shows the paragraphs in correct order. The response shows the learner's submitted order.
+Focus on: how many paragraphs were in the correct position, understanding of discourse markers and paragraph cohesion, and logical flow comprehension.`,
+
+  multiple_choice_reading: `You are a PTE Academic examiner evaluating a Multiple Choice (Reading) response.
+The stimulus shows the passage, question, and all options. The response shows the learner's selection and whether it was correct.
+Focus on: reading comprehension accuracy, understanding of main idea vs supporting details, and any misconceptions revealed by the wrong choice if applicable.`,
 }
 
-const JSON_SCHEMA = `
-You MUST respond with valid JSON only. No markdown, no code blocks.
-Return exactly:
-{
-  "summary": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength1>", "<strength2>"],
-  "weaknesses": ["<weakness1>", "<weakness2>"],
-  "suggestions": ["<suggestion1>", "<suggestion2>"],
-  "details": { /* task-specific details per schema below */ }
-}`
-
+// Task-specific details schema strings (embedded in JSON output template)
 const DETAILS_SCHEMA: Record<PteTaskType, string> = {
   repeat_sentence: `"details": { "taskType": "repeat_sentence", "oralFluency": "<feedback>", "pronunciation": "<feedback>" }`,
   answer_short_question: `"details": { "taskType": "answer_short_question", "contentAccuracy": "<was the answer correct? what was right/wrong?>" }`,
@@ -74,6 +106,84 @@ const DETAILS_SCHEMA: Record<PteTaskType, string> = {
   read_aloud: `"details": { "taskType": "read_aloud", "oralFluency": "<feedback>", "pronunciation": "<feedback>" }`,
   describe_image: `"details": { "taskType": "describe_image", "contentCoverage": "<did they identify image type and key features/trends/comparisons?>", "fluency": "<oral fluency and delivery feedback>" }`,
   re_tell_lecture: `"details": { "taskType": "re_tell_lecture", "contentAccuracy": "<which key points did they capture or miss from the lecture?>", "fluency": "<oral fluency and delivery feedback>" }`,
+  fill_in_the_blanks_reading: `"details": { "taskType": "fill_in_the_blanks_reading", "accuracy": "<which blanks were correct and which were wrong, with explanations>", "vocabulary": "<vocabulary-in-context understanding feedback>" }`,
+  re_order_paragraphs: `"details": { "taskType": "re_order_paragraphs", "orderAccuracy": "<how many paragraphs were in the correct position and which were misplaced>", "logicFeedback": "<feedback on their understanding of text cohesion and discourse structure>" }`,
+  multiple_choice_reading: `"details": { "taskType": "multiple_choice_reading", "answerAccuracy": "<was the answer correct and why the correct option is right>", "readingComprehension": "<feedback on their reading comprehension approach and any misconceptions>" }`,
+}
+
+// Build the primary LLM call output schema — includes dimension scores and coach suggestions for scored tasks
+function buildPrimarySchema(taskType: PteTaskType): string {
+  const details = DETAILS_SCHEMA[taskType]
+
+  if (SCORED_SPEAKING.has(taskType)) {
+    return `You MUST respond with valid JSON only. No markdown, no code blocks.
+Return exactly:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<general tip1>", "<general tip2>"],
+  ${details},
+  "dimensionScores": { "section": "speaking", "fluency": <0-100>, "pronunciation": <0-100>, "content": <0-100> },
+  "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+}`
+  }
+
+  if (SCORED_WRITING.has(taskType)) {
+    return `You MUST respond with valid JSON only. No markdown, no code blocks.
+Return exactly:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<general tip1>", "<general tip2>"],
+  ${details},
+  "dimensionScores": { "section": "writing", "grammar": <0-100>, "vocabulary": <0-100>, "form": <0-100>, "content": <0-100> },
+  "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+}`
+  }
+
+  if (SCORED_READING.has(taskType)) {
+    return `You MUST respond with valid JSON only. No markdown, no code blocks.
+Return exactly:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<general tip1>", "<general tip2>"],
+  ${details},
+  "dimensionScores": { "section": "reading", "vocabulary": <0-100>, "comprehension": <0-100> },
+  "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+}`
+  }
+
+  // personal_intro and write_from_dictation: no dimension scores
+  return `You MUST respond with valid JSON only. No markdown, no code blocks.
+Return exactly:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<suggestion1>", "<suggestion2>"],
+  ${details}
+}`
+}
+
+// Build the independent Judge call system prompt — scores dimensions only, no access to primary result
+function buildJudgeSystemPrompt(taskType: PteTaskType): string | null {
+  if (SCORED_SPEAKING.has(taskType)) {
+    return `You are an independent PTE Academic examiner. Score the fluency, pronunciation, and content of the spoken response on a 0–100 scale. Return ONLY valid JSON, no other text:
+{"dimensionScores": {"section": "speaking", "fluency": <0-100>, "pronunciation": <0-100>, "content": <0-100>}}`
+  }
+  if (SCORED_WRITING.has(taskType)) {
+    return `You are an independent PTE Academic examiner. Score the grammar, vocabulary, form, and content of the written response on a 0–100 scale. Return ONLY valid JSON, no other text:
+{"dimensionScores": {"section": "writing", "grammar": <0-100>, "vocabulary": <0-100>, "form": <0-100>, "content": <0-100>}}`
+  }
+  if (SCORED_READING.has(taskType)) {
+    return `You are an independent PTE Academic examiner. Score the vocabulary and comprehension aspects of the reading response on a 0–100 scale. Return ONLY valid JSON, no other text:
+{"dimensionScores": {"section": "reading", "vocabulary": <0-100>, "comprehension": <0-100>}}`
+  }
+  return null
 }
 
 function extractText(data: LlmResponse): string {
@@ -84,9 +194,120 @@ function extractText(data: LlmResponse): string {
   return ""
 }
 
+async function callLLM(
+  systemPrompt: string,
+  userContent: string,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  maxTokens = 1200,
+  timeoutMs = API_TIMEOUT,
+): Promise<string> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.3,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error(`LLM API error (${res.status})`)
+    const data = (await res.json()) as LlmResponse
+    return extractText(data).trim()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function tryParseJson(raw: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match) {
+      try {
+        return JSON.parse(match[0]) as Record<string, unknown>
+      } catch { /* fall through */ }
+    }
+  }
+  return null
+}
+
+function extractDimensionScores(parsed: Record<string, unknown>): DimensionScores | null {
+  const ds = parsed.dimensionScores as Record<string, unknown> | undefined
+  if (!ds || typeof ds !== "object") return null
+
+  if (
+    ds.section === "speaking" &&
+    typeof ds.fluency === "number" &&
+    typeof ds.pronunciation === "number" &&
+    typeof ds.content === "number"
+  ) {
+    return { section: "speaking", fluency: ds.fluency, pronunciation: ds.pronunciation, content: ds.content }
+  }
+
+  if (
+    ds.section === "writing" &&
+    typeof ds.grammar === "number" &&
+    typeof ds.vocabulary === "number" &&
+    typeof ds.form === "number" &&
+    typeof ds.content === "number"
+  ) {
+    return { section: "writing", grammar: ds.grammar, vocabulary: ds.vocabulary, form: ds.form, content: ds.content }
+  }
+
+  if (
+    ds.section === "reading" &&
+    typeof ds.vocabulary === "number" &&
+    typeof ds.comprehension === "number"
+  ) {
+    return { section: "reading", vocabulary: ds.vocabulary, comprehension: ds.comprehension } as ReadingDimensionScores
+  }
+
+  return null
+}
+
+function findDivergences(
+  primary: DimensionScores,
+  judge: DimensionScores,
+): Array<{ dimension: string; primaryScore: number; judgeScore: number }> {
+  if (primary.section !== judge.section) return []
+
+  const diverged: Array<{ dimension: string; primaryScore: number; judgeScore: number }> = []
+
+  if (primary.section === "speaking" && judge.section === "speaking") {
+    for (const dim of ["fluency", "pronunciation", "content"] as const) {
+      const diff = Math.abs(primary[dim] - judge[dim])
+      if (diff > 15) diverged.push({ dimension: dim, primaryScore: primary[dim], judgeScore: judge[dim] })
+    }
+  } else if (primary.section === "writing" && judge.section === "writing") {
+    for (const dim of ["grammar", "vocabulary", "form", "content"] as const) {
+      const diff = Math.abs(primary[dim] - judge[dim])
+      if (diff > 15) diverged.push({ dimension: dim, primaryScore: primary[dim], judgeScore: judge[dim] })
+    }
+  } else if (primary.section === "reading" && judge.section === "reading") {
+    for (const dim of ["vocabulary", "comprehension"] as const) {
+      const diff = Math.abs(primary[dim] - judge[dim])
+      if (diff > 15) diverged.push({ dimension: dim, primaryScore: primary[dim], judgeScore: judge[dim] })
+    }
+  }
+
+  return diverged
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       taskType: PteTaskType
       stimulus: string
       response: string
@@ -107,11 +328,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "LLM API configuration missing" }, { status: 500 })
     }
 
-    const systemPrompt = [
+    const isScored = SCORED_SPEAKING.has(taskType) || SCORED_WRITING.has(taskType) || SCORED_READING.has(taskType)
+
+    const primarySystemPrompt = [
       SYSTEM_PROMPTS[taskType],
-      JSON_SCHEMA,
-      `Use this details schema: ${DETAILS_SCHEMA[taskType]}`,
-    ].join("\n\n")
+      buildPrimarySchema(taskType),
+      isScored
+        ? "Dimension scores are 0–100 internal reference values only — they do not represent official PTE Academic scores."
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
 
     const pronunciationCtx = pronunciationAssessment
       ? `\n\nAzure Pronunciation scores — Overall: ${pronunciationAssessment.score}, ` +
@@ -123,56 +350,63 @@ export async function POST(request: Request) {
       ? `Stimulus:\n${stimulus}\n\nCandidate response:\n${candidateResponse}${pronunciationCtx}`
       : `Candidate response:\n${candidateResponse}${pronunciationCtx}`
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+    const judgeSystemPrompt = buildJudgeSystemPrompt(taskType)
 
-    let res: Response
-    try {
-      res = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-          temperature: 0.3,
-          max_tokens: 900,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timeoutId)
-    }
+    // Primary call and Judge call run in parallel; Judge failure is non-fatal
+    const [primaryContent, judgeContent] = await Promise.all([
+      callLLM(primarySystemPrompt, userContent, apiKey, baseUrl, model, 1200),
+      judgeSystemPrompt
+        ? callLLM(judgeSystemPrompt, userContent, apiKey, baseUrl, model, 200, JUDGE_TIMEOUT).catch(
+            () => null,
+          )
+        : Promise.resolve(null),
+    ])
 
-    if (!res.ok) {
-      return NextResponse.json({ error: `LLM API error (${res.status})` }, { status: 502 })
-    }
-
-    const data = (await res.json()) as LlmResponse
-    const content = extractText(data).trim()
-
-    if (!content) {
+    if (!primaryContent) {
       return NextResponse.json({ error: "Empty response from LLM" }, { status: 502 })
     }
 
-    const parse = (raw: string): TaskFeedback => {
-      const parsed = JSON.parse(raw) as TaskFeedback
-      if (pronunciationAssessment) parsed.pronunciationAssessment = pronunciationAssessment
-      return parsed
-    }
-
-    try {
-      return NextResponse.json(parse(content))
-    } catch {
-      const match = content.match(/\{[\s\S]*\}/)
-      if (match) {
-        try { return NextResponse.json(parse(match[0])) } catch { /* fall through */ }
-      }
+    let primaryParsed = tryParseJson(primaryContent)
+    if (!primaryParsed) {
       return NextResponse.json({ error: "Invalid feedback format from LLM" }, { status: 502 })
     }
+
+    // LLM-as-Judge: compare dimension scores; retry primary if any dimension diverges > 15 points
+    let judgeLog: JudgeLog | undefined
+    if (judgeContent && judgeSystemPrompt) {
+      const judgeParsed = tryParseJson(judgeContent)
+      if (judgeParsed) {
+        const primaryScores = extractDimensionScores(primaryParsed)
+        const judgeScores = extractDimensionScores(judgeParsed)
+        if (primaryScores && judgeScores) {
+          const diverged = findDivergences(primaryScores, judgeScores)
+          if (diverged.length > 0) {
+            judgeLog = { taskType, divergedDimensions: diverged, timestamp: new Date().toISOString() }
+            console.log("[LLM-as-Judge] Dimension disagreement — retrying primary:", judgeLog)
+            try {
+              const retryContent = await callLLM(
+                primarySystemPrompt,
+                userContent,
+                apiKey,
+                baseUrl,
+                model,
+                1200,
+              )
+              const retryParsed = tryParseJson(retryContent)
+              if (retryParsed) primaryParsed = retryParsed
+            } catch {
+              // Retry failed — original primary result is kept; judgeLog is still attached
+            }
+          }
+        }
+      }
+    }
+
+    const feedback = primaryParsed as TaskFeedback
+    if (pronunciationAssessment) feedback.pronunciationAssessment = pronunciationAssessment
+    if (judgeLog) feedback.judgeLog = judgeLog
+
+    return NextResponse.json(feedback)
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json({ error: "Feedback generation timed out" }, { status: 504 })

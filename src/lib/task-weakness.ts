@@ -1,4 +1,4 @@
-import type { PracticeTask, PteTaskType, TaskTypeWeakness } from "@/types"
+import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
 
 const ALL_TASK_TYPES: PteTaskType[] = [
   "read_aloud",
@@ -10,18 +10,35 @@ const ALL_TASK_TYPES: PteTaskType[] = [
   "write_from_dictation",
   "describe_image",
   "re_tell_lecture",
+  "fill_in_the_blanks_reading",
+  "re_order_paragraphs",
+  "multiple_choice_reading",
 ]
 
-// Heuristic performance score from feedback (0–100)
+// Overall performance score from a single task (0–100).
+// Uses actual dimension scores when available (Phase 6); falls back to strengths/weaknesses heuristic.
 function scoreFromTask(task: PracticeTask): number | null {
   const feedback = task.feedback
   if (!feedback) return null
 
+  const ds = feedback.dimensionScores
+  if (ds) {
+    if (ds.section === "speaking") {
+      return Math.round((ds.fluency + ds.pronunciation + ds.content) / 3)
+    }
+    if (ds.section === "writing") {
+      return Math.round((ds.grammar + ds.vocabulary + ds.form + ds.content) / 4)
+    }
+    if (ds.section === "reading") {
+      return Math.round((ds.vocabulary + ds.comprehension) / 2)
+    }
+  }
+
+  // Fallback heuristic: proportion of strengths vs weaknesses
   const strengths = feedback.strengths.length
   const weaknesses = feedback.weaknesses.length
   const total = strengths + weaknesses
   if (total === 0) return 50
-
   return Math.round((strengths / total) * 100)
 }
 
@@ -32,6 +49,53 @@ function recencyWeight(createdAt: string): number {
   if (ageDays <= 14) return 0.75
   if (ageDays <= 30) return 0.5
   return 0.25
+}
+
+// Aggregate per-dimension weakness from a group of tasks using recency weighting.
+// Returns undefined if no task in the group has dimension scores.
+function aggregateDimensions(tasks: PracticeTask[]): DimensionWeakness[] | undefined {
+  const dimMap = new Map<string, { weightedSum: number; totalWeight: number }>()
+
+  for (const task of tasks) {
+    const ds = task.feedback?.dimensionScores
+    if (!ds) continue
+
+    const weight = recencyWeight(task.createdAt)
+    let entries: Array<[string, number]> = []
+    if (ds.section === "speaking") {
+      entries = [
+        ["fluency", ds.fluency],
+        ["pronunciation", ds.pronunciation],
+        ["content", ds.content],
+      ]
+    } else if (ds.section === "writing") {
+      entries = [
+        ["grammar", ds.grammar],
+        ["vocabulary", ds.vocabulary],
+        ["form", ds.form],
+        ["content", ds.content],
+      ]
+    } else if (ds.section === "reading") {
+      entries = [
+        ["vocabulary", ds.vocabulary],
+        ["comprehension", ds.comprehension],
+      ]
+    }
+
+    for (const [dim, score] of entries) {
+      const entry = dimMap.get(dim) ?? { weightedSum: 0, totalWeight: 0 }
+      entry.weightedSum += score * weight
+      entry.totalWeight += weight
+      dimMap.set(dim, entry)
+    }
+  }
+
+  if (dimMap.size === 0) return undefined
+
+  return Array.from(dimMap.entries()).map(([dimension, { weightedSum, totalWeight }]) => ({
+    dimension,
+    score: Math.round(weightedSum / totalWeight),
+  }))
 }
 
 export function deriveTaskTypeWeakness(tasks: PracticeTask[]): TaskTypeWeakness[] {
@@ -49,12 +113,12 @@ export function deriveTaskTypeWeakness(tasks: PracticeTask[]): TaskTypeWeakness[
     if (scored.length > 0) {
       const totalWeight = scored.reduce((sum, s) => sum + s.weight, 0)
       aggregateScore = Math.round(
-        scored.reduce((sum, s) => sum + s.score * s.weight, 0) / totalWeight
+        scored.reduce((sum, s) => sum + s.score * s.weight, 0) / totalWeight,
       )
     }
 
     const sorted = [...group].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
 
     return {
@@ -62,6 +126,7 @@ export function deriveTaskTypeWeakness(tasks: PracticeTask[]): TaskTypeWeakness[
       score: aggregateScore,
       recentCount: group.length,
       lastPracticed: sorted[0]?.createdAt,
+      dimensions: aggregateDimensions(group),
     }
   })
 }

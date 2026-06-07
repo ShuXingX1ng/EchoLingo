@@ -85,9 +85,33 @@ const TASK_CARDS: TaskCard[] = [
     timer: "~30s",
     azure: false,
   },
+  {
+    href: "/practice/fill-in-the-blanks",
+    section: "Reading",
+    title: "Fill in the Blanks",
+    desc: "Read an academic passage and select the correct word from a dropdown for each blank.",
+    timer: "7 min",
+    azure: false,
+  },
+  {
+    href: "/practice/re-order-paragraphs",
+    section: "Reading",
+    title: "Re-order Paragraphs",
+    desc: "Drag shuffled paragraph tiles into the correct logical order.",
+    timer: "3 min",
+    azure: false,
+  },
+  {
+    href: "/practice/multiple-choice",
+    section: "Reading",
+    title: "Multiple Choice",
+    desc: "Read a passage and select the one correct answer from five options.",
+    timer: "4 min",
+    azure: false,
+  },
 ]
 
-const SECTIONS = ["Speaking", "Writing", "Listening"] as const
+const SECTIONS = ["Speaking", "Writing", "Reading", "Listening"] as const
 
 export default function PracticeHubPage() {
   return (

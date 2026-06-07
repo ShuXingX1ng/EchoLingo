@@ -171,6 +171,9 @@ export const PTE_TASK_LABELS: Record<PteTaskType, string> = {
   write_from_dictation: "Write from Dictation",
   describe_image: "Describe Image",
   re_tell_lecture: "Re-tell Lecture",
+  fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
+  re_order_paragraphs: "Re-order Paragraphs",
+  multiple_choice_reading: "Multiple Choice (Reading)",
 }
 
 export interface PteRecommendation {
