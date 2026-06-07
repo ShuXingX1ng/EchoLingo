@@ -1,6 +1,9 @@
 import { TOPICS, type Topic, getCategories } from "./topics";
 import { getUserProgress, type LearningProgress } from "./supabase-progress";
 import { getWeakSkills as getSupabaseWeakSkills, getTopErrorForSkill as getSupabaseTopError } from "./supabase-error-patterns";
+import type { PteTaskType, TaskTypeWeakness } from "@/types";
+import { getTasks } from "./unified-task-history";
+import { deriveTaskTypeWeakness, rankWeaknesses, ALL_TASK_TYPES } from "./task-weakness";
 
 export interface Recommendation {
   topic: Topic;
@@ -154,4 +157,65 @@ export async function getRecommendations(userId: string): Promise<Recommendation
 
   // Sort by priority and return top 6
   return recommendations.sort((a, b) => a.priority - b.priority).slice(0, 6);
+}
+
+// ── PTE recommendations ───────────────────────────────────────────────────────
+
+export const PTE_TASK_LABELS: Record<PteTaskType, string> = {
+  read_aloud: "Read Aloud",
+  repeat_sentence: "Repeat Sentence",
+  answer_short_question: "Answer Short Question",
+  summarize_written_text: "Summarize Written Text",
+  write_essay: "Write Essay",
+  personal_intro: "Personal Introduction",
+  write_from_dictation: "Write from Dictation",
+  describe_image: "Describe Image",
+  re_tell_lecture: "Re-tell Lecture",
+}
+
+export interface PteRecommendation {
+  taskType: PteTaskType
+  label: string
+  reason: string
+  priority: number
+  weakness?: TaskTypeWeakness
+}
+
+// Returns task types the logged-in user should practise next, ranked by weakness.
+// Falls back to the full ordered task list when there is no PracticeTask history.
+export async function getPteRecommendations(userId: string): Promise<PteRecommendation[]> {
+  const tasks = await getTasks()
+
+  if (tasks.length === 0) {
+    return ALL_TASK_TYPES.map((taskType, i) => ({
+      taskType,
+      label: PTE_TASK_LABELS[taskType],
+      reason: "Start practising this task type",
+      priority: i + 1,
+    }))
+  }
+
+  const weaknesses = deriveTaskTypeWeakness(tasks)
+  const ranked = rankWeaknesses(weaknesses)
+
+  return ranked.map((w, i) => {
+    let reason: string
+    if (w.recentCount === 0) {
+      reason = "You haven't tried this task type yet"
+    } else if (w.score < 40) {
+      reason = `Needs work — low recent performance (score ${w.score}/100)`
+    } else if (w.score < 65) {
+      reason = `Room to improve (score ${w.score}/100)`
+    } else {
+      reason = `Keep practising to maintain your progress`
+    }
+
+    return {
+      taskType: w.taskType,
+      label: PTE_TASK_LABELS[w.taskType],
+      reason,
+      priority: i + 1,
+      weakness: w,
+    }
+  })
 }

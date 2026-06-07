@@ -27,7 +27,7 @@ export default function DesktopNav({
 
   const links: { key: NavItem; href: string; label: string }[] = [
     { key: "home", href: "/", label: t("nav.home") },
-    { key: "practice", href: "/practice/setup", label: t("nav.practice") },
+    { key: "practice", href: "/practice", label: t("nav.practice") },
     { key: "stats", href: "/stats", label: t("nav.stats") },
     { key: "history", href: "/history", label: t("nav.history") },
     { key: "settings", href: "/settings", label: t("nav.settings") },

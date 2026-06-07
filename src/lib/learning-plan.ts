@@ -6,7 +6,7 @@ import { getUserProgress, type LearningProgress } from "./supabase-progress";
 
 export interface DailyTask {
   id: string;
-  type: "practice" | "shadowing" | "review";
+  type: "practice" | "review";
   title: string;
   description: string;
   reason: string;
@@ -85,11 +85,6 @@ function hasPracticedToday(sessions: SessionRecord[]): boolean {
   return sessions.some((s) => isSessionToday(s.created_at));
 }
 
-// Check if user did shadowing today
-function hasShadowedToday(sessions: SessionRecord[]): boolean {
-  return sessions.some((s) => s.mode === "shadowing" && isSessionToday(s.created_at));
-}
-
 // Generate practice task for a topic
 function createPracticeTask(topicId: string, part: "part1" | "part2" | "part3", reason: string): DailyTask {
   const topic = TOPICS.find((t) => t.id === topicId);
@@ -109,20 +104,6 @@ function createPracticeTask(topicId: string, part: "part1" | "part2" | "part3", 
     part,
     status: "pending",
     link: `/practice/setup?mode=${part}&topic=${topicId}`,
-  };
-}
-
-// Generate shadowing task
-function createShadowingTask(): DailyTask {
-  return {
-    id: "shadowing_daily",
-    type: "shadowing",
-    title: "Pronunciation Practice",
-    description: "Shadow 5 sentences to improve pronunciation",
-    reason: "Build fluency and natural rhythm through repetition",
-    targetCount: 5,
-    status: "pending",
-    link: "/practice/shadowing",
   };
 }
 
@@ -153,7 +134,6 @@ export async function generateDailyTasks(userId: string): Promise<DailyTask[]> {
 
   const tasks: DailyTask[] = [];
   const practicedToday = hasPracticedToday(sessions);
-  const shadowedToday = hasShadowedToday(sessions);
 
   // 1. Practice tasks (2-3)
   const unpracticed = getUnpracticedTopics(progress);
@@ -172,12 +152,7 @@ export async function generateDailyTasks(userId: string): Promise<DailyTask[]> {
     }
   }
 
-  // 2. Shadowing task (1)
-  if (!shadowedToday) {
-    tasks.push(createShadowingTask());
-  }
-
-  // 3. Review task (0-1)
+  // 2. Review task (0-1)
   const lowScoreTopics = getLowScoreTopics(progress);
   if (lowScoreTopics.length > 0 && !practicedToday) {
     const worst = lowScoreTopics[0];

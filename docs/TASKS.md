@@ -23,6 +23,8 @@
 | Phase 2a: Read Aloud vertical slice | Done | `/practice/read-aloud`, `/api/read-aloud/stimulus`, `/api/read-aloud/feedback`, WAV conversion, parallel Azure + AI, saveTask |
 | Phase 2b: All remaining task slices | Done | All 7 task routes live; shared `/api/pte/stimulus` + `/api/pte/feedback`; `TaskFeedbackDisplay`; `wav-encoder`; `/practice` hub page |
 | Phase 3: Practice infrastructure | Done | `/history` + `/stats` rewritten for PTE; `task-bank.ts` wired into all 6 task pages; 5s min-recording guard on all spoken tasks |
+| Phase 4: Mock exam | Done | `/mock` orchestrator (7-task PTE sequence, strict timing); `/mock/summary` (per-task breakdown, weaknesses, pronunciation avg); 7 `MockXxx` components in `src/components/mock/` |
+| Phase 5: Deferred task types | Done | `/practice/describe-image` (image bank, 25s prep, 40s record); `/practice/re-tell-lecture` (AI text → Azure TTS, play → 10s prep → 40s record); `src/lib/image-bank.ts`; API extended; `PteTaskType` + all lookup tables updated |
 
 ## Current Test Baseline
 
@@ -47,27 +49,31 @@
 
 ## Next Phase
 
-**Resume point (2026-06-07):** Phase 3 fully complete. Phase 4 (Mock Exam) is next — `/mock` entry point and orchestrator are not yet built.
+**Resume point (2026-06-07):** Phase 5 complete — Describe Image and Re-tell Lecture are live. Phase 6 (Agent Architecture) is next.
 
-What's done (Phase 3):
-- `/history` rewritten — `PracticeTask` records, task-type filter, search, detail view, CSV/JSON export
-- `/stats` rewritten — task-type weakness `WeaknessBar` rows, practice distribution, weekly activity
-- `src/lib/task-bank.ts` created and wired into all 6 generating task pages
-- 5s min-recording guard on all 4 spoken task pages (Stop/Done button disabled + countdown label)
-- `clearAllTasksLocal` added to `src/lib/unified-task-history.ts`
-- Supabase `practice_tasks` SQL documented in `src/lib/supabase-task-history.ts` — **must be applied manually via Supabase SQL editor before cloud save works**
+What's done (Phase 5):
+- `src/app/practice/describe-image/page.tsx` — image bank stimulus, 25s prep timer, 40s recording, Web Speech transcript, AI feedback via `/api/pte/feedback`, `saveTask`
+- `src/app/practice/re-tell-lecture/page.tsx` — AI lecture text via `/api/pte/stimulus`, Azure TTS synthesis, play → 10s prep countdown → 40s recording, AI feedback, Task Bank caching
+- `src/lib/image-bank.ts` — 5 hardcoded public-domain image URLs (charts, maps) with topic/description metadata
+- `src/app/api/pte/stimulus/route.ts` — added `re_tell_lecture` prompt (110–130 word lecture excerpt)
+- `src/app/api/pte/feedback/route.ts` — added `describe_image` and `re_tell_lecture` system prompts and details schemas
+- `src/types/index.ts` — `PteTaskType` extended with `describe_image` and `re_tell_lecture`; `TaskStimulus.kind` extended with `"image"`; `DescribeImageDetails` and `ReTellLectureDetails` types added
+- All `Record<PteTaskType, string>` lookup tables updated in `history/page.tsx`, `stats/page.tsx`, `mock/summary/page.tsx`, `recommendations.ts`, `task-weakness.ts`
+- `/practice` hub: two new task cards added, "coming soon" note removed
 
-What's next (Phase 4):
-- [ ] Apply `practice_tasks` Supabase SQL (top of `src/lib/supabase-task-history.ts`) — prerequisite for cloud save on all tasks
-- [ ] `src/app/mock/page.tsx` — mock exam entry and task orchestrator; sequences all 7 task types in PTE order
-- [ ] Strict timing in mock mode: auto-submit response when window expires; no stop button
-- [ ] `src/app/mock/summary/page.tsx` — end-of-exam summary aggregating feedback across all task types
+What's next (Phase 6 — Agent Architecture):
+- [ ] Scoring Agent — per-dimension scores (10–90, PTE-aligned); key file: `src/app/api/pte/feedback/route.ts`
+- [ ] Diagnosis Agent — Task-Type Weakness derivation; key file: `src/lib/task-weakness.ts`
+- [ ] Coach Agent — targeted suggestions per weak Task Type
+- [ ] LLM-as-Judge — independent re-evaluation; trigger when any dimension diverges > 15 points
+- [ ] Learner profile — Task-Type-keyed weakness profile driving adaptive task selection
 
 Key files to open first:
-- `src/types/index.ts` — `PteTaskType`, `PracticeTask` (task sequence and data shape)
-- `src/app/practice/read-aloud/page.tsx` — reference state machine for spoken tasks
-- `src/app/practice/write-essay/page.tsx` — reference state machine for written tasks
-- `src/lib/unified-task-history.ts` — `saveTask`, `getTasks` for collecting mock exam results
+- `src/app/api/pte/feedback/route.ts` — feedback generation (Phase 6 Scoring Agent entry point)
+- `src/lib/task-weakness.ts` — existing weakness derivation logic (Phase 6 Diagnosis Agent entry point)
+- `src/app/practice/describe-image/page.tsx` — new Describe Image page
+- `src/app/practice/re-tell-lecture/page.tsx` — new Re-tell Lecture page
+- `src/lib/image-bank.ts` — image stimulus bank (expand URLs here when real assets are available)
 
 ---
 
@@ -99,10 +105,10 @@ Each slice: stimulus display → timed response → AI feedback → save → his
 - [ ] Strict timing mode
 - [ ] End-of-exam summary report
 
-### Phase 5 — Deferred task types
+### Phase 5 — Deferred task types ✅
 
-- [ ] Describe Image (requires image stimulus library)
-- [ ] Re-tell Lecture (requires audio lecture library)
+- [x] Describe Image — hardcoded image bank (`src/lib/image-bank.ts`), `/practice/describe-image`
+- [x] Re-tell Lecture — AI text + Azure TTS, `/practice/re-tell-lecture`
 
 ### Phase 6 — Agent Architecture (Portfolio Design)
 

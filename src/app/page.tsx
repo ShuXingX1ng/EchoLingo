@@ -124,25 +124,25 @@ export default function Home() {
 
             <div className="grid gap-4 md:grid-cols-[1fr_220px_220px]">
               <Link
-                href="/practice/setup"
+                href="/practice"
                 className="group border border-slate-900 bg-slate-950 p-5 text-white transition-transform hover:-translate-y-0.5 dark:border-white dark:bg-white dark:text-slate-950"
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300 dark:text-emerald-700">
-                  {t("home.recommendedNext")}
+                  PTE Academic · Recommended
                 </span>
                 <span className="mt-3 block text-2xl font-semibold">
-                  {t("home.continueDrill")}
+                  Practice Now
                 </span>
                 <span className="mt-4 block text-sm leading-6 text-slate-300 dark:text-slate-600">
-                  {t("home.drillCardDesc")}
+                  Read Aloud, Repeat Sentence, Write Essay, and 4 more task types — all with AI feedback.
                 </span>
                 <span className="mt-6 inline-block text-sm font-semibold group-hover:underline">
-                  {t("home.openPractice")}
+                  Choose task type →
                 </span>
               </Link>
 
               <Link
-                href="/practice/exam"
+                href="/mock"
                 className="border border-slate-300 bg-white p-5 transition-colors hover:border-slate-900 dark:border-white/10 dark:bg-slate-900/80 dark:hover:border-white/40"
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -157,17 +157,17 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/practice/shadowing"
+                href="/history"
                 className="border border-slate-300 bg-white p-5 transition-colors hover:border-slate-900 dark:border-white/10 dark:bg-slate-900/80 dark:hover:border-white/40"
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {t("home.pronunciationPractice")}
+                  {t("home.practiceHistory")}
                 </span>
                 <span className="mt-3 block text-lg font-semibold text-slate-950 dark:text-white">
-                  {t("home.shadowing")}
+                  {t("home.reviewProgress")}
                 </span>
                 <span className="mt-3 block text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {t("home.shadowingCardDesc")}
+                  {t("home.reviewProgressDesc")}
                 </span>
               </Link>
             </div>

@@ -3,7 +3,7 @@
 # EchoLingo Development Rules
 
 ## Project Context
-EchoLingo is an IELTS speaking practice platform.
+EchoLingo is a PTE Academic practice platform.
 
 Tech stack:
 - Next.js
@@ -14,9 +14,11 @@ Tech stack:
 ## Workflow
 
 Before coding:
-1. Read docs/PROJECT_CONTEXT.md
-2. Read docs/TASKS.md
-3. Read docs/DEVELOPMENT_LOG.md
+1. Read CONTEXT.md — canonical domain terminology, use these terms in all code and docs
+2. Read docs/adr/ — key architectural decisions and why they were made
+3. Read docs/PROJECT_CONTEXT.md
+4. Read docs/TASKS.md
+5. Read docs/DEVELOPMENT_LOG.md
 
 After coding:
 1. Update DEVELOPMENT_LOG.md

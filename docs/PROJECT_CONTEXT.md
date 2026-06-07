@@ -20,7 +20,7 @@ Target users:
 | Auth | Supabase email + Google OAuth |
 | Tests | 82 frontend unit tests, 20 E2E tests, 86 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
-| Pivot status | Phase 3 complete — Phase 4 (Mock Exam) next |
+| Pivot status | Phase 5 complete — Phase 6 (Agent Architecture) next |
 
 ## Architecture
 
@@ -59,13 +59,13 @@ FastAPI files: `backend/main.py`, `backend/routers/`, `backend/services/`, `back
 | Write Essay | Speaking & Writing | AI-generated prompt | Typed text | No |
 | Personal Introduction | Speaking & Writing | Fixed prompt | Spoken audio (unscored) | No |
 | Write from Dictation | Listening | Azure TTS audio | Typed text | No |
+| Describe Image | Speaking & Writing | Hardcoded image bank (5 public-domain charts/maps) | Spoken audio | No |
+| Re-tell Lecture | Speaking & Writing | AI-generated text → Azure TTS audio | Spoken audio | No |
 
-Deferred / planned task types (designed, not yet implemented):
+Deferred / planned task types (not yet implemented):
 
 | Task Type | Section | Blocker |
 |---|---|---|
-| Describe Image | Speaking & Writing | Requires image stimulus assets |
-| Re-tell Lecture | Speaking & Writing | Requires audio stimulus assets |
 | Fill in the Blanks (Reading) | Reading | Reading section not yet built |
 | Re-order Paragraphs | Reading | Reading section not yet built |
 | Multiple Choice (Reading) | Reading | Reading section not yet built |
@@ -75,8 +75,10 @@ Deferred / planned task types (designed, not yet implemented):
 
 ## Core Features (Target State)
 
-- **All 7 Phase-2 PTE task types live**: Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction (Speaking); Summarize Written Text, Write Essay (Writing); Write from Dictation (Listening) — each with AI stimulus, timed response, AI feedback, `saveTask`
-- **`/practice` hub page** — task-type grid linking all 7 task routes, replacing legacy IELTS chat
+- **All 9 PTE task types live**: Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction, Describe Image, Re-tell Lecture (Speaking); Summarize Written Text, Write Essay (Writing); Write from Dictation (Listening) — each with stimulus, timed response, AI feedback, `saveTask`
+- **`/practice` hub page** — task-type grid linking all 9 task routes, with Mock Exam CTA
+- **`/mock` page** — full mock exam orchestrator: intro screen → 7-task PTE sequence (strict timing, no early stop on speaking tasks) → `/mock/summary`
+- **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
 - **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows), practice distribution, weekly activity
 - **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
@@ -112,6 +114,7 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/wav-encoder.ts` | Convert browser audio Blob → WAV for Azure pronunciation API | computed (Web Audio API) |
 | `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
 | `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type) | localStorage |
+| `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
 | `src/lib/backup.ts` | Export/import | local JSON/CSV backup |
 
