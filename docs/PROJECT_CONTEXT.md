@@ -18,9 +18,9 @@ Target users:
 | Backend | FastAPI beside Next.js API Routes fallback |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 82 frontend unit tests, 32 E2E tests (20 smoke + 12 listening), 105 backend tests |
+| Tests | 82 frontend unit tests, 55 E2E tests (20 smoke + 12 listening + 14 reading + 9 mock exam), 105 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
-| Pivot status | Mock exam complete — all 15 practice task types live; 13-task mock sequence (all 4 PTE sections) |
+| Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
 
 ## Architecture
 
@@ -77,7 +77,7 @@ Deferred / planned task types (not yet implemented):
 
 - **All 15 PTE task types live**: Speaking, Writing, Reading, and Listening task routes each include stimulus, timed response, AI feedback, `saveTask`
 - **`/practice` hub page** — task-type grid linking all 15 task routes, with Mock Exam CTA
-- **`/mock` page** — full mock exam orchestrator: intro screen → 13-task PTE sequence covering all four sections (Speaking & Writing, Reading, Listening; strict timing) → `/mock/summary`
+- **`/mock` page** — full mock exam orchestrator: intro screen → 15-task PTE sequence covering all 15 task types across all four sections (Speaking & Writing, Reading, Listening; strict timing) → `/mock/summary`
 - **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
 - **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing/listening tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity

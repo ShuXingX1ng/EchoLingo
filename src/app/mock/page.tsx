@@ -17,6 +17,8 @@ import MockHighlightCorrectSummary from "@/components/mock/MockHighlightCorrectS
 import MockFillInTheBlanksReading from "@/components/mock/MockFillInTheBlanksReading"
 import MockReOrderParagraphs from "@/components/mock/MockReOrderParagraphs"
 import MockMultipleChoiceReading from "@/components/mock/MockMultipleChoiceReading"
+import MockDescribeImage from "@/components/mock/MockDescribeImage"
+import MockReTellLecture from "@/components/mock/MockReTellLecture"
 import type { PracticeTask } from "@/types"
 
 // PTE Academic task order
@@ -24,6 +26,8 @@ const TASK_SEQUENCE = [
   { type: "personal_intro" as const, label: "Personal Introduction", section: "Speaking & Writing", description: "Introduce yourself. 25s prep, 30s to speak." },
   { type: "read_aloud" as const, label: "Read Aloud", section: "Speaking & Writing", description: "Read the passage aloud. 35s prep, 40s to read." },
   { type: "repeat_sentence" as const, label: "Repeat Sentence", section: "Speaking & Writing", description: "Listen, then repeat the sentence exactly. 15s to respond." },
+  { type: "describe_image" as const, label: "Describe Image", section: "Speaking & Writing", description: "Study the image for 25s, then describe it in detail. 40s to speak." },
+  { type: "re_tell_lecture" as const, label: "Re-tell Lecture", section: "Speaking & Writing", description: "Listen to a short lecture, prepare for 10s, then re-tell it. 40s to speak." },
   { type: "answer_short_question" as const, label: "Answer Short Question", section: "Speaking & Writing", description: "Answer the question with one or a few words. 10s to respond." },
   { type: "summarize_written_text" as const, label: "Summarize Written Text", section: "Writing", description: "Write a one-sentence summary of the passage. 10 minutes." },
   { type: "write_essay" as const, label: "Write Essay", section: "Writing", description: "Write a 200–300 word essay. 20 minutes." },
@@ -171,6 +175,8 @@ export default function MockExamPage() {
               {currentTask.type === "personal_intro" && <MockPersonalIntro onComplete={handleTaskComplete} />}
               {currentTask.type === "read_aloud" && <MockReadAloud onComplete={handleTaskComplete} />}
               {currentTask.type === "repeat_sentence" && <MockRepeatSentence onComplete={handleTaskComplete} />}
+              {currentTask.type === "describe_image" && <MockDescribeImage onComplete={handleTaskComplete} />}
+              {currentTask.type === "re_tell_lecture" && <MockReTellLecture onComplete={handleTaskComplete} />}
               {currentTask.type === "answer_short_question" && <MockAnswerShortQuestion onComplete={handleTaskComplete} />}
               {currentTask.type === "summarize_written_text" && <MockSummarizeWrittenText onComplete={handleTaskComplete} />}
               {currentTask.type === "write_essay" && <MockWriteEssay onComplete={handleTaskComplete} />}

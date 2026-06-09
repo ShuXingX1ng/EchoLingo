@@ -33,14 +33,17 @@
 | FastAPI backend parity | Done | `POST /api/pte/stimulus` + `POST /api/pte/feedback` in FastAPI; all 15 task types; LLM-as-Judge pipeline; 19 new backend tests (105 total) |
 | Stats Listening profile | Done | `listeningProfile` (comprehension + accuracy) added to radar chart / gap analysis; 3-tab switcher (speaking/writing/listening) |
 | Mock exam Reading section | Done | `MockFillInTheBlanksReading`, `MockReOrderParagraphs`, `MockMultipleChoiceReading`; `/mock` now 13-task sequence covering all 4 PTE sections |
+| Mock exam Describe Image + Re-tell Lecture | Done | `MockDescribeImage`, `MockReTellLecture`; `/mock` now 15-task sequence covering all 15 PTE task types |
+| E2E — Reading practice pages | Done | `e2e/reading-tasks.spec.ts`; 14 tests for FIB-Reading, Re-order Paragraphs, Multiple Choice |
+| E2E — Mock exam full flow | Done | `e2e/mock-exam.spec.ts`; 9 tests — intro screen, Start→task-1 transition, summary with injected 15-task session |
 
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
 | Frontend unit | 10 files / 82 tests |
-| E2E | 20 tests |
-| Backend | 86 tests |
+| E2E | 55 tests (20 smoke + 12 listening + 14 reading + 9 mock exam) |
+| Backend | 105 tests |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Active: PTE Pivot
@@ -57,25 +60,22 @@
 
 ## Next Phase
 
-**Resume point (2026-06-10):** Mock exam and Stats page now complete for all four PTE sections. All 15 task types are live in both practice and mock modes.
+**Resume point (2026-06-10):** E2E test suite is now complete. All 15 task types covered in practice, mock, and E2E. 55 E2E tests passing across 5 spec files.
 
 What's done:
-- `src/app/stats/page.tsx` — `listeningProfile` (comprehension + accuracy) added; 3-tab switcher (speaking/writing/listening); `LISTENING_SCORED_TASKS` set wired to `aggregateProfileScores`
-- `src/components/mock/MockFillInTheBlanksReading.tsx` — Reading FIB mock component (passage + inline dropdowns, 7 min timer)
-- `src/components/mock/MockReOrderParagraphs.tsx` — drag-and-drop + arrow reorder, 3 min timer
-- `src/components/mock/MockMultipleChoiceReading.tsx` — passage + radio options, 4 min timer
-- `src/app/mock/page.tsx` — `TASK_SEQUENCE` extended to 13 tasks (Reading tasks inserted as 7–9, after Write Essay)
-- Quality: typecheck 0, lint 0 errors (3 pre-existing warnings unchanged), 82/82 unit tests pass
+- `e2e/mock-exam.spec.ts` — 9 tests: intro screen (heading/nav, 15-task list + all 4 sections, Start→task-1 transition); summary page (no-session fallback, Exam Complete + task count, per-task breakdown for all 15 types, weaknesses, practice links, action buttons)
+- Session data injected via `page.addInitScript` — avoids driving real recording timers
+- `e2e/reading-tasks.spec.ts` — 14 tests for FIB-Reading, Re-order Paragraphs, Multiple Choice
+- Quality: typecheck 0, lint 0, 82/82 unit tests, 55/55 E2E tests pass
 
 What's next:
-- [ ] E2E tests for Reading task practice pages — `fill-in-the-blanks`, `re-order-paragraphs`, `multiple-choice`; follow pattern in `e2e/listening-tasks.spec.ts`
-- [ ] E2E tests for mock exam Reading tasks — verify 13-task sequence completes and reaches `/mock/summary`
-- [ ] Describe Image / Re-tell Lecture in mock exam — add `MockDescribeImage` and `MockReTellLecture` components; add to `TASK_SEQUENCE` in `/mock/page.tsx`
+- [ ] Expand frontend unit tests — currently 82 tests across 10 files; next candidates are `task-weakness.ts` dimension aggregation, `task-bank.ts` cache eviction, `unified-task-history.ts` fallback logic
+- [ ] Update smoke tests — several tests in `e2e/smoke.spec.ts` reference legacy IELTS routes (`/practice/setup`, `/practice/exam`, `/practice/shadowing`) that may no longer exist; audit and remove stale tests
 
 Key files to open first:
-- `src/app/mock/page.tsx`
-- `e2e/listening-tasks.spec.ts`
-- `e2e/helpers.ts`
+- `e2e/smoke.spec.ts`
+- `src/lib/task-weakness.ts`
+- `src/lib/task-bank.ts`
 
 ---
 
