@@ -265,7 +265,7 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
           <div className="flex justify-end">
             <button onClick={() => onComplete(doneTask)}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Finish Exam →
+              Continue to Next Task →
             </button>
           </div>
         </div>

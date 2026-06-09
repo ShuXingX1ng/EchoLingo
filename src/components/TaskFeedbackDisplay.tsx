@@ -160,6 +160,11 @@ function DimensionScoresBlock({ scores }: { scores: DimensionScores }) {
       { label: "Vocabulary", score: scores.vocabulary },
       { label: "Comprehension", score: scores.comprehension },
     ]
+  } else if (scores.section === "listening") {
+    dims = [
+      { label: "Comprehension", score: scores.comprehension },
+      { label: "Accuracy", score: scores.accuracy },
+    ]
   }
 
   return (
@@ -200,6 +205,8 @@ function DetailsBlock({ details }: { details: NonNullable<TaskFeedback["details"
   if ("logicFeedback" in details) rows.push({ label: "Text Logic", value: details.logicFeedback })
   if ("answerAccuracy" in details) rows.push({ label: "Answer Accuracy", value: details.answerAccuracy })
   if ("readingComprehension" in details) rows.push({ label: "Reading Comprehension", value: details.readingComprehension })
+  if ("writingQuality" in details) rows.push({ label: "Writing Quality", value: details.writingQuality })
+  if ("listeningComprehension" in details) rows.push({ label: "Listening Comprehension", value: details.listeningComprehension })
 
   if (rows.length === 0) return null
 

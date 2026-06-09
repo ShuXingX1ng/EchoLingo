@@ -27,6 +27,12 @@
 | Phase 5: Deferred task types | Done | `/practice/describe-image` (image bank, 25s prep, 40s record); `/practice/re-tell-lecture` (AI text → Azure TTS, play → 10s prep → 40s record); `src/lib/image-bank.ts`; API extended; `PteTaskType` + all lookup tables updated |
 | Phase 6: Agent Architecture (core pipeline) | Done | Scoring Agent + Coach Agent + LLM-as-Judge in `feedback/route.ts`; Diagnosis Agent (per-dimension) in `task-weakness.ts`; new types in `src/types/index.ts`; `TaskFeedbackDisplay` updated |
 | Phase 7: Reading section (3 task types) | Done | Fill in the Blanks, Re-order Paragraphs, Multiple Choice (Reading); `ReadingDimensionScores`; reading scoring in feedback pipeline; all lookup tables updated |
+| Phase 8: Listening extended types (3 task types) | Done | Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary; `ListeningDimensionScores`; listening scoring pipeline; all lookup tables updated |
+| Mock exam extension | Done | Added the 3 extended Listening task types to `/mock`; 10-task sequence now saves to `/mock/summary` |
+| E2E — Listening task types | Done | 12 Playwright tests for Summarize Spoken Text, FIB-Listening, Highlight Correct Summary; `mockAudioAutoEnd` helper added |
+| FastAPI backend parity | Done | `POST /api/pte/stimulus` + `POST /api/pte/feedback` in FastAPI; all 15 task types; LLM-as-Judge pipeline; 19 new backend tests (105 total) |
+| Stats Listening profile | Done | `listeningProfile` (comprehension + accuracy) added to radar chart / gap analysis; 3-tab switcher (speaking/writing/listening) |
+| Mock exam Reading section | Done | `MockFillInTheBlanksReading`, `MockReOrderParagraphs`, `MockMultipleChoiceReading`; `/mock` now 13-task sequence covering all 4 PTE sections |
 
 ## Current Test Baseline
 
@@ -51,31 +57,25 @@
 
 ## Next Phase
 
-**Resume point (2026-06-07):** Phase 7 (Reading section) fully complete. Phase 8 (Listening extended types) is next.
+**Resume point (2026-06-10):** Mock exam and Stats page now complete for all four PTE sections. All 15 task types are live in both practice and mock modes.
 
-What's done (Phase 7 — full):
-- `src/types/index.ts` — `fill_in_the_blanks_reading`, `re_order_paragraphs`, `multiple_choice_reading` added to `PteTaskType`; `ReadingDimensionScores`; 3 new `TaskFeedbackDetails` subtypes
-- `src/app/api/pte/stimulus/route.ts` — JSON prompts + `response_format: json_object` + 800-token limit for reading task types
-- `src/app/api/pte/feedback/route.ts` — `SCORED_READING` set; reading system prompts, detail schemas, Judge prompt, score extraction, divergence check
-- `src/lib/task-weakness.ts` — `ALL_TASK_TYPES`, `scoreFromTask`, `aggregateDimensions` extended for reading
-- All `Record<PteTaskType, string>` lookups updated: `history/page.tsx`, `stats/page.tsx`, `mock/summary/page.tsx`, `recommendations.ts`
-- `src/components/TaskFeedbackDisplay.tsx` — `DimensionScoresBlock` + `DetailsBlock` extended for reading types
-- `src/app/practice/fill-in-the-blanks/page.tsx` — inline dropdown blanks, 7 min timer, task bank, saveTask
-- `src/app/practice/re-order-paragraphs/page.tsx` — HTML5 drag-and-drop + arrow button fallback, 3 min timer, task bank, saveTask
-- `src/app/practice/multiple-choice/page.tsx` — radio buttons, 5 options, 4 min timer, task bank, saveTask
-- `src/app/practice/page.tsx` — "Reading" section added with 3 task cards
+What's done:
+- `src/app/stats/page.tsx` — `listeningProfile` (comprehension + accuracy) added; 3-tab switcher (speaking/writing/listening); `LISTENING_SCORED_TASKS` set wired to `aggregateProfileScores`
+- `src/components/mock/MockFillInTheBlanksReading.tsx` — Reading FIB mock component (passage + inline dropdowns, 7 min timer)
+- `src/components/mock/MockReOrderParagraphs.tsx` — drag-and-drop + arrow reorder, 3 min timer
+- `src/components/mock/MockMultipleChoiceReading.tsx` — passage + radio options, 4 min timer
+- `src/app/mock/page.tsx` — `TASK_SEQUENCE` extended to 13 tasks (Reading tasks inserted as 7–9, after Write Essay)
+- Quality: typecheck 0, lint 0 errors (3 pre-existing warnings unchanged), 82/82 unit tests pass
 
-What's next (Phase 8 — Listening extended types):
-- [ ] Summarize Spoken Text — key file: `src/app/practice/summarize-spoken-text/page.tsx` (new); needs Azure TTS audio + transcript → written summary
-- [ ] Fill in the Blanks (Listening) — key file: `src/app/practice/fill-in-the-blanks-listening/page.tsx` (new); audio playback + dropdown blanks
-- [ ] Highlight Correct Summary — key file: `src/app/practice/highlight-correct-summary/page.tsx` (new); audio + select best summary from options
+What's next:
+- [ ] E2E tests for Reading task practice pages — `fill-in-the-blanks`, `re-order-paragraphs`, `multiple-choice`; follow pattern in `e2e/listening-tasks.spec.ts`
+- [ ] E2E tests for mock exam Reading tasks — verify 13-task sequence completes and reaches `/mock/summary`
+- [ ] Describe Image / Re-tell Lecture in mock exam — add `MockDescribeImage` and `MockReTellLecture` components; add to `TASK_SEQUENCE` in `/mock/page.tsx`
 
-Key files to open first for Phase 8:
-- `src/types/index.ts` — extend `PteTaskType` and add new `TaskFeedbackDetails` subtypes
-- `src/app/api/pte/stimulus/route.ts` — add listening stimulus prompts
-- `src/app/api/pte/feedback/route.ts` — add listening system prompts + detail schemas
-- `src/app/practice/re-tell-lecture/page.tsx` — reference for Azure TTS + listen → respond pattern
-- `src/app/practice/fill-in-the-blanks/page.tsx` — reference for JSON stimulus parsing pattern
+Key files to open first:
+- `src/app/mock/page.tsx`
+- `e2e/listening-tasks.spec.ts`
+- `e2e/helpers.ts`
 
 ---
 
@@ -102,10 +102,11 @@ Each slice: stimulus display → timed response → AI feedback → save → his
 
 ### Phase 4 — Mock exam ✅
 
-- [x] `/mock` entry point — intro screen, 7-task PTE sequence, progress bar, sessionStorage handoff to summary
-- [x] Full task sequence following PTE Academic order — 7 `MockXxx` components in `src/components/mock/`
+- [x] `/mock` entry point — intro screen, 10-task PTE sequence, progress bar, sessionStorage handoff to summary
+- [x] Full task sequence following PTE Academic order — 10 `MockXxx` components in `src/components/mock/`
 - [x] Strict timing mode — no stop button on speaking tasks; writing tasks auto-submit on timeout, allow early submit
 - [x] End-of-exam summary report — `/mock/summary`: per-task feedback, top weaknesses, avg pronunciation score, practice links
+- [x] Extended Listening tasks — Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary added to `/mock`
 
 ### Phase 5 — Deferred task types ✅
 
@@ -127,11 +128,11 @@ Each slice: stimulus display → timed response → AI feedback → save → his
 - [x] Reading section: Re-order Paragraphs — `/practice/re-order-paragraphs`
 - [x] Reading section: Multiple Choice — `/practice/multiple-choice`
 
-### Phase 8 — Extended Task Types (Listening, Planned)
+### Phase 8 — Extended Task Types (Listening) ✅
 
-- [ ] Summarize Spoken Text — `/practice/summarize-spoken-text`
-- [ ] Fill in the Blanks (Listening) — `/practice/fill-in-the-blanks-listening`
-- [ ] Highlight Correct Summary — `/practice/highlight-correct-summary`
+- [x] Summarize Spoken Text — `/practice/summarize-spoken-text`
+- [x] Fill in the Blanks (Listening) — `/practice/fill-in-the-blanks-listening`
+- [x] Highlight Correct Summary — `/practice/highlight-correct-summary`
 
 ## Future / Backlog
 

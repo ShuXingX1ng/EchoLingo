@@ -20,6 +20,9 @@ const TASK_LABELS: Record<PteTaskType, string> = {
   fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
   re_order_paragraphs: "Re-order Paragraphs",
   multiple_choice_reading: "Multiple Choice (Reading)",
+  summarize_spoken_text: "Summarize Spoken Text",
+  fill_in_the_blanks_listening: "Fill in the Blanks (Listening)",
+  highlight_correct_summary: "Highlight Correct Summary",
 }
 
 const TASK_SECTION: Record<PteTaskType, string> = {
@@ -35,6 +38,9 @@ const TASK_SECTION: Record<PteTaskType, string> = {
   fill_in_the_blanks_reading: "Reading",
   re_order_paragraphs: "Reading",
   multiple_choice_reading: "Reading",
+  summarize_spoken_text: "Listening",
+  fill_in_the_blanks_listening: "Listening",
+  highlight_correct_summary: "Listening",
 }
 
 function formatDate(iso: string): string {

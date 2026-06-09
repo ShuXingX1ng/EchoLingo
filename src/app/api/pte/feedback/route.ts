@@ -5,6 +5,7 @@ import type {
   PronunciationAssessmentResult,
   DimensionScores,
   ReadingDimensionScores,
+  ListeningDimensionScores,
   JudgeLog,
 } from "@/types"
 
@@ -38,6 +39,13 @@ const SCORED_READING = new Set<PteTaskType>([
   "fill_in_the_blanks_reading",
   "re_order_paragraphs",
   "multiple_choice_reading",
+])
+
+// Listening task types that receive per-dimension scoring
+const SCORED_LISTENING = new Set<PteTaskType>([
+  "summarize_spoken_text",
+  "fill_in_the_blanks_listening",
+  "highlight_correct_summary",
 ])
 
 // PTE-specific examiner prompts per task type
@@ -93,6 +101,22 @@ Focus on: how many paragraphs were in the correct position, understanding of dis
   multiple_choice_reading: `You are a PTE Academic examiner evaluating a Multiple Choice (Reading) response.
 The stimulus shows the passage, question, and all options. The response shows the learner's selection and whether it was correct.
 Focus on: reading comprehension accuracy, understanding of main idea vs supporting details, and any misconceptions revealed by the wrong choice if applicable.`,
+
+  summarize_spoken_text: `You are a PTE Academic examiner evaluating a Summarize Spoken Text response.
+The candidate listened to a short audio passage and then wrote a 50–70 word summary.
+The original passage text is shown in the stimulus.
+Criteria: Content accuracy (did they capture the main idea and key points?), Writing quality (grammar, vocabulary, summary length 50–70 words).
+A strong response identifies the topic, covers the main point and key supporting details in coherent written prose.`,
+
+  fill_in_the_blanks_listening: `You are a PTE Academic examiner evaluating a Fill in the Blanks (Listening) response.
+The candidate listened to a passage read aloud and selected words to fill in blanks in the transcript.
+The stimulus shows the passage with correct answers marked. The response shows which options the learner selected and whether each was correct.
+Focus on: accuracy (which blanks were correct), listening comprehension, and ability to identify content words from audio context.`,
+
+  highlight_correct_summary: `You are a PTE Academic examiner evaluating a Highlight Correct Summary response.
+The candidate listened to an audio passage and selected the summary that best matches what was said.
+The stimulus shows the passage and all summary options. The response shows the learner's selection and whether it was correct.
+Focus on: whether the selected summary accurately captures the main idea and key points, and what was right or wrong about the choice.`,
 }
 
 // Task-specific details schema strings (embedded in JSON output template)
@@ -109,6 +133,9 @@ const DETAILS_SCHEMA: Record<PteTaskType, string> = {
   fill_in_the_blanks_reading: `"details": { "taskType": "fill_in_the_blanks_reading", "accuracy": "<which blanks were correct and which were wrong, with explanations>", "vocabulary": "<vocabulary-in-context understanding feedback>" }`,
   re_order_paragraphs: `"details": { "taskType": "re_order_paragraphs", "orderAccuracy": "<how many paragraphs were in the correct position and which were misplaced>", "logicFeedback": "<feedback on their understanding of text cohesion and discourse structure>" }`,
   multiple_choice_reading: `"details": { "taskType": "multiple_choice_reading", "answerAccuracy": "<was the answer correct and why the correct option is right>", "readingComprehension": "<feedback on their reading comprehension approach and any misconceptions>" }`,
+  summarize_spoken_text: `"details": { "taskType": "summarize_spoken_text", "contentAccuracy": "<did the summary capture the main idea and key points from the audio?>", "writingQuality": "<grammar, vocabulary, and whether summary length is 50–70 words>" }`,
+  fill_in_the_blanks_listening: `"details": { "taskType": "fill_in_the_blanks_listening", "accuracy": "<which blanks were correct and which were wrong, with explanations>", "listeningComprehension": "<feedback on their ability to identify content words from audio context>" }`,
+  highlight_correct_summary: `"details": { "taskType": "highlight_correct_summary", "answerAccuracy": "<was the selection correct and why the correct summary best matches the passage>", "listeningComprehension": "<feedback on their listening comprehension and understanding of the main idea>" }`,
 }
 
 // Build the primary LLM call output schema — includes dimension scores and coach suggestions for scored tasks
@@ -157,6 +184,20 @@ Return exactly:
 }`
   }
 
+  if (SCORED_LISTENING.has(taskType)) {
+    return `You MUST respond with valid JSON only. No markdown, no code blocks.
+Return exactly:
+{
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<general tip1>", "<general tip2>"],
+  ${details},
+  "dimensionScores": { "section": "listening", "comprehension": <0-100>, "accuracy": <0-100> },
+  "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+}`
+  }
+
   // personal_intro and write_from_dictation: no dimension scores
   return `You MUST respond with valid JSON only. No markdown, no code blocks.
 Return exactly:
@@ -182,6 +223,10 @@ function buildJudgeSystemPrompt(taskType: PteTaskType): string | null {
   if (SCORED_READING.has(taskType)) {
     return `You are an independent PTE Academic examiner. Score the vocabulary and comprehension aspects of the reading response on a 0–100 scale. Return ONLY valid JSON, no other text:
 {"dimensionScores": {"section": "reading", "vocabulary": <0-100>, "comprehension": <0-100>}}`
+  }
+  if (SCORED_LISTENING.has(taskType)) {
+    return `You are an independent PTE Academic examiner. Score the comprehension and accuracy of the listening response on a 0–100 scale. Return ONLY valid JSON, no other text:
+{"dimensionScores": {"section": "listening", "comprehension": <0-100>, "accuracy": <0-100>}}`
   }
   return null
 }
@@ -274,6 +319,14 @@ function extractDimensionScores(parsed: Record<string, unknown>): DimensionScore
     return { section: "reading", vocabulary: ds.vocabulary, comprehension: ds.comprehension } as ReadingDimensionScores
   }
 
+  if (
+    ds.section === "listening" &&
+    typeof ds.comprehension === "number" &&
+    typeof ds.accuracy === "number"
+  ) {
+    return { section: "listening", comprehension: ds.comprehension, accuracy: ds.accuracy } as ListeningDimensionScores
+  }
+
   return null
 }
 
@@ -297,6 +350,11 @@ function findDivergences(
     }
   } else if (primary.section === "reading" && judge.section === "reading") {
     for (const dim of ["vocabulary", "comprehension"] as const) {
+      const diff = Math.abs(primary[dim] - judge[dim])
+      if (diff > 15) diverged.push({ dimension: dim, primaryScore: primary[dim], judgeScore: judge[dim] })
+    }
+  } else if (primary.section === "listening" && judge.section === "listening") {
+    for (const dim of ["comprehension", "accuracy"] as const) {
       const diff = Math.abs(primary[dim] - judge[dim])
       if (diff > 15) diverged.push({ dimension: dim, primaryScore: primary[dim], judgeScore: judge[dim] })
     }
@@ -328,7 +386,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "LLM API configuration missing" }, { status: 500 })
     }
 
-    const isScored = SCORED_SPEAKING.has(taskType) || SCORED_WRITING.has(taskType) || SCORED_READING.has(taskType)
+    const isScored = SCORED_SPEAKING.has(taskType) || SCORED_WRITING.has(taskType) || SCORED_READING.has(taskType) || SCORED_LISTENING.has(taskType)
 
     const primarySystemPrompt = [
       SYSTEM_PROMPTS[taskType],

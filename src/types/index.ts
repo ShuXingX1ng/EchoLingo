@@ -13,6 +13,9 @@ export type PteTaskType =
   | "fill_in_the_blanks_reading"
   | "re_order_paragraphs"
   | "multiple_choice_reading"
+  | "summarize_spoken_text"
+  | "fill_in_the_blanks_listening"
+  | "highlight_correct_summary"
 
 export type TaskStimulus = {
   kind: "text" | "audio" | "image"
@@ -47,7 +50,7 @@ export type ReadingDimensionScores = {
   comprehension: number
 }
 
-export type DimensionScores = SpeakingDimensionScores | WritingDimensionScores | ReadingDimensionScores
+export type DimensionScores = SpeakingDimensionScores | WritingDimensionScores | ReadingDimensionScores | ListeningDimensionScores
 
 // LLM-as-Judge disagreement record
 export type JudgeLog = {
@@ -136,6 +139,30 @@ export type MultipleChoiceReadingDetails = {
   readingComprehension: string
 }
 
+export type SummarizeSpokenTextDetails = {
+  taskType: "summarize_spoken_text"
+  contentAccuracy: string
+  writingQuality: string
+}
+
+export type FillInTheBlanksListeningDetails = {
+  taskType: "fill_in_the_blanks_listening"
+  accuracy: string
+  listeningComprehension: string
+}
+
+export type HighlightCorrectSummaryDetails = {
+  taskType: "highlight_correct_summary"
+  answerAccuracy: string
+  listeningComprehension: string
+}
+
+export type ListeningDimensionScores = {
+  section: "listening"
+  comprehension: number
+  accuracy: number
+}
+
 export type TaskFeedbackDetails =
   | ReadAloudDetails
   | RepeatSentenceDetails
@@ -147,6 +174,9 @@ export type TaskFeedbackDetails =
   | FillInTheBlanksReadingDetails
   | ReOrderParagraphsDetails
   | MultipleChoiceReadingDetails
+  | SummarizeSpokenTextDetails
+  | FillInTheBlanksListeningDetails
+  | HighlightCorrectSummaryDetails
 
 export type PracticeTask = {
   id: string

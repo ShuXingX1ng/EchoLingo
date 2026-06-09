@@ -18,9 +18,9 @@ Target users:
 | Backend | FastAPI beside Next.js API Routes fallback |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 82 frontend unit tests, 20 E2E tests, 86 backend tests |
+| Tests | 82 frontend unit tests, 32 E2E tests (20 smoke + 12 listening), 105 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
-| Pivot status | Phase 7 (Reading section) complete — Listening extended types next |
+| Pivot status | Mock exam complete — all 15 practice task types live; 13-task mock sequence (all 4 PTE sections) |
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Important: before editing Next.js code, read the relevant guide in `node_modules
 | Path | Status | Notes |
 |------|--------|-------|
 | Next.js API Routes | Fallback kept | Do not delete yet |
-| Python FastAPI | Implemented | Preferred deployable backend |
+| Python FastAPI | Implemented | Preferred deployable backend; now includes `POST /api/pte/stimulus` and `POST /api/pte/feedback` |
 
 Frontend requests go through `src/lib/api-client.ts`:
 
@@ -64,27 +64,27 @@ FastAPI files: `backend/main.py`, `backend/routers/`, `backend/services/`, `back
 | Fill in the Blanks (Reading) | Reading | AI-generated passage with blanks (JSON) | Dropdown selection | No |
 | Re-order Paragraphs | Reading | AI-generated shuffled paragraphs (JSON) | Drag-and-drop order | No |
 | Multiple Choice (Reading) | Reading | AI-generated passage + question (JSON) | Radio button selection | No |
+| Summarize Spoken Text | Listening | AI-generated text → Azure TTS audio | Typed summary (50–70 words) | No |
+| Fill in the Blanks (Listening) | Listening | AI-generated text → Azure TTS audio + blanks (JSON) | Dropdown selection | No |
+| Highlight Correct Summary | Listening | AI-generated text → Azure TTS audio + 5 summaries (JSON) | Radio button selection | No |
 
 Deferred / planned task types (not yet implemented):
 
 | Task Type | Section | Blocker |
 |---|---|---|
-| Summarize Spoken Text | Listening | Extended Listening section not yet built |
-| Fill in the Blanks (Listening) | Listening | Extended Listening section not yet built |
-| Highlight Correct Summary | Listening | Extended Listening section not yet built |
 
 ## Core Features (Target State)
 
-- **All 12 PTE task types live**: Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction, Describe Image, Re-tell Lecture (Speaking); Summarize Written Text, Write Essay (Writing); Write from Dictation (Listening); Fill in the Blanks, Re-order Paragraphs, Multiple Choice (Reading) — each with stimulus, timed response, AI feedback, `saveTask`
-- **`/practice` hub page** — task-type grid linking all 9 task routes, with Mock Exam CTA
-- **`/mock` page** — full mock exam orchestrator: intro screen → 7-task PTE sequence (strict timing, no early stop on speaking tasks) → `/mock/summary`
+- **All 15 PTE task types live**: Speaking, Writing, Reading, and Listening task routes each include stimulus, timed response, AI feedback, `saveTask`
+- **`/practice` hub page** — task-type grid linking all 15 task routes, with Mock Exam CTA
+- **`/mock` page** — full mock exam orchestrator: intro screen → 13-task PTE sequence covering all four sections (Speaking & Writing, Reading, Listening; strict timing) → `/mock/summary`
 - **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
-- **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity
+- **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing/listening tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity
 - **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
 - **Min recording guard** — Stop/Done button disabled for first 5s on all 4 spoken task pages (Read Aloud, Repeat Sentence, Answer Short Question, Personal Intro)
 - PTE task-type practice with timed exercises
-- Full mock exam flow covering all supported task types
+- Full mock exam flow covering the original 7-task sequence plus 3 extended Listening tasks
 - AI-generated feedback: generic envelope (summary, strengths, weaknesses, suggestions) + task-specific details + per-dimension scores (0–100 internal scale) + targeted coaching suggestions via Coach Agent + LLM-as-Judge (independent parallel call; >15-point divergence triggers retry and `judgeLog`)
 - Azure Neural TTS for stimulus audio generation and caching
 - Azure Pronunciation Assessment for Read Aloud and Repeat Sentence
@@ -177,7 +177,7 @@ LLM-as-Judge  ← independent model re-evaluates Coach output; disagreement trig
 | Speaking Agent | Implemented | Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction |
 | Writing Agent | Implemented | Summarize Written Text, Write Essay |
 | Reading Agent | Implemented | Fill in the Blanks (Reading), Re-order Paragraphs, Multiple Choice (Reading) |
-| Listening Agent | Partially implemented | Write from Dictation (implemented); Summarize Spoken Text, FitB, Highlight Correct Summary (designed) |
+| Listening Agent | Implemented | Write from Dictation, Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary |
 
 ### Speaking Agent — key design decisions
 

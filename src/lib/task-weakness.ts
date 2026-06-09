@@ -13,6 +13,9 @@ const ALL_TASK_TYPES: PteTaskType[] = [
   "fill_in_the_blanks_reading",
   "re_order_paragraphs",
   "multiple_choice_reading",
+  "summarize_spoken_text",
+  "fill_in_the_blanks_listening",
+  "highlight_correct_summary",
 ]
 
 // Overall performance score from a single task (0–100).
@@ -31,6 +34,9 @@ function scoreFromTask(task: PracticeTask): number | null {
     }
     if (ds.section === "reading") {
       return Math.round((ds.vocabulary + ds.comprehension) / 2)
+    }
+    if (ds.section === "listening") {
+      return Math.round((ds.comprehension + ds.accuracy) / 2)
     }
   }
 
@@ -79,6 +85,11 @@ function aggregateDimensions(tasks: PracticeTask[]): DimensionWeakness[] | undef
       entries = [
         ["vocabulary", ds.vocabulary],
         ["comprehension", ds.comprehension],
+      ]
+    } else if (ds.section === "listening") {
+      entries = [
+        ["comprehension", ds.comprehension],
+        ["accuracy", ds.accuracy],
       ]
     }
 

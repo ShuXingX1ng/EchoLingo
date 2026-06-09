@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import examiner, feedback, tts, pronunciation
+from routers import examiner, feedback, tts, pronunciation, pte_stimulus, pte_feedback
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +39,8 @@ app.include_router(examiner.router, prefix="/api", tags=["examiner"])
 app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 app.include_router(tts.router, prefix="/api", tags=["tts"])
 app.include_router(pronunciation.router, prefix="/api", tags=["pronunciation"])
+app.include_router(pte_stimulus.router, prefix="/api", tags=["pte"])
+app.include_router(pte_feedback.router, prefix="/api", tags=["pte"])
 
 
 @app.get("/health")

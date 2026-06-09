@@ -20,6 +20,9 @@ const TASK_LABELS: Record<PteTaskType, string> = {
   fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
   re_order_paragraphs: "Re-order Paragraphs",
   multiple_choice_reading: "Multiple Choice (Reading)",
+  summarize_spoken_text: "Summarize Spoken Text",
+  fill_in_the_blanks_listening: "Fill in the Blanks (Listening)",
+  highlight_correct_summary: "Highlight Correct Summary",
 }
 
 const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
@@ -35,6 +38,9 @@ const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
   fill_in_the_blanks_reading: "/practice/fill-in-the-blanks",
   re_order_paragraphs: "/practice/re-order-paragraphs",
   multiple_choice_reading: "/practice/multiple-choice",
+  summarize_spoken_text: "/practice/summarize-spoken-text",
+  fill_in_the_blanks_listening: "/practice/fill-in-the-blanks-listening",
+  highlight_correct_summary: "/practice/highlight-correct-summary",
 }
 
 function formatDuration(seconds: number): string {

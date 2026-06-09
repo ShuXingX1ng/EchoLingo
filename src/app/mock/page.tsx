@@ -11,6 +11,12 @@ import MockAnswerShortQuestion from "@/components/mock/MockAnswerShortQuestion"
 import MockSummarizeWrittenText from "@/components/mock/MockSummarizeWrittenText"
 import MockWriteEssay from "@/components/mock/MockWriteEssay"
 import MockWriteFromDictation from "@/components/mock/MockWriteFromDictation"
+import MockSummarizeSpokenText from "@/components/mock/MockSummarizeSpokenText"
+import MockFillInTheBlanksListening from "@/components/mock/MockFillInTheBlanksListening"
+import MockHighlightCorrectSummary from "@/components/mock/MockHighlightCorrectSummary"
+import MockFillInTheBlanksReading from "@/components/mock/MockFillInTheBlanksReading"
+import MockReOrderParagraphs from "@/components/mock/MockReOrderParagraphs"
+import MockMultipleChoiceReading from "@/components/mock/MockMultipleChoiceReading"
 import type { PracticeTask } from "@/types"
 
 // PTE Academic task order
@@ -21,7 +27,13 @@ const TASK_SEQUENCE = [
   { type: "answer_short_question" as const, label: "Answer Short Question", section: "Speaking & Writing", description: "Answer the question with one or a few words. 10s to respond." },
   { type: "summarize_written_text" as const, label: "Summarize Written Text", section: "Writing", description: "Write a one-sentence summary of the passage. 10 minutes." },
   { type: "write_essay" as const, label: "Write Essay", section: "Writing", description: "Write a 200–300 word essay. 20 minutes." },
+  { type: "fill_in_the_blanks_reading" as const, label: "Fill in the Blanks (Reading)", section: "Reading", description: "Read the passage and select the correct word for each blank. 7 minutes." },
+  { type: "re_order_paragraphs" as const, label: "Re-order Paragraphs", section: "Reading", description: "Drag the paragraph tiles into the correct logical order. 3 minutes." },
+  { type: "multiple_choice_reading" as const, label: "Multiple Choice (Reading)", section: "Reading", description: "Read the passage and select the one correct answer. 4 minutes." },
   { type: "write_from_dictation" as const, label: "Write from Dictation", section: "Listening", description: "Listen to the sentence, then type exactly what you heard." },
+  { type: "summarize_spoken_text" as const, label: "Summarize Spoken Text", section: "Listening", description: "Listen to a passage, then write a 50–70 word summary. 10 minutes." },
+  { type: "fill_in_the_blanks_listening" as const, label: "Fill in the Blanks (Listening)", section: "Listening", description: "Listen to a passage, then select the missing words. 7 minutes." },
+  { type: "highlight_correct_summary" as const, label: "Highlight Correct Summary", section: "Listening", description: "Listen to a passage, then choose the best summary. 5 minutes." },
 ]
 
 type ExamPhase = "intro" | "running" | "finished"
@@ -75,7 +87,7 @@ export default function MockExamPage() {
               </p>
               <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Mock Exam</h1>
               <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                This mock exam covers all 7 PTE task types in order. Timing is strictly enforced — speaking tasks
+                This mock exam covers 10 PTE task types in order. Timing is strictly enforced — speaking tasks
                 auto-submit when time is up; writing tasks auto-submit if you don&apos;t finish in time.
               </p>
             </div>
@@ -162,7 +174,13 @@ export default function MockExamPage() {
               {currentTask.type === "answer_short_question" && <MockAnswerShortQuestion onComplete={handleTaskComplete} />}
               {currentTask.type === "summarize_written_text" && <MockSummarizeWrittenText onComplete={handleTaskComplete} />}
               {currentTask.type === "write_essay" && <MockWriteEssay onComplete={handleTaskComplete} />}
+              {currentTask.type === "fill_in_the_blanks_reading" && <MockFillInTheBlanksReading onComplete={handleTaskComplete} />}
+              {currentTask.type === "re_order_paragraphs" && <MockReOrderParagraphs onComplete={handleTaskComplete} />}
+              {currentTask.type === "multiple_choice_reading" && <MockMultipleChoiceReading onComplete={handleTaskComplete} />}
               {currentTask.type === "write_from_dictation" && <MockWriteFromDictation onComplete={handleTaskComplete} />}
+              {currentTask.type === "summarize_spoken_text" && <MockSummarizeSpokenText onComplete={handleTaskComplete} />}
+              {currentTask.type === "fill_in_the_blanks_listening" && <MockFillInTheBlanksListening onComplete={handleTaskComplete} />}
+              {currentTask.type === "highlight_correct_summary" && <MockHighlightCorrectSummary onComplete={handleTaskComplete} />}
             </div>
           </div>
         )}

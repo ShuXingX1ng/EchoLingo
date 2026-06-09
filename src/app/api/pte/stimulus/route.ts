@@ -14,6 +14,8 @@ const JSON_TASK_TYPES = new Set<PteTaskType>([
   "fill_in_the_blanks_reading",
   "re_order_paragraphs",
   "multiple_choice_reading",
+  "fill_in_the_blanks_listening",
+  "highlight_correct_summary",
 ])
 
 const PROMPTS: Partial<Record<PteTaskType, string>> = {
@@ -71,6 +73,29 @@ const PROMPTS: Partial<Record<PteTaskType, string>> = {
     "Generate a short academic lecture excerpt (110–130 words) on a topic from science, technology, environment, health, or society. " +
     "It should sound like natural spoken academic English — use discourse markers (Firstly, However, In conclusion, etc.) and a clear main point with two or three supporting details. " +
     "Respond with ONLY the lecture text. No title, no labels, no speaker attribution.",
+
+  summarize_spoken_text:
+    "Generate a 90–110 word academic passage on a topic from science, technology, environment, health, or society. " +
+    "Use clear, spoken-style English with discourse markers (Firstly, Furthermore, In conclusion, etc.) and a single main idea with two or three supporting points. " +
+    "The passage will be converted to audio for a listening task. " +
+    "Respond with ONLY the passage text. No title, no labels.",
+
+  fill_in_the_blanks_listening:
+    'Generate a PTE Academic Fill in the Blanks (Listening) task. ' +
+    'Create an academic passage of 80–100 words with exactly 5 blanks marked as [BLANK_0], [BLANK_1], [BLANK_2], [BLANK_3], [BLANK_4]. ' +
+    'For each blank provide 4 options where exactly one is correct. ' +
+    'The passage will be read aloud as audio — blanks are content words that listeners must identify from context and audio. ' +
+    'Return ONLY valid JSON, no other text:\n' +
+    '{"passage":"...text with [BLANK_0] markers...","blanks":[{"options":["opt1","opt2","opt3","opt4"],"correct":0}]}\n' +
+    'The passage must read naturally with the correct options filled in. Topic: science, technology, environment, or society.',
+
+  highlight_correct_summary:
+    'Generate a PTE Academic Highlight Correct Summary task. ' +
+    'Create an academic passage of 100–120 words on a topic from science, technology, environment, health, or society. ' +
+    'Provide 5 summary options: one that accurately captures the main idea and key points, and four plausible but subtly wrong alternatives (wrong topic, over-generalisation, missing key point, or including information not in the passage). ' +
+    'Return ONLY valid JSON, no other text:\n' +
+    '{"passage":"...","summaries":["S1","S2","S3","S4","S5"],"correct":0}\n' +
+    'The "correct" field is the 0-based index of the accurate summary. Summaries should be 1–2 sentences each.',
 }
 
 function extractText(data: LlmResponse): string {

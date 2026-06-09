@@ -20,9 +20,12 @@ const TASK_SHORT: Record<PteTaskType, string> = {
   write_from_dictation: "WFD",
   describe_image: "DI",
   re_tell_lecture: "RTL",
-  fill_in_the_blanks_reading: "FIB",
+  fill_in_the_blanks_reading: "FIB-R",
   re_order_paragraphs: "ROP",
   multiple_choice_reading: "MCR",
+  summarize_spoken_text: "SST",
+  fill_in_the_blanks_listening: "FIB-L",
+  highlight_correct_summary: "HCS",
 }
 
 const TASK_LABELS: Record<PteTaskType, string> = {
@@ -35,9 +38,12 @@ const TASK_LABELS: Record<PteTaskType, string> = {
   write_from_dictation: "Write from Dictation",
   describe_image: "Describe Image",
   re_tell_lecture: "Re-tell Lecture",
-  fill_in_the_blanks_reading: "Fill in the Blanks",
+  fill_in_the_blanks_reading: "Fill in the Blanks (R)",
   re_order_paragraphs: "Re-order Paragraphs",
   multiple_choice_reading: "Multiple Choice",
+  summarize_spoken_text: "Summarize Spoken Text",
+  fill_in_the_blanks_listening: "Fill in the Blanks (L)",
+  highlight_correct_summary: "Highlight Correct Summary",
 }
 
 const SPEAKING_SCORED_TASKS = new Set<PteTaskType>([
@@ -45,6 +51,10 @@ const SPEAKING_SCORED_TASKS = new Set<PteTaskType>([
 ])
 
 const WRITING_SCORED_TASKS = new Set<PteTaskType>(["summarize_written_text", "write_essay"])
+
+const LISTENING_SCORED_TASKS = new Set<PteTaskType>([
+  "summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary",
+])
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -109,6 +119,7 @@ type PteStats = {
   taskTypeBreakdown: Array<{ taskType: PteTaskType; count: number }>
   speakingProfile: DimProfile | null
   writingProfile: DimProfile | null
+  listeningProfile: DimProfile | null
   weeklyScores: Map<PteTaskType, Array<{ week: string; avgScore: number | null }>>
 }
 
@@ -131,6 +142,11 @@ function computeStats(tasks: PracticeTask[]): PteStats {
     weaknesses,
     WRITING_SCORED_TASKS,
     ["grammar", "vocabulary", "form", "content"],
+  )
+  const listeningProfile = aggregateProfileScores(
+    weaknesses,
+    LISTENING_SCORED_TASKS,
+    ["comprehension", "accuracy"],
   )
 
   // Last 8 week buckets
@@ -184,6 +200,7 @@ function computeStats(tasks: PracticeTask[]): PteStats {
     taskTypeBreakdown,
     speakingProfile,
     writingProfile,
+    listeningProfile,
     weeklyScores,
   }
 }
@@ -401,7 +418,7 @@ export default function StatsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [targetScore, setTargetScore] = useState(75)
   const [selectedProgressTask, setSelectedProgressTask] = useState<PteTaskType | null>(null)
-  const [profileTab, setProfileTab] = useState<"speaking" | "writing">("speaking")
+  const [profileTab, setProfileTab] = useState<"speaking" | "writing" | "listening">("speaking")
 
   useEffect(() => {
     let mounted = true
@@ -415,7 +432,10 @@ export default function StatsPage() {
           const practiced = s.weaknesses.find((w) => w.recentCount > 0)
           if (practiced) setSelectedProgressTask(practiced.taskType)
           // Default profile tab to whichever section has data
-          if (!s.speakingProfile && s.writingProfile) setProfileTab("writing")
+          if (!s.speakingProfile) {
+            if (s.writingProfile) setProfileTab("writing")
+            else if (s.listeningProfile) setProfileTab("listening")
+          }
         }
       } catch {
         if (mounted) setStats(null)
@@ -464,8 +484,15 @@ export default function StatsPage() {
   }
 
   const topWeaknesses = stats.weaknesses.filter((w) => w.recentCount > 0 && w.score < 65).slice(0, 3)
-  const activeProfile = profileTab === "speaking" ? stats.speakingProfile : stats.writingProfile
-  const hasDimensionData = !!(stats.speakingProfile || stats.writingProfile)
+  const activeProfile = profileTab === "speaking" ? stats.speakingProfile
+    : profileTab === "writing" ? stats.writingProfile
+    : stats.listeningProfile
+  const hasDimensionData = !!(stats.speakingProfile || stats.writingProfile || stats.listeningProfile)
+  const availableProfileTabs = (["speaking", "writing", "listening"] as const).filter((tab) =>
+    tab === "speaking" ? !!stats.speakingProfile
+    : tab === "writing" ? !!stats.writingProfile
+    : !!stats.listeningProfile,
+  )
 
   // Progress curve: show weeks that have at least one data point for the selected task
   const progressData = selectedProgressTask
@@ -536,10 +563,10 @@ export default function StatsPage() {
                     </p>
                   </div>
 
-                  {/* Section tab switcher */}
-                  {stats.speakingProfile && stats.writingProfile && (
+                  {/* Section tab switcher — shown when 2+ sections have data */}
+                  {availableProfileTabs.length >= 2 && (
                     <div className="flex rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden text-xs">
-                      {(["speaking", "writing"] as const).map((tab) => (
+                      {availableProfileTabs.map((tab) => (
                         <button key={tab} onClick={() => setProfileTab(tab)}
                           className={`px-3 py-1.5 capitalize transition ${
                             profileTab === tab
