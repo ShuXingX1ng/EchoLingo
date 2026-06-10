@@ -37,7 +37,7 @@ function CountdownRing({ seconds, total, size = 80 }: { seconds: number; total: 
           style={{ transition: "stroke-dasharray 0.9s linear" }}
         />
       </svg>
-      <span className={`absolute text-xl font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+      <span className={`absolute text-xl font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>
         {seconds}
       </span>
     </div>
@@ -298,23 +298,23 @@ export default function ReadAloudPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         {/* Header breadcrumb */}
-        <div className="mb-6 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/" className="hover:text-slate-700 dark:hover:text-slate-200">Home</Link>
+        <div className="mb-6 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/" className="hover:text-[var(--foreground)]">Home</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Read Aloud</span>
+          <span className="text-[var(--foreground)] font-medium">Read Aloud</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
             PTE Speaking
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Read Aloud</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Read Aloud</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Read the passage aloud as clearly and naturally as possible. You will have{" "}
             {PREP_TIME}s to prepare, then {RECORD_TIME}s to read.
           </p>
@@ -322,8 +322,8 @@ export default function ReadAloudPage() {
 
         {/* ── Idle ─────────────────────────────────────────────────────────── */}
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-slate-600 dark:text-slate-300 text-sm mb-8 max-w-sm mx-auto">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-[var(--text-secondary)] text-sm mb-8 max-w-sm mx-auto">
               An AI-generated passage will appear. Study it during the preparation phase, then read it aloud when recording starts.
             </p>
             <button
@@ -341,32 +341,32 @@ export default function ReadAloudPage() {
 
         {/* ── Generating ───────────────────────────────────────────────────── */}
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating passage…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating passage…</p>
           </div>
         )}
 
         {/* ── Ready (prep timer) ───────────────────────────────────────────── */}
         {phase === "ready" && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-white p-6 dark:border-white/15 dark:bg-slate-900 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-slate-900 bg-[var(--surface)] p-6 dark:border-white/15 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Preparation
                 </p>
                 <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
               </div>
-              <p className="text-base sm:text-lg leading-8 text-slate-900 dark:text-white font-serif">
+              <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">
                 {stimulus}
               </p>
             </div>
 
-            <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <p>Recording starts automatically when the timer reaches 0.</p>
               <button
                 onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700 transition-colors hover:border-slate-900 hover:text-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white dark:hover:text-white"
+                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
               >
                 Start now
               </button>
@@ -377,7 +377,7 @@ export default function ReadAloudPage() {
         {/* ── Recording ────────────────────────────────────────────────────── */}
         {phase === "recording" && (
           <div className="space-y-6">
-            <div className="border-2 border-red-400 bg-white p-6 dark:bg-slate-900">
+            <div className="border-2 border-red-400 bg-[var(--surface)] p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
@@ -387,7 +387,7 @@ export default function ReadAloudPage() {
                 </div>
                 <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={72} />
               </div>
-              <p className="text-base sm:text-lg leading-8 text-slate-900 dark:text-white font-serif">
+              <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">
                 {stimulus}
               </p>
             </div>
@@ -411,12 +411,12 @@ export default function ReadAloudPage() {
 
         {/* ── Processing ───────────────────────────────────────────────────── */}
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">
               Analyzing your reading…
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-[var(--text-muted)]">
               Running AI feedback and pronunciation assessment in parallel
             </p>
           </div>
@@ -426,22 +426,22 @@ export default function ReadAloudPage() {
         {phase === "done" && feedback && (
           <div className="space-y-6">
             {/* Stimulus recap */}
-            <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/50">
+            <div className="border border-[var(--border)] bg-[var(--background)] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Passage</p>
-              <p className="text-sm leading-7 text-slate-700 dark:text-slate-300 font-serif">{stimulus}</p>
+              <p className="text-sm leading-7 text-[var(--text-secondary)] font-serif">{stimulus}</p>
             </div>
 
             {/* Transcript */}
             {transcript && transcript !== "[transcript not captured]" && (
-              <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+              <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Your Reading</p>
-                <p className="text-sm leading-7 text-slate-600 dark:text-slate-300 italic">{transcript}</p>
+                <p className="text-sm leading-7 text-[var(--text-secondary)] italic">{transcript}</p>
               </div>
             )}
 
             {/* Pronunciation score summary */}
             {feedback.pronunciationAssessment && (
-              <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+              <div className="border border-slate-900 bg-[var(--surface)] p-5 dark:border-white/15 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
                   Azure Pronunciation Assessment
                 </p>
@@ -454,7 +454,7 @@ export default function ReadAloudPage() {
                   ].map(({ label, score }) => (
                     <div key={label} className="text-center">
                       <ScoreBadge score={score} />
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -463,20 +463,20 @@ export default function ReadAloudPage() {
             )}
 
             {/* AI feedback */}
-            <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
+            <div className="border border-slate-900 bg-[var(--surface)] p-5 dark:border-white/15 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 AI Feedback
               </p>
 
-              <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{feedback.summary}</p>
+              <p className="text-sm leading-7 text-[var(--foreground)]">{feedback.summary}</p>
 
               {feedback.details && feedback.details.taskType === "read_aloud" && (
-                <div className="grid gap-4 sm:grid-cols-2 border-t border-slate-100 dark:border-white/10 pt-4">
+                <div className="grid gap-4 sm:grid-cols-2 border-t border-[var(--border)] pt-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">
                       Oral Fluency
                     </p>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="text-sm leading-6 text-[var(--text-secondary)]">
                       {feedback.details.oralFluency}
                     </p>
                   </div>
@@ -484,7 +484,7 @@ export default function ReadAloudPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">
                       Pronunciation
                     </p>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="text-sm leading-6 text-[var(--text-secondary)]">
                       {feedback.details.pronunciation}
                     </p>
                   </div>
@@ -492,13 +492,13 @@ export default function ReadAloudPage() {
               )}
 
               {feedback.strengths.length > 0 && (
-                <div className="border-t border-slate-100 dark:border-white/10 pt-4">
+                <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 mb-2">
                     Strengths
                   </p>
                   <ul className="space-y-1">
                     {feedback.strengths.map((s, i) => (
-                      <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
+                      <li key={i} className="flex gap-2 text-sm text-[var(--foreground)]">
                         <span className="text-emerald-500 shrink-0">+</span>{s}
                       </li>
                     ))}
@@ -507,13 +507,13 @@ export default function ReadAloudPage() {
               )}
 
               {feedback.weaknesses.length > 0 && (
-                <div className="border-t border-slate-100 dark:border-white/10 pt-4">
+                <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-600 dark:text-red-400 mb-2">
                     Areas to Improve
                   </p>
                   <ul className="space-y-1">
                     {feedback.weaknesses.map((w, i) => (
-                      <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
+                      <li key={i} className="flex gap-2 text-sm text-[var(--foreground)]">
                         <span className="text-red-400 shrink-0">–</span>{w}
                       </li>
                     ))}
@@ -522,13 +522,13 @@ export default function ReadAloudPage() {
               )}
 
               {feedback.suggestions.length > 0 && (
-                <div className="border-t border-slate-100 dark:border-white/10 pt-4">
+                <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">
                     Suggestions
                   </p>
                   <ul className="space-y-1">
                     {feedback.suggestions.map((s, i) => (
-                      <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <li key={i} className="flex gap-2 text-sm text-[var(--text-secondary)]">
                         <span className="shrink-0 tabular-nums text-slate-400">{i + 1}.</span>{s}
                       </li>
                     ))}
@@ -547,7 +547,7 @@ export default function ReadAloudPage() {
               </button>
               <Link
                 href="/"
-                className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white"
+                className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]"
               >
                 Back to Home
               </Link>

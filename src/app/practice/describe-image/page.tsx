@@ -31,7 +31,7 @@ function CountdownRing({ seconds, total, size = 72 }: { seconds: number; total: 
           className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
           style={{ transition: "stroke-dasharray 0.9s linear" }} />
       </svg>
-      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>
         {seconds}
       </span>
     </div>
@@ -194,29 +194,29 @@ export default function DescribeImagePage() {
   }, [image])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Describe Image</span>
+          <span className="text-[var(--foreground)] font-medium">Describe Image</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
             PTE Speaking
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Describe Image</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Describe Image</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Study the image for {PREP_TIME}s, then describe it in detail. You have {RECORD_TIME}s to speak.
           </p>
         </div>
 
         {/* Idle */}
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8 max-w-sm mx-auto">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
               A chart, map, or diagram will appear. Study it during the preparation phase, then describe what you see when recording starts.
             </p>
             <button
@@ -234,14 +234,14 @@ export default function DescribeImagePage() {
         {/* Ready — image + prep timer */}
         {phase === "ready" && image && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-slate-900 bg-[var(--surface)] p-5 dark:border-white/15 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preparation</p>
                 <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{image.topic}</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
-                <div className="flex items-center justify-center h-48 bg-slate-100 dark:bg-slate-800 text-sm text-slate-500 dark:text-slate-400">
+                <div className="flex items-center justify-center h-48 bg-[var(--background)] text-sm text-[var(--text-secondary)]">
                   Image failed to load
                 </div>
               ) : (
@@ -258,11 +258,11 @@ export default function DescribeImagePage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <p>Recording starts automatically when the timer reaches 0.</p>
               <button
                 onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700 hover:border-slate-900 hover:text-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white dark:hover:text-white transition-colors"
+                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)] transition-colors"
               >
                 Start now
               </button>
@@ -273,7 +273,7 @@ export default function DescribeImagePage() {
         {/* Recording */}
         {phase === "recording" && image && (
           <div className="space-y-6">
-            <div className="border-2 border-red-400 bg-white p-5 dark:bg-slate-900">
+            <div className="border-2 border-red-400 bg-[var(--surface)] p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
@@ -281,9 +281,9 @@ export default function DescribeImagePage() {
                 </div>
                 <CountdownRing seconds={recSeconds} total={RECORD_TIME} />
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{image.topic}</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
-                <div className="flex items-center justify-center h-48 bg-slate-100 dark:bg-slate-800 text-sm text-slate-500">
+                <div className="flex items-center justify-center h-48 bg-[var(--background)] text-sm text-[var(--text-secondary)]">
                   Image failed to load
                 </div>
               ) : (
@@ -319,18 +319,18 @@ export default function DescribeImagePage() {
 
         {/* Processing */}
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Analyzing your description…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Analyzing your description…</p>
           </div>
         )}
 
         {/* Done */}
         {phase === "done" && feedback && image && (
           <div className="space-y-6">
-            <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/50">
+            <div className="border border-[var(--border)] bg-[var(--background)] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Image</p>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{image.topic}</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-2">{image.topic}</p>
               <div className="relative w-full">
                 <Image
                   src={image.url}
@@ -356,7 +356,7 @@ export default function DescribeImagePage() {
               >
                 New Image
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

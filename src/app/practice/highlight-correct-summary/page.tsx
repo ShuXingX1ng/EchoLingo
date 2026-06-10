@@ -193,25 +193,25 @@ export default function HighlightCorrectSummaryPage() {
   const timeUrgent = seconds <= 60
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Highlight Correct Summary</span>
+          <span className="text-[var(--foreground)] font-medium">Highlight Correct Summary</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Listening</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Highlight Correct Summary</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Highlight Correct Summary</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Listen to a passage, then select the summary that best matches what you heard. 5 minutes.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated passage will be read aloud. After listening, select the one summary that accurately captures the main idea and key points.
             </p>
             <button
@@ -224,14 +224,14 @@ export default function HighlightCorrectSummaryPage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating passage and audio…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating passage and audio…</p>
           </div>
         )}
 
         {phase === "ready" && audioUrl && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               Passage ready — listen carefully
             </p>
@@ -244,14 +244,14 @@ export default function HighlightCorrectSummaryPage() {
               </svg>
               Play Passage
             </button>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-[var(--text-muted)]">
               After the passage ends, you will choose the correct summary from 5 options.
             </p>
           </div>
         )}
 
         {phase === "listening" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-center gap-2 mb-4">
               {[0, 1, 2, 3, 4].map(i => (
                 <span
@@ -264,8 +264,8 @@ export default function HighlightCorrectSummaryPage() {
                 />
               ))}
             </div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Passage playing…</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Focus on the main idea and key points.</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Passage playing…</p>
+            <p className="text-xs text-[var(--text-muted)]">Focus on the main idea and key points.</p>
             <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
@@ -274,12 +274,12 @@ export default function HighlightCorrectSummaryPage() {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select the correct summary</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
 
-            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900 space-y-3">
+            <div className="border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-3">
                 Which summary best captures what the passage was about?
               </p>
@@ -289,7 +289,7 @@ export default function HighlightCorrectSummaryPage() {
                   className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-all ${
                     selected === i
                       ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
-                      : "border-slate-200 bg-white hover:border-slate-400 dark:border-white/10 dark:bg-slate-900 dark:hover:border-white/30"
+                      : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--foreground)]"
                   }`}
                 >
                   <input
@@ -300,7 +300,7 @@ export default function HighlightCorrectSummaryPage() {
                     onChange={() => setSelected(i)}
                     className="mt-0.5 shrink-0 accent-emerald-600"
                   />
-                  <span className="text-sm text-slate-800 dark:text-slate-100">
+                  <span className="text-sm text-[var(--foreground)]">
                     <span className="font-semibold mr-2">{String.fromCharCode(65 + i)}.</span>{s}
                   </span>
                 </label>
@@ -328,9 +328,9 @@ export default function HighlightCorrectSummaryPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your answer…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answer…</p>
           </div>
         )}
 
@@ -347,7 +347,7 @@ export default function HighlightCorrectSummaryPage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Another
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

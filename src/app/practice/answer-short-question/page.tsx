@@ -29,7 +29,7 @@ function CountdownRing({ seconds, total, size = 64 }: { seconds: number; total: 
           className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
           style={{ transition: "stroke-dasharray 0.9s linear" }} />
       </svg>
-      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>{seconds}</span>
+      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>{seconds}</span>
     </div>
   )
 }
@@ -199,25 +199,25 @@ export default function AnswerShortQuestionPage() {
   }, [question, correctAnswer])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Answer Short Question</span>
+          <span className="text-[var(--foreground)] font-medium">Answer Short Question</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Speaking</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Answer Short Question</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Answer Short Question</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Listen to the question, then give a short spoken answer (1–3 words). {RECORD_TIME}s to respond.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated factual question will appear. Answer as briefly and accurately as possible.
             </p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
@@ -227,17 +227,17 @@ export default function AnswerShortQuestionPage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating question…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating question…</p>
           </div>
         )}
 
         {(phase === "countdown" || phase === "ready") && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">Question</p>
-              <p className="text-2xl font-semibold text-slate-900 dark:text-white leading-relaxed">{question}</p>
+              <p className="text-2xl font-semibold text-[var(--foreground)] leading-relaxed">{question}</p>
               <div className="mt-6 flex flex-col items-center gap-2">
                 <CountdownRing seconds={countSec} total={PAUSE_TIME} size={56} />
                 <p className="text-xs text-slate-400">Recording starts automatically</p>
@@ -248,12 +248,12 @@ export default function AnswerShortQuestionPage() {
 
         {phase === "recording" && (
           <div className="space-y-6">
-            <div className="border-2 border-red-400 bg-white p-8 dark:bg-slate-900 text-center">
+            <div className="border-2 border-red-400 bg-[var(--surface)] p-8 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Recording</p>
               </div>
-              <p className="text-2xl font-semibold text-slate-900 dark:text-white mb-6">{question}</p>
+              <p className="text-2xl font-semibold text-[var(--foreground)] mb-6">{question}</p>
               <CountdownRing seconds={recSec} total={RECORD_TIME} size={72} />
             </div>
             <div className="text-center">
@@ -269,9 +269,9 @@ export default function AnswerShortQuestionPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Checking your answer…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Checking your answer…</p>
           </div>
         )}
 
@@ -289,7 +289,7 @@ export default function AnswerShortQuestionPage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Next Question
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

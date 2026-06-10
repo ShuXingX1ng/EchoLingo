@@ -108,10 +108,10 @@ function TaskCard({
 
   return (
     <div
-      className={`w-full bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-5 border transition-all text-left group ${
+      className={`w-full bg-[var(--surface)] rounded-xl p-4 sm:p-5 border transition-all text-left group ${
         isSelectMode && isSelected
-          ? "border-slate-900 dark:border-white ring-2 ring-slate-200 dark:ring-slate-700"
-          : "border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-md"
+          ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/20"
+          : "border-[var(--border)] hover:border-[var(--brand)] hover:shadow-md"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -134,16 +134,16 @@ function TaskCard({
                 <span className="text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 px-2 py-0.5">
                   {TASK_LABELS[task.taskType]}
                 </span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">
+                <span className="text-xs text-[var(--text-muted)]">
                   {TASK_SECTION[task.taskType]}
                 </span>
               </div>
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
                 {formatDate(task.createdAt)} · {task.durationSeconds}s
               </p>
             </div>
             {!isSelectMode && (
-              <span className="text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:translate-x-1 transition-all shrink-0">
+              <span className="text-[var(--text-muted)] group-hover:text-[var(--foreground)] group-hover:translate-x-1 transition-all shrink-0">
                 →
               </span>
             )}
@@ -152,7 +152,7 @@ function TaskCard({
           {task.feedback && (
             <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
               {task.feedback.summary && (
-                <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200 line-clamp-2">
+                <p className="rounded-lg bg-[var(--background)] px-3 py-2 text-[var(--text-secondary)] line-clamp-2">
                   {task.feedback.summary}
                 </p>
               )}
@@ -195,23 +195,23 @@ function TaskDetail({
   onDelete: () => void
 }) {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="history" />
 
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200 dark:border-white/10 dark:bg-slate-950/90 px-4 py-3">
+      <div className="sticky top-0 z-10 bg-[var(--surface)]/90 backdrop-blur border-b border-[var(--border)] px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
             >
               ← Back
             </button>
             <div>
-              <h1 className="font-semibold text-slate-900 dark:text-white">
+              <h1 className="font-semibold text-[var(--foreground)]">
                 {TASK_LABELS[task.taskType]}
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[var(--text-secondary)]">
                 {formatDate(task.createdAt)}
               </p>
             </div>
@@ -239,21 +239,21 @@ function TaskDetail({
             responseLabel={task.response.kind === "audio" ? "Spoken Response (transcript)" : "Your Response"}
           />
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-slate-900 text-center">
-            <p className="text-sm text-slate-500 dark:text-slate-400">No feedback available for this task.</p>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+            <p className="text-sm text-[var(--text-secondary)]">No feedback available for this task.</p>
           </div>
         )}
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-8">
           <Link
             href="/practice"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-[var(--brand)] rounded-xl hover:bg-[var(--brand-hover)] transition-colors"
           >
             Practice Again
           </Link>
           <button
             onClick={onBack}
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background)] transition-colors"
           >
             Back to History
           </button>
@@ -375,7 +375,7 @@ export default function HistoryPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="history" />
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6">
@@ -385,25 +385,25 @@ export default function HistoryPage() {
               {[0, 0.15, 0.3].map((delay, i) => (
                 <div
                   key={i}
-                  className="w-3 h-3 bg-slate-900 dark:bg-white rounded-full animate-bounce"
+                  className="w-3 h-3 bg-[var(--brand)] rounded-full animate-bounce"
                   style={{ animationDelay: `${delay}s` }}
                 />
               ))}
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading history…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Loading history…</p>
           </div>
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
             <div className="text-6xl mb-6">📝</div>
-            <h2 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+            <h2 className="text-lg font-medium text-[var(--foreground)] mb-2">
               No Practice History Yet
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-md">
+            <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-md">
               Complete a PTE practice task to see your history and track progress here.
             </p>
             <Link
               href="/practice"
-              className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all hover:shadow-lg"
+              className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-[var(--brand)] rounded-xl hover:bg-[var(--brand-hover)] transition-all hover:shadow-lg"
             >
               Start Practicing
             </Link>
@@ -424,8 +424,8 @@ export default function HistoryPage() {
                     onClick={() => setFilterType(type)}
                     className={`shrink-0 px-3 py-1.5 text-xs rounded-full transition-colors ${
                       filterType === type
-                        ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-                        : "bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-slate-500"
+                        ? "bg-[var(--brand)] text-white"
+                        : "bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--brand)]"
                     }`}
                   >
                     {label} ({count})
@@ -442,7 +442,7 @@ export default function HistoryPage() {
                   placeholder="Search by task type, feedback, or stimulus text…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
                 />
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,8 +456,8 @@ export default function HistoryPage() {
                   onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds(new Set()) }}
                   className={`px-3 py-2 text-xs rounded-lg transition-colors ${
                     isSelectMode
-                      ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white"
-                      : "border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      ? "bg-[var(--border)] text-[var(--foreground)]"
+                      : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--background)]"
                   }`}
                 >
                   {isSelectMode ? "Cancel" : "Select"}
@@ -467,18 +467,18 @@ export default function HistoryPage() {
                   <div className="relative">
                     <button
                       onClick={() => setIsExportOpen(!isExportOpen)}
-                      className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      className="px-3 py-2 text-xs border border-[var(--border)] rounded-lg text-[var(--text-secondary)] hover:bg-[var(--background)] transition-colors"
                     >
                       Export
                     </button>
                     {isExportOpen && (
-                      <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10">
+                      <div className="absolute right-0 mt-1 w-32 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg z-10">
                         <button onClick={() => handleExport("json")}
-                          className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-t-lg">
+                          className="w-full px-4 py-2 text-xs text-left text-[var(--text-secondary)] hover:bg-[var(--background)] rounded-t-lg">
                           Export JSON
                         </button>
                         <button onClick={() => handleExport("csv")}
-                          className="w-full px-4 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-b-lg">
+                          className="w-full px-4 py-2 text-xs text-left text-[var(--text-secondary)] hover:bg-[var(--background)] rounded-b-lg">
                           Export CSV
                         </button>
                       </div>
@@ -494,20 +494,20 @@ export default function HistoryPage() {
               </div>
 
               {isSelectMode && (
-                <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-[var(--background)] rounded-xl">
                   <div className="flex items-center gap-3">
                     <button onClick={toggleSelectAll}
-                      className="text-xs text-slate-900 dark:text-white hover:underline">
+                      className="text-xs text-[var(--foreground)] hover:underline">
                       {selectedIds.size === filteredTasks.length ? "Deselect All" : "Select All"}
                     </button>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="text-xs text-[var(--text-secondary)]">
                       {selectedIds.size} selected
                     </span>
                   </div>
                   <button
                     onClick={handleBatchDelete}
                     disabled={selectedIds.size === 0}
-                    className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 bg-white dark:bg-slate-900 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 bg-[var(--surface)] rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Delete Selected
                   </button>
@@ -517,7 +517,7 @@ export default function HistoryPage() {
 
             {/* Task list */}
             <div className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-[var(--text-secondary)]">
                 {searchQuery
                   ? `${filteredTasks.length} result(s) for "${searchQuery}"`
                   : `${filteredTasks.length} practice task(s)`}
@@ -525,7 +525,7 @@ export default function HistoryPage() {
 
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-slate-500 dark:text-slate-400">No tasks match your search.</p>
+                  <p className="text-[var(--text-secondary)]">No tasks match your search.</p>
                 </div>
               ) : (
                 filteredTasks.map((task, index) => (

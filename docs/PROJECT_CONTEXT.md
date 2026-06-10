@@ -14,13 +14,14 @@ Target users:
 
 | Area | Status |
 |------|--------|
-| Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS |
+| Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4; DM Serif Display + DM Sans via `next/font/google` |
 | Backend | FastAPI beside Next.js API Routes fallback |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 82 frontend unit tests, 55 E2E tests (20 smoke + 12 listening + 14 reading + 9 mock exam), 105 backend tests |
+| Tests | 122 frontend unit tests (13 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 105 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
+| UI | Design token pass complete — all practice task pages, nav, history, stats, home use `var(--surface/border/foreground/text-secondary/text-muted)` tokens; DM Serif Display + DM Sans typography |
 
 ## Architecture
 

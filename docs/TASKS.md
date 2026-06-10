@@ -36,13 +36,18 @@
 | Mock exam Describe Image + Re-tell Lecture | Done | `MockDescribeImage`, `MockReTellLecture`; `/mock` now 15-task sequence covering all 15 PTE task types |
 | E2E — Reading practice pages | Done | `e2e/reading-tasks.spec.ts`; 14 tests for FIB-Reading, Re-order Paragraphs, Multiple Choice |
 | E2E — Mock exam full flow | Done | `e2e/mock-exam.spec.ts`; 9 tests — intro screen, Start→task-1 transition, summary with injected 15-task session |
+| Unit test expansion | Done | 40 new tests across `task-weakness.test.ts` (14), `task-bank.test.ts` (14), `unified-task-history.test.ts` (14); total 122 unit tests |
+| Smoke test PTE rewrite | Done | `e2e/smoke.spec.ts` rewritten: all stale IELTS routes removed; 14 PTE-focused P0/P1/P2 smoke tests |
+| UI redesign — learning platform aesthetic | Done | DM Serif Display + DM Sans fonts; redesigned DesktopNav + MobileNav; home page stats bar + 4-card feature grid + staggered animations |
+| UI token pass — remaining pages | Done | `var(--surface)` / `var(--border)` / `var(--brand)` tokens applied to `/practice/setup`, `/history`, `/stats`; all hardcoded slate colors replaced |
+| UI token pass — all 15 practice task pages | Done | All 15 practice task pages tokenized; 401 token usages; bold-card borders intentionally kept; typecheck clean |
 
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
-| Frontend unit | 10 files / 82 tests |
-| E2E | 55 tests (20 smoke + 12 listening + 14 reading + 9 mock exam) |
+| Frontend unit | 13 files / 122 tests |
+| E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
 | Backend | 105 tests |
 | Quality gate | lint 0, typecheck pass, build pass |
 
@@ -60,22 +65,23 @@
 
 ## Next Phase
 
-**Resume point (2026-06-10):** E2E test suite is now complete. All 15 task types covered in practice, mock, and E2E. 55 E2E tests passing across 5 spec files.
+**Resume point (2026-06-10):** Design token pass complete across all pages — all 15 practice task pages, nav, home, history, stats now use CSS variable tokens; typecheck clean.
 
 What's done:
-- `e2e/mock-exam.spec.ts` — 9 tests: intro screen (heading/nav, 15-task list + all 4 sections, Start→task-1 transition); summary page (no-session fallback, Exam Complete + task count, per-task breakdown for all 15 types, weaknesses, practice links, action buttons)
-- Session data injected via `page.addInitScript` — avoids driving real recording timers
-- `e2e/reading-tasks.spec.ts` — 14 tests for FIB-Reading, Re-order Paragraphs, Multiple Choice
-- Quality: typecheck 0, lint 0, 82/82 unit tests, 55/55 E2E tests pass
+- UI token pass: all 15 practice task pages — `bg-white`, `bg-slate-*`, `border-slate-*`, `text-slate-*` replaced with `var(--surface)` / `var(--background)` / `var(--border)` / `var(--foreground)` / `var(--text-secondary)` / `var(--text-muted)` tokens (401 total usages)
+- Bold-card borders (`border-slate-900 dark:border-white/15`) intentionally kept as design elements
+- Functional state colors (red recording, emerald brand, amber warning) untouched
 
 What's next:
-- [ ] Expand frontend unit tests — currently 82 tests across 10 files; next candidates are `task-weakness.ts` dimension aggregation, `task-bank.ts` cache eviction, `unified-task-history.ts` fallback logic
-- [ ] Update smoke tests — several tests in `e2e/smoke.spec.ts` reference legacy IELTS routes (`/practice/setup`, `/practice/exam`, `/practice/shadowing`) that may no longer exist; audit and remove stale tests
+- [ ] Smoke test visual changes in browser (dark mode + light mode) — check all 15 task pages render correctly
+- [ ] Check `src/app/practice/exam/page.tsx` — may still have untokenized patterns; tokenize if needed
+- [ ] Consider a `/settings` page styled to the same token system — key file: `src/app/settings/page.tsx` (if it exists)
+- [ ] Consider converting bold-card borders to a new `--border-strong` token for full consistency
 
 Key files to open first:
-- `e2e/smoke.spec.ts`
-- `src/lib/task-weakness.ts`
-- `src/lib/task-bank.ts`
+- `src/app/globals.css` — token definitions (`--surface`, `--border`, `--brand`, `--foreground`, etc.)
+- `src/app/page.tsx` — canonical visual pattern for reference
+- `src/app/practice/read-aloud/page.tsx` — representative tokenized task page
 
 ---
 

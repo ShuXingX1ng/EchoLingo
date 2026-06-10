@@ -37,7 +37,7 @@ function CountdownRing({ seconds, total, size = 72 }: { seconds: number; total: 
           className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
           style={{ transition: "stroke-dasharray 0.9s linear" }} />
       </svg>
-      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>
         {seconds}
       </span>
     </div>
@@ -229,29 +229,29 @@ export default function ReTellLecturePage() {
   }, [lectureText])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Re-tell Lecture</span>
+          <span className="text-[var(--foreground)] font-medium">Re-tell Lecture</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
             PTE Speaking
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Re-tell Lecture</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Re-tell Lecture</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Listen to a short lecture, then re-tell it in your own words. You have {PREP_TIME}s to prepare and {RECORD_TIME}s to respond.
           </p>
         </div>
 
         {/* Idle */}
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8 max-w-sm mx-auto">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
               An AI-generated lecture will be synthesized as audio. Listen carefully, prepare for 10s, then re-tell the key points.
             </p>
             <button
@@ -268,16 +268,16 @@ export default function ReTellLecturePage() {
 
         {/* Generating */}
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Generating lecture audio…</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Writing lecture text and synthesizing speech</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Generating lecture audio…</p>
+            <p className="text-xs text-[var(--text-muted)]">Writing lecture text and synthesizing speech</p>
           </div>
         )}
 
         {/* Ready — play button */}
         {phase === "ready" && audioUrl && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               Lecture ready — listen carefully
             </p>
@@ -290,7 +290,7 @@ export default function ReTellLecturePage() {
               </svg>
               Play Lecture
             </button>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-[var(--text-muted)]">
               After the lecture ends, you will have {PREP_TIME}s to prepare, then {RECORD_TIME}s to re-tell it.
             </p>
           </div>
@@ -298,7 +298,7 @@ export default function ReTellLecturePage() {
 
         {/* Listening — audio is playing */}
         {phase === "listening" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-center gap-2 mb-4">
               {[0, 1, 2, 3, 4].map(i => (
                 <span
@@ -311,20 +311,20 @@ export default function ReTellLecturePage() {
                 />
               ))}
             </div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Lecture playing…</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Listen carefully. The preparation timer starts when the lecture ends.</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Lecture playing…</p>
+            <p className="text-xs text-[var(--text-muted)]">Listen carefully. The preparation timer starts when the lecture ends.</p>
             <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
 
         {/* Prep — 10s countdown after audio ends */}
         {phase === "prep" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               Preparation — organise your thoughts
             </p>
             <CountdownRing seconds={prepSeconds} total={PREP_TIME} size={88} />
-            <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+            <p className="mt-4 text-xs text-[var(--text-muted)]">
               Recording starts automatically in {prepSeconds}s
             </p>
           </div>
@@ -333,7 +333,7 @@ export default function ReTellLecturePage() {
         {/* Recording */}
         {phase === "recording" && (
           <div className="space-y-6">
-            <div className="border-2 border-red-400 bg-white p-8 dark:bg-slate-900 text-center">
+            <div className="border-2 border-red-400 bg-[var(--surface)] p-8 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">
@@ -361,9 +361,9 @@ export default function ReTellLecturePage() {
 
         {/* Processing */}
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Analyzing your re-tell…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Analyzing your re-tell…</p>
           </div>
         )}
 
@@ -384,7 +384,7 @@ export default function ReTellLecturePage() {
               >
                 New Lecture
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

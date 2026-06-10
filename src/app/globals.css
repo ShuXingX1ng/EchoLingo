@@ -1,29 +1,70 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9fafb;
+  --foreground: #111827;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --border: #e5e7eb;
+  --border-focus: #059669;
+  --brand: #059669;
+  --brand-hover: #047857;
+  --brand-light: #ecfdf5;
+  --brand-text: #065f46;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-body), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display, "DM Serif Display"), Georgia, serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --surface: #1e293b;
+    --surface-raised: #293548;
+    --border: #334155;
+    --brand-light: #064e3b;
+    --brand-text: #6ee7b7;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
+
+/* ========== 字体工具类 ========== */
+
+.font-display {
+  font-family: var(--font-display, "DM Serif Display"), Georgia, serif;
+}
+
+/* ========== 页面入场动画 ========== */
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-enter {
+  animation: pageEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-enter-1 { animation: pageEnter 0.5s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-enter-2 { animation: pageEnter 0.5s 0.10s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-enter-3 { animation: pageEnter 0.5s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-enter-4 { animation: pageEnter 0.5s 0.20s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-enter-5 { animation: pageEnter 0.5s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* ========== 全局动画 ========== */
 

@@ -170,25 +170,25 @@ export default function FillInTheBlanksPage() {
   const segments = parsed ? splitPassage(parsed.passage) : []
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Fill in the Blanks</span>
+          <span className="text-[var(--foreground)] font-medium">Fill in the Blanks</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Fill in the Blanks</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Fill in the Blanks</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Read the passage and select the correct word from the dropdown for each blank. 7 minutes.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated academic passage will appear with blanks. Choose the best word for each gap from the dropdown options.
             </p>
             <button
@@ -201,9 +201,9 @@ export default function FillInTheBlanksPage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating passage…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating passage…</p>
           </div>
         )}
 
@@ -211,11 +211,11 @@ export default function FillInTheBlanksPage() {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
-            <div className="border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-slate-900 leading-9 text-sm text-slate-800 dark:text-slate-100">
+            <div className="border border-[var(--border)] bg-[var(--surface)] p-6 leading-9 text-sm text-[var(--foreground)]">
               {segments.map((seg, i) => {
                 if (seg.type === "text") return <span key={i}>{seg.value}</span>
                 const blankIdx = parseInt(seg.value, 10)
@@ -229,7 +229,7 @@ export default function FillInTheBlanksPage() {
                       newSel[blankIdx] = e.target.value || null
                       setSelections(newSel)
                     }}
-                    className="mx-1 inline-block rounded border border-emerald-400 bg-white px-2 py-0.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-slate-800 dark:text-white dark:border-emerald-600"
+                    className="mx-1 inline-block rounded border border-emerald-400 bg-[var(--surface)] px-2 py-0.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">— choose —</option>
                     {blank.options.map((opt, oi) => (
@@ -255,9 +255,9 @@ export default function FillInTheBlanksPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your answers…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answers…</p>
           </div>
         )}
 
@@ -274,7 +274,7 @@ export default function FillInTheBlanksPage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Another
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

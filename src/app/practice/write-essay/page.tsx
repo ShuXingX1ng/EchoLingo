@@ -114,25 +114,25 @@ export default function WriteEssayPage() {
   const wordStatus = wordCount < MIN_WORDS ? "below" : wordCount > MAX_WORDS ? "over" : "ok"
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Write Essay</span>
+          <span className="text-[var(--foreground)] font-medium">Write Essay</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Writing</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Write Essay</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Write Essay</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Write a {MIN_WORDS}–{MAX_WORDS} word essay in response to the prompt. 20 minutes.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated essay question will appear. Write a structured {MIN_WORDS}–{MAX_WORDS} word response.
             </p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
@@ -142,9 +142,9 @@ export default function WriteEssayPage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating essay question…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating essay question…</p>
           </div>
         )}
 
@@ -152,12 +152,12 @@ export default function WriteEssayPage() {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Essay Question</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
-            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm leading-8 text-slate-800 dark:text-slate-100">{prompt}</p>
+            <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+              <p className="text-sm leading-8 text-[var(--foreground)]">{prompt}</p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -170,7 +170,7 @@ export default function WriteEssayPage() {
                 value={userText}
                 onChange={e => setUserText(e.target.value)}
                 placeholder={`Write your essay here. Aim for ${MIN_WORDS}–${MAX_WORDS} words with a clear structure: introduction, body paragraphs, conclusion.`}
-                className="w-full rounded-lg border border-slate-300 bg-white p-4 text-sm leading-7 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-white/20 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 resize-none"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--foreground)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 rows={16}
               />
             </div>
@@ -184,9 +184,9 @@ export default function WriteEssayPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your essay…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Evaluating your essay…</p>
           </div>
         )}
 
@@ -198,7 +198,7 @@ export default function WriteEssayPage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Another
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

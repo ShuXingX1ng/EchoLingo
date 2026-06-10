@@ -32,7 +32,7 @@ function CountdownRing({ seconds, total, size = 80 }: { seconds: number; total: 
           className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
           style={{ transition: "stroke-dasharray 0.9s linear" }} />
       </svg>
-      <span className={`absolute text-xl font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>{seconds}</span>
+      <span className={`absolute text-xl font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>{seconds}</span>
     </div>
   )
 }
@@ -180,26 +180,26 @@ export default function PersonalIntroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Personal Introduction</span>
+          <span className="text-[var(--foreground)] font-medium">Personal Introduction</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Speaking</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Personal Introduction</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Personal Introduction</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Unscored in PTE, but great for warming up. {PREP_TIME}s prep, {RECORD_TIME}s to speak.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <div className="mb-6 rounded-lg bg-slate-50 p-4 text-sm leading-7 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-left font-serif">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="mb-6 rounded-lg bg-[var(--background)] p-4 text-sm leading-7 text-[var(--text-secondary)] text-left font-serif">
               {FIXED_PROMPT}
             </div>
             <button onClick={() => setPhase("ready")}
@@ -211,16 +211,16 @@ export default function PersonalIntroPage() {
 
         {phase === "ready" && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-white p-6 dark:border-white/15 dark:bg-slate-900 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-slate-900 bg-[var(--surface)] p-6 dark:border-white/15 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Prepare</p>
                 <CountdownRing seconds={prepSec} total={PREP_TIME} />
               </div>
-              <p className="text-base leading-8 text-slate-900 dark:text-white font-serif">{FIXED_PROMPT}</p>
+              <p className="text-base leading-8 text-[var(--foreground)] font-serif">{FIXED_PROMPT}</p>
             </div>
             <div className="text-center">
               <button onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Start speaking now
               </button>
             </div>
@@ -229,7 +229,7 @@ export default function PersonalIntroPage() {
 
         {phase === "recording" && (
           <div className="space-y-6">
-            <div className="border-2 border-red-400 bg-white p-6 dark:bg-slate-900">
+            <div className="border-2 border-red-400 bg-[var(--surface)] p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
@@ -237,7 +237,7 @@ export default function PersonalIntroPage() {
                 </div>
                 <CountdownRing seconds={recSec} total={RECORD_TIME} size={72} />
               </div>
-              <p className="text-base leading-8 text-slate-900 dark:text-white font-serif">{FIXED_PROMPT}</p>
+              <p className="text-base leading-8 text-[var(--foreground)] font-serif">{FIXED_PROMPT}</p>
             </div>
             <div className="text-center">
               <button onClick={stopRecording}
@@ -252,9 +252,9 @@ export default function PersonalIntroPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating feedback…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating feedback…</p>
           </div>
         )}
 
@@ -267,7 +267,7 @@ export default function PersonalIntroPage() {
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Again
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

@@ -34,39 +34,41 @@ export default function DesktopNav({
   ];
 
   return (
-    <header className="border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-white/10 dark:bg-slate-950/90">
-      <div className={`mx-auto flex ${maxWidthClasses[maxWidth]} items-center justify-between gap-4`}>
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-sm">
+      <div className={`mx-auto flex ${maxWidthClasses[maxWidth]} items-center justify-between gap-4 px-4 py-3 sm:px-6`}>
         {/* Logo */}
-        <Link href="/" className="group flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center border border-slate-900 bg-slate-950 text-xs font-semibold text-white dark:border-white dark:bg-white dark:text-slate-950">
+        <Link href="/" className="group flex items-center gap-2.5 shrink-0">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-xs font-bold text-white shadow-sm">
             EL
           </span>
-          <span className="hidden sm:block">
-            <span className="block text-sm font-semibold tracking-[0.12em] text-slate-950 dark:text-white">
-              EchoLingo
-            </span>
+          <span className="hidden text-sm font-semibold tracking-tight text-[var(--foreground)] sm:block">
+            EchoLingo
           </span>
         </Link>
 
         {/* Nav Links */}
-        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-500 dark:text-slate-400 md:flex">
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
           {links.map((link) => (
             <Link
               key={link.key}
               href={link.href}
-              className={
+              className={`relative rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 active === link.key
-                  ? "text-slate-950 dark:text-white"
-                  : "transition-colors hover:text-slate-950 dark:hover:text-white"
-              }
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  : "text-[var(--text-secondary)] hover:bg-gray-100 hover:text-[var(--foreground)] dark:hover:bg-white/10 dark:hover:text-white"
+              }`}
+              aria-current={active === link.key ? "page" : undefined}
             >
               {link.label}
+              {active === link.key && (
+                <span className="absolute inset-x-3 -bottom-[13px] h-0.5 rounded-full bg-emerald-600" />
+              )}
             </Link>
           ))}
         </nav>
 
         {/* Right Side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {rightContent}
           <MuteButton />
           <LanguageSwitcher />

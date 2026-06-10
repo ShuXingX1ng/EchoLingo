@@ -190,25 +190,25 @@ export default function ReOrderParagraphsPage() {
   const timeUrgent = seconds <= 30
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Re-order Paragraphs</span>
+          <span className="text-[var(--foreground)] font-medium">Re-order Paragraphs</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Re-order Paragraphs</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Re-order Paragraphs</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Drag the paragraph tiles into the correct logical order. 3 minutes.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               Shuffled paragraph tiles will appear. Drag them or use the arrows to arrange them in the correct order.
             </p>
             <button
@@ -221,9 +221,9 @@ export default function ReOrderParagraphsPage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating paragraphs…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating paragraphs…</p>
           </div>
         )}
 
@@ -233,7 +233,7 @@ export default function ReOrderParagraphsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Drag to reorder
               </p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
@@ -247,22 +247,22 @@ export default function ReOrderParagraphsPage() {
                   onDragOver={e => { e.preventDefault(); setDragOverIdx(idx) }}
                   onDrop={() => handleDrop(idx)}
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                  className={`group flex items-start gap-3 border bg-white p-4 cursor-grab active:cursor-grabbing transition-all dark:bg-slate-900 ${
+                  className={`group flex items-start gap-3 border bg-[var(--surface)] p-4 cursor-grab active:cursor-grabbing transition-all ${
                     dragOverIdx === idx && dragIdx !== idx
                       ? "border-emerald-400 shadow-[0_0_0_2px_rgba(52,211,153,0.3)]"
-                      : "border-slate-200 dark:border-white/10"
+                      : "border-[var(--border)]"
                   } ${dragIdx === idx ? "opacity-50" : ""}`}
                 >
-                  <span className="mt-0.5 shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-mono font-semibold text-slate-500 dark:border-white/10 dark:bg-slate-800 dark:text-slate-400">
+                  <span className="mt-0.5 shrink-0 rounded border border-[var(--border)] bg-[var(--background)] px-1.5 py-0.5 text-xs font-mono font-semibold text-[var(--text-secondary)]">
                     {idx + 1}
                   </span>
-                  <p className="flex-1 text-sm leading-7 text-slate-800 dark:text-slate-100">{para.text}</p>
+                  <p className="flex-1 text-sm leading-7 text-[var(--foreground)]">{para.text}</p>
                   <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => moveUp(idx)}
                       disabled={idx === 0}
                       aria-label="Move up"
-                      className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 dark:hover:text-slate-200"
+                      className="rounded p-1 text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-20"
                     >
                       ↑
                     </button>
@@ -270,7 +270,7 @@ export default function ReOrderParagraphsPage() {
                       onClick={() => moveDown(idx)}
                       disabled={idx === displayOrder.length - 1}
                       aria-label="Move down"
-                      className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 dark:hover:text-slate-200"
+                      className="rounded p-1 text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-20"
                     >
                       ↓
                     </button>
@@ -291,9 +291,9 @@ export default function ReOrderParagraphsPage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your order…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Evaluating your order…</p>
           </div>
         )}
 
@@ -310,7 +310,7 @@ export default function ReOrderParagraphsPage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Another
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

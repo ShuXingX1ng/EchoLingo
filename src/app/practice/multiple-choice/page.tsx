@@ -164,25 +164,25 @@ export default function MultipleChoicePage() {
   const timeUrgent = seconds <= 60
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/practice" className="hover:text-slate-700 dark:hover:text-slate-200">Practice</Link>
+        <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Multiple Choice</span>
+          <span className="text-[var(--foreground)] font-medium">Multiple Choice</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Multiple Choice</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Multiple Choice</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Read the passage and select the one correct answer from the five options. 4 minutes.
           </p>
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-8">
+          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated passage with a comprehension question will appear. Read carefully and select the best answer.
             </p>
             <button
@@ -195,9 +195,9 @@ export default function MultipleChoicePage() {
         )}
 
         {phase === "generating" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Generating question…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Generating question…</p>
           </div>
         )}
 
@@ -205,16 +205,16 @@ export default function MultipleChoicePage() {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
-            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm leading-8 text-slate-800 dark:text-slate-100">{parsed.passage}</p>
+            <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+              <p className="text-sm leading-8 text-[var(--foreground)]">{parsed.passage}</p>
             </div>
 
-            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900 space-y-4">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white leading-7">{parsed.question}</p>
+            <div className="border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4">
+              <p className="text-sm font-semibold text-[var(--foreground)] leading-7">{parsed.question}</p>
               <div className="space-y-2">
                 {parsed.options.map((opt, i) => (
                   <label
@@ -222,7 +222,7 @@ export default function MultipleChoicePage() {
                     className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-all ${
                       selected === i
                         ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
-                        : "border-slate-200 bg-white hover:border-slate-400 dark:border-white/10 dark:bg-slate-900 dark:hover:border-white/30"
+                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--foreground)]"
                     }`}
                   >
                     <input
@@ -233,7 +233,7 @@ export default function MultipleChoicePage() {
                       onChange={() => setSelected(i)}
                       className="mt-0.5 shrink-0 accent-emerald-600"
                     />
-                    <span className="text-sm text-slate-800 dark:text-slate-100">{opt}</span>
+                    <span className="text-sm text-[var(--foreground)]">{opt}</span>
                   </label>
                 ))}
               </div>
@@ -252,9 +252,9 @@ export default function MultipleChoicePage() {
         )}
 
         {phase === "processing" && (
-          <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your answer…</p>
+            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answer…</p>
           </div>
         )}
 
@@ -271,7 +271,7 @@ export default function MultipleChoicePage() {
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
                 Try Another
               </button>
-              <Link href="/practice" className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300">
+              <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 Back to Practice
               </Link>
             </div>

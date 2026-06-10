@@ -282,7 +282,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
         return (
           <div key={label} className="space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-700 dark:text-slate-200">{label}</span>
+              <span className="font-medium text-[var(--text-secondary)]">{label}</span>
               <span className="tabular-nums">
                 <span className="text-slate-500">{score} / 100</span>
                 {gap > 0 ? (
@@ -292,7 +292,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
                 )}
               </span>
             </div>
-            <div className="relative h-2 rounded-full bg-slate-100 dark:bg-white/10 overflow-visible">
+            <div className="relative h-2 rounded-full bg-[var(--border)] overflow-visible">
               <div className={`h-full rounded-full ${barCls}`} style={{ width: `${score}%` }} />
               <div
                 className="absolute top-0 h-full w-px bg-amber-400"
@@ -302,7 +302,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
           </div>
         )
       })}
-      <p className="text-[11px] text-slate-400 dark:text-slate-500">
+      <p className="text-[11px] text-[var(--text-muted)]">
         Yellow line = target ({target}). Scores are 0–100 internal reference values, not official PTE scores.
       </p>
     </div>
@@ -329,30 +329,30 @@ function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
         className={`flex items-center justify-between text-xs ${hasDims ? "cursor-pointer select-none" : ""}`}
         onClick={() => hasDims && setExpanded((v) => !v)}
       >
-        <span className="text-slate-700 dark:text-slate-200 font-medium">
+        <span className="text-[var(--text-secondary)] font-medium">
           {TASK_LABELS[weakness.taskType]}
         </span>
         <div className="flex items-center gap-2">
           {weakness.recentCount === 0 && (
-            <span className="text-slate-400 dark:text-slate-500 italic">no data</span>
+            <span className="text-[var(--text-muted)] italic">no data</span>
           )}
           <span className={`font-semibold tabular-nums ${labelColor}`}>
             {weakness.recentCount > 0 ? score : "—"}
           </span>
           {hasDims && (
-            <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+            <span className="text-[var(--text-muted)] text-[10px]">
               {expanded ? "▲" : "▼"}
             </span>
           )}
         </div>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
+      <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
         {weakness.recentCount > 0 && (
           <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${score}%` }} />
         )}
       </div>
       {weakness.recentCount > 0 && (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="text-[11px] text-[var(--text-muted)]">
           {weakness.recentCount} task{weakness.recentCount !== 1 ? "s" : ""}
           {weakness.lastPracticed
             ? ` · last: ${new Date(weakness.lastPracticed).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
@@ -362,16 +362,16 @@ function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
 
       {/* Expandable per-dimension breakdown */}
       {expanded && weakness.dimensions && (
-        <div className="mt-2 ml-3 pl-3 border-l-2 border-slate-100 dark:border-white/10 space-y-1.5">
+        <div className="mt-2 ml-3 pl-3 border-l-2 border-[var(--border)] space-y-1.5">
           {weakness.dimensions.map((d) => {
             const dimBar = d.score < 40 ? "bg-red-400" : d.score < 65 ? "bg-amber-400" : "bg-emerald-400"
             return (
               <div key={d.dimension} className="space-y-0.5">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="capitalize text-slate-500 dark:text-slate-400">{d.dimension}</span>
-                  <span className="tabular-nums text-slate-600 dark:text-slate-300">{d.score}</span>
+                  <span className="capitalize text-[var(--text-secondary)]">{d.dimension}</span>
+                  <span className="tabular-nums text-[var(--text-secondary)]">{d.score}</span>
                 </div>
-                <div className="h-1 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
+                <div className="h-1 rounded-full bg-[var(--border)] overflow-hidden">
                   <div className={`h-full rounded-full ${dimBar}`} style={{ width: `${d.score}%` }} />
                 </div>
               </div>
@@ -391,13 +391,13 @@ function ActionLink({ href, label, desc, color }: {
   const colorClasses = {
     emerald: "hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10",
     cyan: "hover:border-cyan-300 hover:bg-cyan-50 dark:hover:border-cyan-500/40 dark:hover:bg-cyan-500/10",
-    slate: "hover:border-slate-400 hover:bg-slate-50 dark:hover:border-white/30 dark:hover:bg-white/5",
+    slate: "hover:border-[var(--brand)] hover:bg-[var(--background)]",
   }
   return (
     <Link href={href}
-      className={`block rounded-xl border border-slate-200 bg-white p-3 transition dark:border-white/10 dark:bg-slate-900 ${colorClasses[color]}`}>
-      <p className="text-sm font-medium text-slate-950 dark:text-white">{label}</p>
-      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{desc}</p>
+      className={`block rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 transition ${colorClasses[color]}`}>
+      <p className="text-sm font-medium text-[var(--foreground)]">{label}</p>
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">{desc}</p>
     </Link>
   )
 }
@@ -405,8 +405,8 @@ function ActionLink({ href, label, desc, color }: {
 function QuickStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-center">
-      <p className="text-2xl font-semibold text-slate-950 dark:text-white">{value}</p>
-      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-2xl font-semibold text-[var(--foreground)]">{value}</p>
+      <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{label}</p>
     </div>
   )
 }
@@ -448,7 +448,7 @@ export default function StatsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col min-h-screen bg-[var(--background)]">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center">
           <div className="flex gap-2">
@@ -464,7 +464,7 @@ export default function StatsPage() {
 
   if (!stats || stats.totalTasks === 0) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col min-h-screen bg-[var(--background)]">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center px-6">
           <div className="text-center animate-fade-in">
@@ -474,7 +474,7 @@ export default function StatsPage() {
               Complete a PTE practice task to see your task-type weakness profile and progress trends.
             </p>
             <Link href="/practice"
-              className="inline-flex items-center justify-center h-12 px-8 rounded-xl bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-medium transition-all hover:bg-slate-800 dark:hover:bg-slate-200 hover:shadow-lg">
+              className="inline-flex items-center justify-center h-12 px-8 rounded-xl bg-[var(--brand)] text-white font-medium transition-all hover:bg-[var(--brand-hover)] hover:shadow-lg">
               Start Practicing
             </Link>
           </div>
@@ -502,7 +502,7 @@ export default function StatsPage() {
     : []
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col min-h-screen bg-[var(--background)]">
       <DesktopNav active="stats" />
 
       <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
@@ -510,14 +510,14 @@ export default function StatsPage() {
 
           {/* Section 1: Overview */}
           <section className="animate-fade-in">
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-6">
+            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
                 Practice Overview
               </p>
               <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-5xl font-semibold text-slate-950 dark:text-white">{stats.totalTasks}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">total practice tasks</p>
+                  <p className="text-5xl font-semibold text-[var(--foreground)]">{stats.totalTasks}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">total practice tasks</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4">
                   <QuickStat label="This week" value={stats.thisWeekTasks} />
@@ -530,13 +530,13 @@ export default function StatsPage() {
 
           {/* Section 2: Task-Type Weakness */}
           <section className="animate-card-in">
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-6">
+            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
               <div className="flex items-start justify-between mb-5">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
                     Task-Type Weakness
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
                     Score 0–100, lower means weaker. Tap a row to expand per-dimension breakdown.
                   </p>
                 </div>
@@ -552,26 +552,26 @@ export default function StatsPage() {
           {/* Section 3: Dimension Profile + Gap Analysis (shown only when dimension data exists) */}
           {hasDimensionData && (
             <section className="animate-card-in">
-              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-6 space-y-5">
+              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6 space-y-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-400">
                       Learner Profile
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
                       Aggregate dimension scores across all practiced task types.
                     </p>
                   </div>
 
                   {/* Section tab switcher — shown when 2+ sections have data */}
                   {availableProfileTabs.length >= 2 && (
-                    <div className="flex rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden text-xs">
+                    <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
                       {availableProfileTabs.map((tab) => (
                         <button key={tab} onClick={() => setProfileTab(tab)}
                           className={`px-3 py-1.5 capitalize transition ${
                             profileTab === tab
-                              ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-                              : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+                              ? "bg-[var(--brand)] text-white"
+                              : "text-[var(--text-secondary)] hover:bg-[var(--background)]"
                           }`}>
                           {tab}
                         </button>
@@ -585,7 +585,7 @@ export default function StatsPage() {
                     {/* Radar chart */}
                     <div>
                       <RadarChart dims={activeProfile} target={targetScore} />
-                      <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 -mt-1">
+                      <p className="text-center text-[11px] text-[var(--text-muted)] -mt-1">
                         Green = your scores · Dashed = target ({targetScore})
                       </p>
                     </div>
@@ -594,7 +594,7 @@ export default function StatsPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                          Target score: <span className="text-slate-950 dark:text-white font-semibold">{targetScore}</span>
+                          Target score: <span className="text-[var(--foreground)] font-semibold">{targetScore}</span>
                         </label>
                         <input
                           type="range" min={40} max={95} step={1} value={targetScore}
@@ -609,7 +609,7 @@ export default function StatsPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400 dark:text-slate-500">
+                  <p className="text-sm text-[var(--text-muted)]">
                     No {profileTab} dimension data yet. Complete some {profileTab} tasks to see your profile.
                   </p>
                 )}
@@ -629,7 +629,7 @@ export default function StatsPage() {
                         className="text-amber-900 dark:text-amber-100 hover:underline">
                         {TASK_LABELS[w.taskType]}
                       </Link>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-amber-800 shadow-sm dark:bg-slate-900 dark:text-amber-200">
+                      <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-amber-800 shadow-sm dark:text-amber-200">
                         score {w.score}
                       </span>
                     </li>
@@ -644,8 +644,8 @@ export default function StatsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white mb-3">Recommended next steps</h3>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Recommended next steps</h3>
               <div className="space-y-3">
                 <ActionLink href="/practice" label="Task Practice" desc="Pick any PTE task type and drill with AI feedback." color="emerald" />
                 <ActionLink href="/mock" label="Mock Exam" desc="Sequence all task types under exam conditions." color="cyan" />
@@ -656,14 +656,14 @@ export default function StatsPage() {
 
           {/* Section 5: Score Trajectory */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
-              <summary className="cursor-pointer list-none p-5 font-semibold text-slate-950 dark:text-white sm:p-6">
+            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                 Score trajectory by task type
                 <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
                 <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
               </summary>
               <div className="px-5 pb-5 sm:px-6 sm:pb-6 space-y-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-[var(--text-secondary)]">
                   Weekly average overall score (0–100). Select a task type to view its trend.
                 </p>
 
@@ -674,8 +674,8 @@ export default function StatsPage() {
                       onClick={() => setSelectedProgressTask(w.taskType)}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
                         selectedProgressTask === w.taskType
-                          ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-                          : "border border-slate-200 text-slate-600 dark:border-white/10 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+                          ? "bg-[var(--brand)] text-white"
+                          : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--background)]"
                       }`}>
                       {TASK_SHORT[w.taskType]} — {TASK_LABELS[w.taskType]}
                     </button>
@@ -690,7 +690,7 @@ export default function StatsPage() {
                       color="rgb(99, 102, 241)"
                     />
                   ) : (
-                    <p className="text-sm text-slate-400 dark:text-slate-500 py-4 text-center">
+                    <p className="text-sm text-[var(--text-muted)] py-4 text-center">
                       Not enough weekly data for {TASK_LABELS[selectedProgressTask]} yet.
                     </p>
                   )
@@ -701,8 +701,8 @@ export default function StatsPage() {
 
           {/* Section 6: Practice distribution */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
-              <summary className="cursor-pointer list-none p-5 font-semibold text-slate-950 dark:text-white sm:p-6">
+            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                 Practice distribution
                 <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
                 <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
@@ -716,7 +716,7 @@ export default function StatsPage() {
                   }))}
                   height={160}
                 />
-                <div className="mt-4 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-4 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4 text-xs text-[var(--text-secondary)]">
                   {stats.taskTypeBreakdown.map((b) => (
                     <div key={b.taskType} className="flex items-center gap-1">
                       <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{TASK_SHORT[b.taskType]}</span>
@@ -731,8 +731,8 @@ export default function StatsPage() {
           {/* Section 7: Weekly activity */}
           {stats.weeklyActivity.some((w) => w.count > 0) && (
             <section className="animate-card-in">
-              <details className="group rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
-                <summary className="cursor-pointer list-none p-5 font-semibold text-slate-950 dark:text-white sm:p-6">
+              <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                   Weekly activity
                   <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
                   <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
@@ -754,7 +754,7 @@ export default function StatsPage() {
         </div>
       </main>
 
-      <footer className="py-6 text-center text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-white/10">
+      <footer className="py-6 text-center text-sm text-[var(--text-secondary)] border-t border-[var(--border)]">
         <p>EchoLingo — PTE Academic practice</p>
       </footer>
     </div>
