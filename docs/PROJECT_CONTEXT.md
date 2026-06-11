@@ -21,7 +21,7 @@ Target users:
 | Tests | 122 frontend unit tests (13 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 105 backend tests |
 | Quality gate | lint 0, typecheck pass, build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
-| UI | Design token pass complete — all practice task pages, nav, history, stats, home use `var(--surface/border/foreground/text-secondary/text-muted)` tokens; DM Serif Display + DM Sans typography |
+| UI | Design token system complete — every page (practice tasks, exam, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
 
 ## Architecture
 

@@ -32,6 +32,7 @@
 | Unit test expansion | Done | 122 frontend unit tests across 13 files |
 | E2E suite | Done | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
 | UI redesign | Done | DM Serif Display + DM Sans; design token pass across all pages |
+| Design token completion | Done | `--border-strong` token; exam + settings fully tokenized; Playwright visual verification passed |
 
 ## Current Test Baseline
 
@@ -42,12 +43,25 @@
 | Backend | 105 tests |
 | Quality gate | lint 0, typecheck pass, build pass |
 
-## Next Steps
+## Next Phase
 
-- [x] Tokenize `src/app/practice/exam/page.tsx` — replaced all hardcoded slate classes with CSS variable tokens
-- [x] Add `--border-strong` token to `globals.css` (light: `#0f172a`, dark: `rgba(255,255,255,0.15)`) and apply across all 16 practice pages
-- [x] Tokenize `src/app/settings/page.tsx` — replaced all slate surface/border/text classes with tokens
-- [ ] Smoke test visual changes in browser (dark mode + light mode) — check all practice pages render correctly
+**Resume point (2026-06-11):** Design token system complete — all pages use CSS variable tokens; codebase is clean and verified. No active feature work in progress.
+
+What's done:
+- All 15 PTE task types live with full practice + mock exam flows
+- Design token system complete: `--background`, `--surface`, `--border`, `--border-strong`, `--foreground`, `--text-secondary`, `--text-muted`, `--brand` applied across every page
+- 122 frontend unit tests + 55 E2E tests + 105 backend tests all passing
+- FastAPI backend at parity with Next.js API Routes
+
+What's next:
+- [ ] Mobile nav links to `/practice` (currently points to `/practice/setup` — stale IELTS route); update `MobileNav.tsx`
+- [ ] Consider adding `.idea/` to `.gitignore` to keep IDE files out of working tree
+- [ ] Backlog: full mobile redesign, real-API E2E in CI, removing Next.js API Routes fallback
+
+Key files to open first:
+- `src/components/MobileNav.tsx` — if fixing stale nav link
+- `src/app/globals.css` — if adding new tokens
+- `docs/PROJECT_CONTEXT.md` — for architecture context before any new feature work
 
 ## Future / Backlog
 
