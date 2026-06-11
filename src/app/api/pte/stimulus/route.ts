@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { PteTaskType } from "@/types"
 
-const API_TIMEOUT = 30000
+const API_TIMEOUT = 60000
 
 type LlmResponse = {
   choices?: Array<{ message?: { content?: string } }>
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.85,
-        max_tokens: JSON_TASK_TYPES.has(taskType) ? 800 : 300,
+        max_tokens: JSON_TASK_TYPES.has(taskType) ? 6000 : 4000,
         ...(JSON_TASK_TYPES.has(taskType) ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: controller.signal,

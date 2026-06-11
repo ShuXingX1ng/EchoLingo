@@ -331,7 +331,7 @@ function ExamPage() {
   const currentPhase = phaseConfig[phase];
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col h-screen bg-[var(--background)]">
       {/* Header */}
       <DesktopNav
         active="practice"
@@ -350,7 +350,7 @@ function ExamPage() {
       />
 
       {/* Phase Indicator */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 px-4 py-2">
+      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2">
             {(["part1", "part2-prep", "part3"] as ExamPhase[]).map(
@@ -370,7 +370,7 @@ function ExamPage() {
                     {index > 0 && (
                       <div
                         className={`h-0.5 flex-1 rounded ${
-                          isPast ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
+                          isPast ? "bg-emerald-500" : "bg-[var(--border)]"
                         }`}
                       />
                     )}
@@ -378,10 +378,10 @@ function ExamPage() {
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
                           isCurrent
-                            ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                            ? "bg-[var(--foreground)] text-[var(--background)]"
                             : isPast
                             ? "bg-emerald-500 text-white"
-                            : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                            : "bg-[var(--border)] text-[var(--text-muted)]"
                         }`}
                       >
                         {index + 1}
@@ -390,7 +390,7 @@ function ExamPage() {
                         className={`text-xs font-medium hidden sm:inline ${
                           isCurrent
                             ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-slate-500 dark:text-slate-400"
+                            : "text-[var(--text-muted)]"
                         }`}
                       >
                         {config.label}
@@ -404,7 +404,7 @@ function ExamPage() {
 
           {/* Timer / Status */}
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-[var(--text-muted)]">
               {currentPhase.desc}
             </span>
             {(phase === "part2-prep" || phase === "part2-speak") && (
@@ -413,7 +413,7 @@ function ExamPage() {
                   (phase === "part2-prep" && prepTimeLeft <= 10) ||
                   (phase === "part2-speak" && speakTimeLeft <= 30)
                     ? "text-red-500"
-                    : "text-slate-700 dark:text-slate-300"
+                    : "text-[var(--text-secondary)]"
                 }`}
               >
                 {phase === "part2-prep"
@@ -447,7 +447,7 @@ function ExamPage() {
                 <span className={`text-lg ${
                   phase === "part2-prep" ? "📝" : "🎤"
                 }`} />
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <span className="text-sm font-medium text-[var(--text-secondary)]">
                   {phase === "part2-prep" ? t("exam.prepTime") : t("exam.speakTime")}
                 </span>
               </div>
@@ -469,7 +469,7 @@ function ExamPage() {
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
+            <div className="w-full bg-[var(--border)] rounded-full h-2 sm:h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-1000 ease-linear ${
                   phase === "part2-prep"
@@ -523,13 +523,13 @@ function ExamPage() {
               <div
                 className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md"
-                    : "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md shadow-sm"
+                    ? "bg-[var(--foreground)] text-[var(--background)] rounded-br-md"
+                    : "bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] rounded-bl-md shadow-sm"
                 }`}
               >
                 {message.role === "examiner" && (
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <p className="text-xs font-medium text-[var(--text-muted)]">
                       {t("practice.examiner")}
                     </p>
                     <VoiceOutput
@@ -554,19 +554,19 @@ function ExamPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-white/10 p-4">
+      <div className="bg-[var(--surface)] border-t border-[var(--border)] p-4">
         <div className="max-w-4xl mx-auto">
           {phase !== "ended" ? (
             <>
               {/* Mode Toggle */}
               <div className="flex justify-center mb-3">
-                <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-800/50">
+                <div className="inline-flex rounded-xl border border-[var(--border)] p-1 bg-[var(--background)]">
                   <button
                     onClick={() => setInputMode("text")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "text"
-                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                        ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     }`}
                   >
                     {t("practice.textMode")}
@@ -575,8 +575,8 @@ function ExamPage() {
                     onClick={() => setInputMode("voice")}
                     className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                       inputMode === "voice"
-                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                        ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     }`}
                   >
                     {t("practice.voiceMode")}
@@ -596,13 +596,13 @@ function ExamPage() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder={t("practice.inputPlaceholder")}
-                    className="flex-1 px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 transition-shadow"
+                    className="flex-1 px-4 py-3 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-shadow"
                     disabled={isLoading}
                   />
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading}
-                    className="px-4 sm:px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 sm:px-6 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {t("practice.send")}
                   </button>
@@ -626,7 +626,7 @@ function ExamPage() {
               ) : feedback ? (
                 <button
                   onClick={() => (window.location.href = "/practice/exam")}
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
+                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:opacity-90 transition-colors"
                 >
                   {t("exam.newExam")}
                 </button>
@@ -637,7 +637,7 @@ function ExamPage() {
                   </p>
                   <button
                     onClick={() => (window.location.href = "/practice/exam")}
-                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-slate-950 rounded-xl hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 transition-colors"
+                    className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:opacity-90 transition-colors"
                   >
                     {t("practice.tryAgain")}
                   </button>

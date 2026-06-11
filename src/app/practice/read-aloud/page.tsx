@@ -68,6 +68,7 @@ export default function ReadAloudPage() {
   const [recSeconds, setRecSeconds] = useState(RECORD_TIME)
   const [transcript, setTranscript] = useState("")
 
+  const stimulusRef = useRef("")
   const startedAtRef = useRef<string>("")
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -108,6 +109,7 @@ export default function ReadAloudPage() {
         text = ((await res.json()) as { text: string }).text
         addStimulusToBank("read_aloud", text)
       }
+      stimulusRef.current = text
       setStimulus(text)
       setPhase("ready")
     } catch (err) {
@@ -237,7 +239,7 @@ export default function ReadAloudPage() {
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", stimulus)
+            form.append("text", stimulusRef.current)
             const res = await fetch("/api/pronunciation", { method: "POST", body: form })
             if (!res.ok) return null
             return await res.json() as PronunciationAssessmentResult
@@ -250,7 +252,7 @@ export default function ReadAloudPage() {
         const res = await fetch("/api/read-aloud/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stimulus, transcript: capturedTranscript }),
+          body: JSON.stringify({ stimulus: stimulusRef.current, transcript: capturedTranscript }),
         })
         if (!res.ok) return null
         return await res.json() as TaskFeedback
@@ -281,7 +283,7 @@ export default function ReadAloudPage() {
     try {
       await saveTask({
         taskType: "read_aloud",
-        stimulus: { kind: "text", content: stimulus },
+        stimulus: { kind: "text", content: stimulusRef.current },
         response: { kind: "audio", content: capturedTranscript },
         feedback: mergedFeedback,
         durationSeconds,
@@ -293,7 +295,7 @@ export default function ReadAloudPage() {
     }
 
     setPhase("done")
-  }, [stimulus])
+  }, [])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -322,7 +324,7 @@ export default function ReadAloudPage() {
 
         {/* ── Idle ─────────────────────────────────────────────────────────── */}
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-[var(--text-secondary)] text-sm mb-8 max-w-sm mx-auto">
               An AI-generated passage will appear. Study it during the preparation phase, then read it aloud when recording starts.
             </p>
@@ -350,7 +352,7 @@ export default function ReadAloudPage() {
         {/* ── Ready (prep timer) ───────────────────────────────────────────── */}
         {phase === "ready" && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-[var(--surface)] p-6 dark:border-white/15 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Preparation
@@ -441,7 +443,7 @@ export default function ReadAloudPage() {
 
             {/* Pronunciation score summary */}
             {feedback.pronunciationAssessment && (
-              <div className="border border-slate-900 bg-[var(--surface)] p-5 dark:border-white/15 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+              <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
                   Azure Pronunciation Assessment
                 </p>
@@ -463,7 +465,7 @@ export default function ReadAloudPage() {
             )}
 
             {/* AI feedback */}
-            <div className="border border-slate-900 bg-[var(--surface)] p-5 dark:border-white/15 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
+            <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 AI Feedback
               </p>

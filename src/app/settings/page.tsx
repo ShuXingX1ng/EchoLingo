@@ -157,33 +157,33 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="settings" />
 
       <main className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Practice Goals */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
             {t("settings.practiceGoals")}
           </h2>
 
           {goalProgress && (
             <div className="mb-6 space-y-4">
-              <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+              <div className="p-4 bg-[var(--background)] rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-sm text-[var(--text-muted)]">
                     {t("settings.weeklyPractice")}
                   </span>
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                  <span className="text-sm font-medium text-[var(--foreground)]">
                     {goalProgress.weeklyCompleted} / {goalProgress.weeklyTarget}
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                <div className="w-full bg-[var(--border)] rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full transition-all ${
                       goalProgress.isWeeklyGoalMet
                         ? "bg-green-500"
-                        : "bg-slate-900 dark:bg-slate-400"
+                        : "bg-[var(--foreground)]"
                     }`}
                     style={{ width: `${goalProgress.weeklyProgress}%` }}
                   />
@@ -195,21 +195,21 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+              <div className="p-4 bg-[var(--background)] rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-sm text-[var(--text-muted)]">
                     {t("settings.bandScore")}
                   </span>
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                  <span className="text-sm font-medium text-[var(--foreground)]">
                     {goalProgress.currentAverageBand} / {goalProgress.targetBand}
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                <div className="w-full bg-[var(--border)] rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full transition-all ${
                       goalProgress.isBandGoalMet
                         ? "bg-green-500"
-                        : "bg-slate-900 dark:bg-slate-400"
+                        : "bg-[var(--foreground)]"
                     }`}
                     style={{ width: `${goalProgress.bandProgress}%` }}
                   />
@@ -224,7 +224,7 @@ export default function SettingsPage() {
           )}
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               {t("settings.weeklyTarget")}: {weeklyTarget} {t("settings.sessions")}
             </label>
             <input
@@ -234,9 +234,9 @@ export default function SettingsPage() {
               step="1"
               value={weeklyTarget}
               onChange={(e) => setWeeklyTarget(parseInt(e.target.value))}
-              className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-[var(--border)] rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
               <span>{t("settings.oneSession")}</span>
               <span>{t("settings.sevenSessions")}</span>
               <span>{t("settings.fourteenSessions")}</span>
@@ -244,7 +244,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               {t("settings.targetBand")}: {targetBand.toFixed(1)}
             </label>
             <input
@@ -254,9 +254,9 @@ export default function SettingsPage() {
               step="0.5"
               value={targetBand}
               onChange={(e) => setTargetBand(parseFloat(e.target.value))}
-              className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-[var(--border)] rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
               <span>4.0</span>
               <span>6.5</span>
               <span>9.0</span>
@@ -267,14 +267,14 @@ export default function SettingsPage() {
             {goalProgress && (
               <button
                 onClick={handleClearGoals}
-                className="flex-1 px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background)] transition-colors"
               >
                 {t("settings.clearGoals")}
               </button>
             )}
             <button
               onClick={handleSaveGoals}
-              className="flex-1 px-4 py-3 text-sm font-medium text-white dark:text-slate-950 bg-slate-950 dark:bg-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+              className="flex-1 px-4 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
             >
               {isGoalSaved ? t("settings.saved") : t("settings.saveGoals")}
             </button>
@@ -282,8 +282,8 @@ export default function SettingsPage() {
         </div>
 
         {/* Learning Reminders */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
             {t("reminder.title")}
           </h2>
 
@@ -321,16 +321,16 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+            <div className="p-4 bg-[var(--background)] rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">
                     {t("reminder.todayPractice")}
                   </p>
                   <p className={`text-xs mt-0.5 ${
                     practicedToday
                       ? "text-green-600 dark:text-green-400"
-                      : "text-slate-500 dark:text-slate-400"
+                      : "text-[var(--text-muted)]"
                   }`}>
                     {practicedToday ? t("reminder.practiced") : t("reminder.notPracticed")}
                   </p>
@@ -351,10 +351,10 @@ export default function SettingsPage() {
 
           {/* Exam Date */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               {t("reminder.examDate")}
             </label>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            <p className="text-xs text-[var(--text-muted)] mb-2">
               {t("reminder.examDateDesc")}
             </p>
             <input
@@ -362,17 +362,17 @@ export default function SettingsPage() {
               value={examDate}
               onChange={(e) => setExamDate(e.target.value)}
               min={new Date().toISOString().split("T")[0]}
-              className="w-full px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className="w-full px-4 py-3 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
 
           {/* Daily Reminder Toggle */}
-          <div className="mb-6 flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+          <div className="mb-6 flex items-center justify-between p-4 bg-[var(--background)] rounded-xl">
             <div>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="text-sm font-medium text-[var(--text-secondary)]">
                 {t("reminder.dailyReminder")}
               </label>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 {t("reminder.dailyReminderDesc")}
               </p>
             </div>
@@ -380,12 +380,12 @@ export default function SettingsPage() {
               onClick={() => setDailyReminderEnabled(!dailyReminderEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 dailyReminderEnabled
-                  ? "bg-slate-950 dark:bg-white"
-                  : "bg-slate-300 dark:bg-slate-600"
+                  ? "bg-[var(--foreground)]"
+                  : "bg-[var(--border)]"
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-950 transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-[var(--background)] transition-transform ${
                   dailyReminderEnabled ? "translate-x-6" : "translate-x-1"
                 }`}
               />
@@ -395,14 +395,14 @@ export default function SettingsPage() {
           {/* Reminder Time */}
           {dailyReminderEnabled && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                 {t("reminder.reminderTime")}
               </label>
               <input
                 type="time"
                 value={reminderTime}
                 onChange={(e) => setReminderTime(e.target.value)}
-                className="w-full px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-4 py-3 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
           )}
@@ -411,14 +411,14 @@ export default function SettingsPage() {
             {(examDate || dailyReminderEnabled) && (
               <button
                 onClick={handleClearReminders}
-                className="flex-1 px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background)] transition-colors"
               >
                 {t("reminder.clear")}
               </button>
             )}
             <button
               onClick={handleSaveReminders}
-              className="flex-1 px-4 py-3 text-sm font-medium text-white dark:text-slate-950 bg-slate-950 dark:bg-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+              className="flex-1 px-4 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
             >
               {isReminderSaved ? t("reminder.saved") : t("reminder.save")}
             </button>
@@ -426,17 +426,17 @@ export default function SettingsPage() {
         </div>
 
         {/* Voice Settings */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
             {t("settings.voiceSettings")}
           </h2>
 
-          <div className="mb-6 flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+          <div className="mb-6 flex items-center justify-between p-4 bg-[var(--background)] rounded-xl">
             <div>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="text-sm font-medium text-[var(--text-secondary)]">
                 {t("settings.autoPlayVoice")}
               </label>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 {isMuted ? t("settings.mutedDesc") : t("settings.autoDesc")}
               </p>
             </div>
@@ -444,12 +444,12 @@ export default function SettingsPage() {
               onClick={() => setIsMuted(!isMuted)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 isMuted
-                  ? "bg-slate-300 dark:bg-slate-600"
-                  : "bg-slate-950 dark:bg-white"
+                  ? "bg-[var(--border)]"
+                  : "bg-[var(--foreground)]"
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-950 transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-[var(--background)] transition-transform ${
                   isMuted ? "translate-x-1" : "translate-x-6"
                 }`}
               />
@@ -457,13 +457,13 @@ export default function SettingsPage() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               {t("settings.examinerVoice")}
             </label>
             <select
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
-              className="w-full px-4 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className="w-full px-4 py-3 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             >
               {AZURE_VOICES.map((voice) => (
                 <option key={voice.id} value={voice.id}>
@@ -471,13 +471,13 @@ export default function SettingsPage() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               {t("settings.poweredByAzure")}
             </p>
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               {t("settings.speechSpeed")}: {rate.toFixed(2)}x
             </label>
             <input
@@ -487,9 +487,9 @@ export default function SettingsPage() {
               step="0.05"
               value={rate}
               onChange={(e) => setRate(parseFloat(e.target.value))}
-              className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-[var(--border)] rounded-lg appearance-none cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
               <span>{t("settings.slower")}</span>
               <span>{t("settings.normal")}</span>
               <span>{t("settings.faster")}</span>
@@ -500,13 +500,13 @@ export default function SettingsPage() {
             <button
               onClick={handleTest}
               disabled={isTestPlaying}
-              className="flex-1 px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-3 text-sm font-medium text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background)] transition-colors disabled:opacity-50"
             >
               {isTestPlaying ? t("settings.playing") : t("settings.testVoice")}
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 px-4 py-3 text-sm font-medium text-white dark:text-slate-950 bg-slate-950 dark:bg-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+              className="flex-1 px-4 py-3 text-sm font-medium text-[var(--background)] bg-[var(--foreground)] rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
             >
               {isSaved ? t("settings.saved") : t("settings.saveSettings")}
             </button>
@@ -515,11 +515,11 @@ export default function SettingsPage() {
 
         {/* Account */}
         {user && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+          <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
               {t("settings.account")}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            <p className="text-sm text-[var(--text-muted)] mb-4">
               {user.email}
             </p>
             <button
@@ -540,11 +540,11 @@ export default function SettingsPage() {
         )}
 
         {/* Info */}
-        <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-slate-800 dark:text-slate-300 mb-2">
+        <div className="bg-[var(--background)] border border-[var(--border)] rounded-xl p-4">
+          <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-2">
             {t("settings.aboutTitle")}
           </h3>
-          <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+          <ul className="text-xs text-[var(--text-muted)] space-y-1">
             <li>{t("settings.aboutGoals")}</li>
             <li>{t("settings.aboutVoices")}</li>
             <li>{t("settings.aboutSpeed")}</li>

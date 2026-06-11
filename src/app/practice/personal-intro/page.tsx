@@ -198,7 +198,7 @@ export default function PersonalIntroPage() {
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <div className="mb-6 rounded-lg bg-[var(--background)] p-4 text-sm leading-7 text-[var(--text-secondary)] text-left font-serif">
               {FIXED_PROMPT}
             </div>
@@ -211,7 +211,7 @@ export default function PersonalIntroPage() {
 
         {phase === "ready" && (
           <div className="space-y-6">
-            <div className="border border-slate-900 bg-[var(--surface)] p-6 dark:border-white/15 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Prepare</p>
                 <CountdownRing seconds={prepSec} total={PREP_TIME} />

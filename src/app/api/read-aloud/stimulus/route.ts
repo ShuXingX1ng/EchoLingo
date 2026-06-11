@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const API_TIMEOUT = 30000
+const API_TIMEOUT = 60000
 
 type LlmResponse = {
   choices?: Array<{ message?: { content?: string } }>
@@ -54,7 +54,7 @@ export async function POST() {
           { role: "user", content: "Generate a Read Aloud passage now." },
         ],
         temperature: 0.85,
-        max_tokens: 200,
+        max_tokens: 4000,
       }),
       signal: controller.signal,
     })
@@ -67,7 +67,8 @@ export async function POST() {
     const text = extractText(data).trim()
 
     if (!text) {
-      return NextResponse.json({ error: "Empty response from LLM" }, { status: 502 })
+      console.error("[read-aloud/stimulus] Empty text. Raw response:", JSON.stringify(data))
+      return NextResponse.json({ error: "Empty response from LLM", debug: data }, { status: 502 })
     }
 
     return NextResponse.json({ text })

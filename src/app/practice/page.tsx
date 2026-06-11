@@ -164,7 +164,7 @@ export default function PracticeHubPage() {
                   <Link
                     key={card.href}
                     href={card.href}
-                    className="group border border-slate-200 bg-white p-5 transition-all hover:border-slate-900 hover:shadow-[4px_4px_0_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900 dark:hover:border-white/40"
+                    className="group border border-slate-200 bg-[var(--surface)] p-5 transition-all hover:border-[var(--border-strong)] hover:shadow-[4px_4px_0_rgba(15,23,42,0.08)] dark:border-white/10 "
                   >
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <h3 className="text-base font-semibold text-slate-900 dark:text-white group-hover:text-emerald-800 dark:group-hover:text-emerald-300 transition-colors">
@@ -191,7 +191,7 @@ export default function PracticeHubPage() {
         })}
 
         {/* Mock Exam CTA */}
-        <div className="mt-6 border border-slate-900 bg-white p-6 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="mt-6 border border-[var(--border-strong)] bg-[var(--surface)] p-6  shadow-[4px_4px_0_rgba(15,23,42,0.08)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400 mb-1">
               Full Mock Exam
@@ -203,7 +203,7 @@ export default function PracticeHubPage() {
           </div>
           <Link
             href="/mock"
-            className="shrink-0 rounded-xl bg-slate-950 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            className="shrink-0 rounded-xl bg-slate-950 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-[var(--surface)] dark:text-slate-950 dark:hover:bg-slate-200"
           >
             Start Mock Exam →
           </Link>

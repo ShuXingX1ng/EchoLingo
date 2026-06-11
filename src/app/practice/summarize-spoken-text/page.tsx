@@ -173,7 +173,7 @@ export default function SummarizeSpokenTextPage() {
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
               An AI-generated academic passage will be synthesized as audio. Listen carefully, then write a concise 50–70 word summary.
             </p>
@@ -195,7 +195,7 @@ export default function SummarizeSpokenTextPage() {
         )}
 
         {phase === "ready" && audioUrl && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               Passage ready — listen carefully
             </p>
@@ -215,7 +215,7 @@ export default function SummarizeSpokenTextPage() {
         )}
 
         {phase === "listening" && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-center gap-2 mb-4">
               {[0, 1, 2, 3, 4].map(i => (
                 <span

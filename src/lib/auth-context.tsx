@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "./supabase";
-import { useRouter } from "next/navigation";
 import { fetchProfile, type Profile } from "./admin";
 
 type AuthContextType = {
@@ -22,19 +21,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    // Get initial session
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        const p = await fetchProfile(user.id);
-        setProfile(p);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+        if (user) {
+          const p = await fetchProfile(user.id).catch(() => null);
+          setProfile(p);
+        }
+      } catch {
+        // Supabase unreachable (paused project, no network) — run as unauthenticated
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     getUser();
@@ -45,20 +47,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
-          const p = await fetchProfile(currentUser.id);
+          const p = await fetchProfile(currentUser.id).catch(() => null);
           setProfile(p);
         } else {
           setProfile(null);
         }
         setLoading(false);
-        router.refresh();
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [supabase]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({

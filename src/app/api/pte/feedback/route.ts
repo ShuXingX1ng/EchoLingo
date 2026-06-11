@@ -9,8 +9,8 @@ import type {
   JudgeLog,
 } from "@/types"
 
-const API_TIMEOUT = 60000
-const JUDGE_TIMEOUT = 30000
+const API_TIMEOUT = 120000
+const JUDGE_TIMEOUT = 60000
 
 type LlmResponse = {
   choices?: Array<{ message?: { content?: string } }>
@@ -245,7 +245,7 @@ async function callLLM(
   apiKey: string,
   baseUrl: string,
   model: string,
-  maxTokens = 1200,
+  maxTokens = 8000,
   timeoutMs = API_TIMEOUT,
 ): Promise<string> {
   const controller = new AbortController()
@@ -412,9 +412,9 @@ export async function POST(request: Request) {
 
     // Primary call and Judge call run in parallel; Judge failure is non-fatal
     const [primaryContent, judgeContent] = await Promise.all([
-      callLLM(primarySystemPrompt, userContent, apiKey, baseUrl, model, 1200),
+      callLLM(primarySystemPrompt, userContent, apiKey, baseUrl, model, 8000),
       judgeSystemPrompt
-        ? callLLM(judgeSystemPrompt, userContent, apiKey, baseUrl, model, 200, JUDGE_TIMEOUT).catch(
+        ? callLLM(judgeSystemPrompt, userContent, apiKey, baseUrl, model, 2000, JUDGE_TIMEOUT).catch(
             () => null,
           )
         : Promise.resolve(null),
@@ -448,7 +448,7 @@ export async function POST(request: Request) {
                 apiKey,
                 baseUrl,
                 model,
-                1200,
+                8000,
               )
               const retryParsed = tryParseJson(retryContent)
               if (retryParsed) primaryParsed = retryParsed

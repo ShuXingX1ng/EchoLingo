@@ -131,7 +131,7 @@ export default function WriteEssayPage() {
         </div>
 
         {phase === "idle" && (
-          <div className="border border-slate-900 bg-[var(--surface)] p-8 dark:border-white/15 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
               An AI-generated essay question will appear. Write a structured {MIN_WORDS}–{MAX_WORDS} word response.
             </p>

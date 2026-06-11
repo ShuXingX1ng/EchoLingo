@@ -47,8 +47,8 @@ function dbTaskToPracticeTask(db: DbTask): PracticeTask {
 
 async function getCurrentUserId(): Promise<string | null> {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id || null
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user?.id || null
 }
 
 export async function saveTaskToCloud(task: Omit<PracticeTask, "id">): Promise<PracticeTask | null> {
