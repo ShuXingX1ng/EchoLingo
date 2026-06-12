@@ -35,8 +35,8 @@ MOCK_FEEDBACK = json.dumps({
 
 @pytest.mark.anyio
 async def test_feedback_full_session_flow():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -59,8 +59,8 @@ async def test_feedback_full_session_flow():
 
 @pytest.mark.anyio
 async def test_feedback_llm_called_with_correct_params():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post("/api/feedback", json={
@@ -70,18 +70,18 @@ async def test_feedback_llm_called_with_correct_params():
                 ],
             })
 
-    mock_llm.assert_called_once()
-    call_kwargs = mock_llm.call_args.kwargs
+    mock_ainvoke.assert_called_once()
+    call_kwargs = mock_ainvoke.call_args.kwargs
     assert call_kwargs["temperature"] == 0.3
     assert call_kwargs["max_tokens"] == 3000
     assert call_kwargs["timeout"] == 120.0
-    assert call_kwargs["response_format"] == {"type": "json_object"}
+    assert call_kwargs["json_mode"] is True
 
 
 @pytest.mark.anyio
 async def test_feedback_transcript_formatting():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post("/api/feedback", json={
@@ -92,9 +92,8 @@ async def test_feedback_transcript_formatting():
                 ],
             })
 
-    call_args = mock_llm.call_args
-    messages = call_args.kwargs.get("messages", call_args[1].get("messages", []))
-    user_msg = messages[1]["content"]
+    call_kwargs = mock_ainvoke.call_args.kwargs
+    user_msg = call_kwargs["user"]
     assert "Examiner: Hello!" in user_msg
     assert "Candidate: Hi there!" in user_msg
 
@@ -102,8 +101,8 @@ async def test_feedback_transcript_formatting():
 @pytest.mark.anyio
 async def test_feedback_json_with_extra_text():
     response_with_extra = "Here is the feedback: " + MOCK_FEEDBACK
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = response_with_extra
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = response_with_extra
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -120,8 +119,8 @@ async def test_feedback_json_with_extra_text():
 
 @pytest.mark.anyio
 async def test_feedback_malformed_json_from_llm():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = "This is not JSON at all, just random text."
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = "This is not JSON at all, just random text."
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -138,8 +137,8 @@ async def test_feedback_malformed_json_from_llm():
 @pytest.mark.anyio
 async def test_feedback_missing_required_fields_in_json():
     incomplete_json = json.dumps({"estimatedBand": 5.0})
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = incomplete_json
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = incomplete_json
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -149,14 +148,13 @@ async def test_feedback_missing_required_fields_in_json():
                 ],
             })
 
-    # Feedback API returns 502 when LLM response cannot be parsed
     assert response.status_code in [422, 502]
 
 
 @pytest.mark.anyio
 async def test_feedback_part2_mode():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -173,8 +171,8 @@ async def test_feedback_part2_mode():
 
 @pytest.mark.anyio
 async def test_feedback_part3_mode():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={

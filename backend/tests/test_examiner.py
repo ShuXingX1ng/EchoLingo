@@ -3,9 +3,18 @@ Tests for Examiner API.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from main import app
+
+
+def _make_examiner_mock(return_value: str):
+    """Return a (MockChatOpenAI context, mock_chain) pair for the examiner router."""
+    mock_chain = MagicMock()
+    mock_chain.ainvoke = AsyncMock(return_value=return_value)
+    mock_llm = MagicMock()
+    mock_llm.__or__ = MagicMock(return_value=mock_chain)
+    return mock_llm, mock_chain
 
 
 @pytest.mark.anyio
@@ -17,7 +26,7 @@ async def test_examiner_missing_messages():
             "/api/examiner",
             json={"mode": "ielts_part_1", "messages": []},
         )
-    assert response.status_code == 400  # Manual validation in route handler
+    assert response.status_code == 400
 
 
 @pytest.mark.anyio
@@ -39,17 +48,16 @@ async def test_examiner_invalid_mode():
                 ],
             },
         )
-    assert response.status_code == 422  # Pydantic validation error
+    assert response.status_code == 422
 
 
 @pytest.mark.anyio
 async def test_examiner_success():
     """Test examiner endpoint returns valid response with mocked LLM."""
     mock_response = "That's interesting. What do you like most about your hometown?"
+    mock_llm, _ = _make_examiner_mock(mock_response)
 
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = mock_response
-
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
@@ -81,8 +89,13 @@ async def test_examiner_success():
 
 @pytest.mark.anyio
 async def test_examiner_llm_not_configured():
-    """Test examiner endpoint handles unconfigured LLM."""
-    with patch("services.llm.llm_service.is_configured", return_value=False):
+    """Test examiner endpoint handles unconfigured LLM (ValueError → 502)."""
+    mock_chain = MagicMock()
+    mock_chain.ainvoke = AsyncMock(side_effect=ValueError("LLM_API_KEY is not set."))
+    mock_llm = MagicMock()
+    mock_llm.__or__ = MagicMock(return_value=mock_chain)
+
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(

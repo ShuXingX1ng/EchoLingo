@@ -3,8 +3,18 @@ fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6
 
-# AI/LLM
+# AI/LLM — LangChain + OpenAI-compatible client
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langgraph>=0.2.0
 openai>=1.12.0
+
+# Vector store
+vecs>=0.4.0
+
+# Prompt files
+pyyaml>=6.0
 
 # Azure Speech
 azure-cognitiveservices-speech>=1.35.0

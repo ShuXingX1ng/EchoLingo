@@ -18,8 +18,8 @@ Target users:
 | Backend | FastAPI beside Next.js API Routes fallback |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 122 frontend unit tests (13 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 105 backend tests |
-| Quality gate | lint 0, typecheck pass, build pass |
+| Tests | 122 frontend unit tests (13 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 132 backend tests (111 original + 21 new LangGraph graph tests) |
+| Quality gate | lint 0 errors; typecheck currently blocked by stale `.next/types` ref to deleted debug-supabase route (pre-existing, clears on next build); build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
 | UI | Design token system complete — every page (practice tasks, exam, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
 
@@ -116,6 +116,11 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
 | `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type) | localStorage |
 | `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
+| `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |
+| `backend/services/rag.py` | `retrieve_context(task_type) -> str`; queries `rubric_chunks` with task_type filter; silent fallback | computed |
+| `backend/services/feedback_graph.py` | LangGraph `StateGraph` for the PTE feedback pipeline; `FeedbackState` TypedDict; nodes: `retrieve_context`, `call_primary`, `call_judge`, `check_divergence`, `retry_primary`, `finalize`; exposes `run_feedback_graph(request)->dict` | computed |
+| `backend/data/rubrics/` | Hand-written YAML rubric files per task type (5 done: read_aloud, repeat_sentence, write_essay, summarize_written_text, fill_in_the_blanks_reading) | static YAML |
+| `backend/scripts/seed_rubrics.py` | One-time script: reads rubric YAMLs → embeds → upserts to Supabase `rubric_chunks` | — |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
 | `src/lib/backup.ts` | Export/import | local JSON/CSV backup |
 

@@ -43,14 +43,14 @@ async def test_feedback_missing_messages():
             "/api/feedback",
             json={"mode": "ielts_part_1", "messages": []},
         )
-    assert response.status_code == 400  # Manual validation in route handler
+    assert response.status_code == 400
 
 
 @pytest.mark.anyio
 async def test_feedback_success():
     """Test feedback endpoint returns valid SessionFeedback with mocked LLM."""
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = MOCK_FEEDBACK_RESPONSE
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = MOCK_FEEDBACK_RESPONSE
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -94,8 +94,8 @@ async def test_feedback_json_in_markdown():
     """Test feedback endpoint handles JSON wrapped in markdown code blocks."""
     markdown_response = f"```json\n{MOCK_FEEDBACK_RESPONSE}\n```"
 
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = markdown_response
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = markdown_response
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -122,7 +122,8 @@ async def test_feedback_json_in_markdown():
 @pytest.mark.anyio
 async def test_feedback_llm_not_configured():
     """Test feedback endpoint handles unconfigured LLM."""
-    with patch("services.llm.llm_service.is_configured", return_value=False):
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.side_effect = ValueError("LLM_API_KEY is not set.")
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(

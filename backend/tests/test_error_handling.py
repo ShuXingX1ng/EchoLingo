@@ -8,14 +8,25 @@ import httpx
 from main import app
 
 
+def _make_examiner_mock(side_effect=None, return_value=None):
+    mock_chain = MagicMock()
+    if side_effect is not None:
+        mock_chain.ainvoke = AsyncMock(side_effect=side_effect)
+    else:
+        mock_chain.ainvoke = AsyncMock(return_value=return_value)
+    mock_llm = MagicMock()
+    mock_llm.__or__ = MagicMock(return_value=mock_chain)
+    return mock_llm
+
+
 # ============================================================
 # LLM Error Handling
 # ============================================================
 
 @pytest.mark.anyio
 async def test_examiner_llm_timeout():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.side_effect = httpx.TimeoutException("Connection timed out")
+    mock_llm = _make_examiner_mock(side_effect=httpx.TimeoutException("Connection timed out"))
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/examiner", json={
@@ -30,8 +41,8 @@ async def test_examiner_llm_timeout():
 
 @pytest.mark.anyio
 async def test_examiner_llm_value_error():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.side_effect = ValueError("LLM API configuration is missing.")
+    mock_llm = _make_examiner_mock(side_effect=ValueError("LLM API configuration is missing."))
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/examiner", json={
@@ -46,8 +57,8 @@ async def test_examiner_llm_value_error():
 
 @pytest.mark.anyio
 async def test_feedback_llm_timeout():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.side_effect = httpx.TimeoutException("Request timed out")
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.side_effect = httpx.TimeoutException("Request timed out")
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -62,8 +73,8 @@ async def test_feedback_llm_timeout():
 
 @pytest.mark.anyio
 async def test_feedback_llm_empty_response():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.side_effect = ValueError("The AI returned an empty response.")
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.side_effect = ValueError("The AI returned an empty response.")
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={
@@ -78,8 +89,8 @@ async def test_feedback_llm_empty_response():
 
 @pytest.mark.anyio
 async def test_feedback_llm_rate_limit():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.side_effect = ValueError("Rate limit exceeded. Please wait a moment and try again.")
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.side_effect = ValueError("Rate limit exceeded. Please wait a moment and try again.")
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={

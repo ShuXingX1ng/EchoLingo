@@ -35,8 +35,14 @@ async def test_root():
 
 @pytest.mark.anyio
 async def test_examiner_not_implemented():
-    """Test examiner endpoint returns 502 when LLM not configured."""
-    with patch("services.llm.llm_service.is_configured", return_value=False):
+    """Test examiner endpoint returns 502 when LLM raises ValueError (not configured)."""
+    from unittest.mock import MagicMock, AsyncMock
+    mock_chain = MagicMock()
+    mock_chain.ainvoke = AsyncMock(side_effect=ValueError("LLM_API_KEY is not set."))
+    mock_llm = MagicMock()
+    mock_llm.__or__ = MagicMock(return_value=mock_chain)
+
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(

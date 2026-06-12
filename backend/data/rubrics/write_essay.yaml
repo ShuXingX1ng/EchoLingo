@@ -1,0 +1,75 @@
+task_type: write_essay
+description: PTE Academic Write Essay scoring rubric
+dimensions:
+  - name: content
+    weight: 3
+    max_score: 3
+    description: >
+      Content evaluates whether the essay addresses the topic fully and coherently.
+      Score 3 (Expert): addresses all aspects; well-developed argument with relevant
+      examples. Score 2 (Good): addresses most aspects; adequate development.
+      Score 1 (Limited): partially addresses the topic; underdeveloped.
+      Score 0: fails to address the topic or is off-topic.
+    criteria:
+      3: Fully addresses the topic; well-developed argument with examples.
+      2: Addresses most aspects; adequate development.
+      1: Partially addresses the topic; underdeveloped.
+      0: Off-topic or fails to address the prompt.
+
+  - name: form
+    weight: 2
+    max_score: 2
+    description: >
+      Form assesses essay structure: introduction, body paragraphs, and conclusion.
+      Score 2 (Expert): clear three-part structure; well-organised paragraphs with
+      topic sentences and transitions. Score 1 (Good): identifiable structure but
+      transitions or paragraph organisation may be weak. Score 0: no clear structure.
+    criteria:
+      2: Clear intro-body-conclusion; effective transitions.
+      1: Identifiable structure; weak transitions or organisation.
+      0: No discernible structure.
+
+  - name: grammar
+    weight: 2
+    max_score: 2
+    description: >
+      Grammar measures control of English grammatical structures. Score 2 (Expert):
+      consistently correct grammar; uses a range of complex structures accurately.
+      Score 1 (Good): mostly correct with occasional errors that do not impede
+      meaning. Score 0: frequent errors that impede comprehension.
+    criteria:
+      2: Consistently correct; wide range of complex structures.
+      1: Mostly correct; occasional non-impeding errors.
+      0: Frequent errors that impede meaning.
+
+  - name: vocabulary
+    weight: 2
+    max_score: 2
+    description: >
+      Vocabulary assesses range and accuracy of lexical items. Score 2 (Expert):
+      sophisticated, varied vocabulary used accurately. Score 1 (Good): adequate
+      vocabulary; some repetition or minor inaccuracies. Score 0: very limited
+      vocabulary that impairs meaning.
+    criteria:
+      2: Sophisticated, varied vocabulary used accurately.
+      1: Adequate vocabulary; some repetition or minor errors.
+      0: Very limited vocabulary; meaning impaired.
+
+  - name: spelling
+    weight: 2
+    max_score: 2
+    description: >
+      Spelling measures orthographic accuracy. Score 2 (Expert): no or very few
+      spelling errors. Score 1 (Good): some spelling errors that do not impede
+      understanding. Score 0: frequent spelling errors that impede reading.
+    criteria:
+      2: No or very few spelling errors.
+      1: Some errors; comprehension not impeded.
+      0: Frequent errors that impede reading.
+
+scoring_notes: >
+  Write Essay is a writing task requiring 200–300 words in response to a prompt.
+  The five dimensions (content, form, grammar, vocabulary, spelling) combine for
+  a maximum of 15 points, mapped to a 0–90 reporting scale. Responses under 120
+  words or over 380 words receive a score of 0 for form. Academic vocabulary and
+  formal register are expected throughout.

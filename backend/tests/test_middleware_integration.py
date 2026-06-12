@@ -112,8 +112,13 @@ async def test_cors_alt_origin():
 
 @pytest.mark.anyio
 async def test_examiner_no_auth_required():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = "What is your name?"
+    from unittest.mock import MagicMock, AsyncMock
+    mock_chain = MagicMock()
+    mock_chain.ainvoke = AsyncMock(return_value="What is your name?")
+    mock_llm = MagicMock()
+    mock_llm.__or__ = MagicMock(return_value=mock_chain)
+
+    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/examiner", json={
@@ -140,8 +145,8 @@ async def test_feedback_no_auth_required():
         "improvedSampleAnswer": "Sample answer here.",
         "errorAnnotations": [],
     })
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = mock_feedback
+    with patch("services.llm_chain.llm_chain.ainvoke", new_callable=AsyncMock) as mock_ainvoke:
+        mock_ainvoke.return_value = mock_feedback
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/feedback", json={

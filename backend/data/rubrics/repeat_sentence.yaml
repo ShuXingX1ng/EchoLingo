@@ -1,0 +1,63 @@
+task_type: repeat_sentence
+description: PTE Academic Repeat Sentence scoring rubric
+dimensions:
+  - name: oral_fluency
+    weight: 5
+    max_score: 5
+    description: >
+      Oral Fluency for Repeat Sentence evaluates smooth, connected speech that
+      mirrors the rhythm and phrasing of the original sentence. Score 5 (Expert):
+      delivery is natural and uninterrupted. Score 4 (Good): one or two minor
+      hesitations that do not break flow. Score 3 (Intermediate): noticeable
+      disruptions but communicative. Score 2 (Limited): frequent hesitations
+      that impede comprehension. Score 1 (Elementary): very halting. Score 0:
+      unintelligible.
+    criteria:
+      5: Smooth, uninterrupted delivery matching native pacing.
+      4: 1–2 minor pauses; flow essentially intact.
+      3: Noticeable disruptions; still communicative.
+      2: Frequent hesitations; comprehension difficult.
+      1: Halting with many long pauses.
+      0: Unintelligible.
+
+  - name: pronunciation
+    weight: 5
+    max_score: 5
+    description: >
+      Pronunciation in Repeat Sentence assesses phoneme accuracy, stress placement,
+      and intonation across the repeated sentence. Score 5: native-like; all
+      phonemes correct with appropriate stress and intonation. Score 4: minor
+      accent features but fully comprehensible. Score 3: some errors; listener
+      can follow. Score 2: frequent errors that impair comprehension. Score 1:
+      serious errors throughout. Score 0: unintelligible.
+    criteria:
+      5: Native-like phoneme accuracy, stress, and intonation.
+      4: Minor accent; fully comprehensible.
+      3: Some errors; listener can follow with effort.
+      2: Frequent errors impairing comprehension.
+      1: Many serious pronunciation errors.
+      0: Unintelligible.
+
+  - name: content
+    weight: 5
+    max_score: 5
+    description: >
+      Content measures how accurately the candidate reproduces the words and
+      structure of the original sentence. Score 5: exact reproduction with no
+      additions, omissions, or substitutions. Score 4: 1–2 minor errors that
+      preserve meaning. Score 3: some words missing or substituted but core
+      meaning intact. Score 2: significant omissions or changes alter meaning.
+      Score 1: only isolated words reproduced. Score 0: no recognisable content.
+    criteria:
+      5: Exact reproduction of the sentence.
+      4: 1–2 minor errors; meaning preserved.
+      3: Some words missing/substituted; core meaning intact.
+      2: Significant changes alter meaning.
+      1: Only isolated words reproduced.
+      0: No recognisable content.
+
+scoring_notes: >
+  Repeat Sentence is a speaking task. The candidate hears a sentence and must
+  repeat it verbatim. All three dimensions contribute up to 5 points each.
+  Maximum total is 15 points. Each word reproduced correctly contributes to the
+  Content score. Partial credit is awarded within each dimension.

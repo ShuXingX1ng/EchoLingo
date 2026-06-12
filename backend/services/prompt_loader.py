@@ -1,0 +1,107 @@
+"""
+Prompt Loader
+
+Loads all prompt YAML files at startup and exposes them as typed dicts.
+Import the singleton `prompts` in routers — no file I/O at request time.
+"""
+
+from pathlib import Path
+import yaml
+
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+
+
+def _load(path: str) -> dict:
+    with open(_PROMPTS_DIR / path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+class Prompts:
+    def __init__(self):
+        _ielts_examiner     = _load("ielts/examiner.yaml")
+        _ielts_evaluator    = _load("ielts/evaluator.yaml")
+        _pte_stimulus       = _load("pte/stimulus.yaml")
+        _pte_fb_tasks       = _load("pte/feedback_tasks.yaml")
+        _pte_fb_schemas     = _load("pte/feedback_schemas.yaml")
+        _pte_judge          = _load("pte/judge.yaml")
+        _pte_retry          = _load("pte/retry_note.yaml")
+        _read_aloud         = _load("read_aloud/prompts.yaml")
+
+        # IELTS examiner — system prompt by mode
+        self.examiner_base:       str = _ielts_examiner["base"]
+        self.examiner_part1_ext:  str = _ielts_examiner["part1_extension"]
+        self.examiner_part2_ext:  str = _ielts_examiner["part2_extension"]
+        self.examiner_part3_ext:  str = _ielts_examiner["part3_extension"]
+
+        # IELTS evaluator
+        self.evaluator_system: str = _ielts_evaluator["system"]
+        self.evaluator_user:   str = _ielts_evaluator["user"]
+
+        # PTE stimulus
+        self.stimulus_system: str           = _pte_stimulus["system"]
+        self.stimulus_tasks:  dict[str, str] = _pte_stimulus["tasks"]
+
+        # PTE feedback — per task type
+        self.feedback_tasks: dict[str, dict] = _pte_fb_tasks["tasks"]
+
+        # PTE feedback — output schema templates (assembled by build_primary_schema)
+        self.schema_base_fields: str         = _pte_fb_schemas["base_fields"]
+        self.schema_speaking:    str         = _pte_fb_schemas["speaking"]
+        self.schema_writing:     str         = _pte_fb_schemas["writing"]
+        self.schema_reading:     str         = _pte_fb_schemas["reading"]
+        self.schema_listening:   str         = _pte_fb_schemas["listening"]
+        self.schema_unscored:    str         = _pte_fb_schemas["unscored"]
+        self.schema_scoring_note: str        = _pte_fb_schemas["scoring_note"]
+
+        # PTE judge prompts — per scoring section
+        self.judge_speaking:  str = _pte_judge["speaking"]
+        self.judge_writing:   str = _pte_judge["writing"]
+        self.judge_reading:   str = _pte_judge["reading"]
+        self.judge_listening: str = _pte_judge["listening"]
+
+        # PTE retry note template
+        self.retry_note_template: str = _pte_retry["template"]
+
+        # Read Aloud
+        self.read_aloud_stimulus_system: str = _read_aloud["stimulus"]["system"]
+        self.read_aloud_stimulus_user:   str = _read_aloud["stimulus"]["user"]
+        self.read_aloud_feedback_system: str = _read_aloud["feedback"]["system"]
+        self.read_aloud_feedback_user:   str = _read_aloud["feedback"]["user"]
+
+    def build_primary_schema(self, section: str, details_schema: str) -> str:
+        """Assemble the full output schema string for the primary LLM call."""
+        schema_map = {
+            "speaking":  self.schema_speaking,
+            "writing":   self.schema_writing,
+            "reading":   self.schema_reading,
+            "listening": self.schema_listening,
+            "unscored":  self.schema_unscored,
+        }
+        template = schema_map[section]
+        return (
+            template
+            .replace("FIELDS_PLACEHOLDER", self.schema_base_fields)
+            .replace("DETAILS_PLACEHOLDER", details_schema)
+        )
+
+    def build_retry_note(self, diverged: list) -> str:
+        """Build the retry note appended to user_content when Judge disagrees."""
+        diverged_list = "\n".join(
+            f"  - {d['dimension']}: your score {d['primaryScore']}, second examiner {d['judgeScore']}"
+            for d in diverged
+        )
+        return self.retry_note_template.replace("<<DIVERGED_LIST>>", diverged_list)
+
+    def examiner_system(self, mode: str) -> str:
+        """Assemble examiner system prompt for the given mode."""
+        mode_map = {
+            "ielts_part_1": self.examiner_part1_ext,
+            "ielts_part_2": self.examiner_part2_ext,
+            "ielts_part_3": self.examiner_part3_ext,
+        }
+        extension = mode_map.get(mode, self.examiner_part1_ext)
+        return f"{self.examiner_base}\n\n{extension}"
+
+
+# Singleton — loaded once at import time
+prompts = Prompts()

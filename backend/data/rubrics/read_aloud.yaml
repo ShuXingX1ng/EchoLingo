@@ -1,0 +1,65 @@
+task_type: read_aloud
+description: PTE Academic Read Aloud scoring rubric
+dimensions:
+  - name: oral_fluency
+    weight: 5
+    max_score: 5
+    description: >
+      Oral Fluency measures whether the candidate's speech flows smoothly without
+      hesitations, repetitions, or false starts. A score of 5 (Expert) indicates
+      native-like rhythm and phrasing with no unnatural pauses. Score 4 (Good)
+      allows minor hesitations that do not disrupt meaning. Score 3 (Intermediate)
+      shows noticeable pausing or unnatural groupings but meaning is still clear.
+      Score 2 (Limited) shows frequent hesitations that impede communication.
+      Score 1 (Elementary) is halting speech with long pauses. Score 0 (Minimal)
+      is unintelligible or no attempt.
+    criteria:
+      5: No unnatural pauses; smooth, native-like rhythm.
+      4: Occasional minor hesitations; overall fluent delivery.
+      3: Noticeable pauses or unnatural phrasing; meaning preserved.
+      2: Frequent hesitations; flow significantly disrupted.
+      1: Halting delivery with many long pauses.
+      0: Unintelligible or no meaningful output.
+
+  - name: pronunciation
+    weight: 5
+    max_score: 5
+    description: >
+      Pronunciation assesses how closely the candidate's phoneme production matches
+      standard English. Score 5 (Expert): all phonemes produced clearly; stress and
+      intonation are native-like. Score 4 (Good): most phonemes correct; minor
+      accent features that do not impair understanding. Score 3 (Intermediate):
+      some phoneme errors but overall comprehensible. Score 2 (Limited): frequent
+      errors that require listener effort. Score 1 (Elementary): many serious errors.
+      Score 0 (Minimal): unintelligible.
+    criteria:
+      5: All phonemes correct; stress and intonation native-like.
+      4: Minor accent; no comprehension impact.
+      3: Some phoneme errors; listener can follow with effort.
+      2: Frequent errors; hard to understand.
+      1: Many serious errors; barely comprehensible.
+      0: Unintelligible.
+
+  - name: content
+    weight: 5
+    max_score: 5
+    description: >
+      Content scores how accurately and completely the candidate reads the text.
+      Score 5: every word read correctly in the correct order. Score 4: one or
+      two minor substitutions or omissions that do not alter meaning. Score 3:
+      several errors but the overall message is preserved. Score 2: significant
+      errors or omissions that change meaning. Score 1: only a few words read
+      correctly. Score 0: no recognisable content from the original text.
+    criteria:
+      5: Every word read correctly and in order.
+      4: 1–2 minor errors; meaning intact.
+      3: Several errors; overall message preserved.
+      2: Significant errors or omissions change meaning.
+      1: Only isolated words recognised.
+      0: No recognisable content.
+
+scoring_notes: >
+  Read Aloud is a speaking task. The candidate reads a written text aloud.
+  All three dimensions (oral fluency, pronunciation, content) each contribute
+  up to 5 points. Maximum total score is 15 points. Scores are converted to
+  a 0–90 scale for reporting. Partial credit is awarded within each dimension.

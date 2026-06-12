@@ -1,0 +1,58 @@
+task_type: summarize_written_text
+description: PTE Academic Summarize Written Text scoring rubric
+dimensions:
+  - name: content
+    weight: 2
+    max_score: 2
+    description: >
+      Content evaluates whether the summary captures the main idea(s) of the passage.
+      Score 2 (Expert): the main point is accurately and completely captured; key
+      supporting ideas may be included. Score 1 (Good): the main point is present
+      but may be incomplete or slightly inaccurate. Score 0: main point is missing,
+      distorted, or the response is irrelevant.
+    criteria:
+      2: Main point accurately and completely captured.
+      1: Main point present but incomplete or slightly inaccurate.
+      0: Main point absent, distorted, or irrelevant.
+
+  - name: form
+    weight: 1
+    max_score: 1
+    description: >
+      Form assesses whether the response is a single, complete sentence within
+      the 5–75 word limit. Score 1: a single grammatically complete sentence,
+      5–75 words. Score 0: not a single sentence, or outside the word-count range.
+    criteria:
+      1: Single complete sentence, 5–75 words.
+      0: Multiple sentences, fragment, or out of word-count range.
+
+  - name: grammar
+    weight: 1
+    max_score: 1
+    description: >
+      Grammar measures grammatical accuracy within the single-sentence summary.
+      Score 1 (Expert): grammatically correct. Score 0: contains grammatical errors
+      that impede understanding or make the sentence incomplete.
+    criteria:
+      1: Grammatically correct sentence.
+      0: Grammatical errors that impede meaning or completeness.
+
+  - name: vocabulary
+    weight: 1
+    max_score: 1
+    description: >
+      Vocabulary assesses appropriate and accurate word choice in the summary.
+      Score 1 (Expert): vocabulary is accurate and appropriate; paraphrasing is
+      effective. Score 0: word choice is inappropriate, inaccurate, or the text
+      is copied verbatim without meaningful paraphrasing.
+    criteria:
+      1: Accurate, appropriate vocabulary; effective paraphrasing.
+      0: Inappropriate word choice or copied text without paraphrasing.
+
+scoring_notes: >
+  Summarize Written Text is a writing task. The candidate reads a passage (up to
+  300 words) and writes a one-sentence summary in 5–75 words. Maximum total is
+  5 points mapped to a 0–90 scale. The most common error is writing more than one
+  sentence. Use of source text vocabulary is acceptable but excessive copying
+  reduces the vocabulary score. Conjunctions such as "which", "that", and
+  participial phrases are recommended for single-sentence structure.
