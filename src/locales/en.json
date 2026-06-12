@@ -245,6 +245,9 @@
   "home.archiveDesc": "Keep each attempt easy to review.",
   "home.archiveDetailDesc": "Revisit transcripts, corrected phrases, pronunciation scores, and the sample answer to practise next.",
   "home.openArchive": "Open session archive",
+  "home.reviewProgress": "Review Progress",
+  "home.reviewProgressDesc": "See your practice records and score trends.",
+  "home.practiceHistory": "Practice History",
 
   "reminder.title": "Learning Reminders",
   "reminder.examDate": "Exam Date",
