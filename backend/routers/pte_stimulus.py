@@ -6,8 +6,8 @@ POST /api/pte/stimulus — generate stimulus for any PTE task type.
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import PteStimulusRequest, PteStimulusResponse
-from services.llm_chain import llm_chain
 from services.prompt_loader import prompts
+from services.stimulus_service import generate_stimulus
 
 router = APIRouter()
 
@@ -16,11 +16,6 @@ VALID_TASK_TYPES = {
     "write_essay", "personal_intro", "write_from_dictation", "describe_image", "re_tell_lecture",
     "fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading",
     "summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary",
-}
-
-JSON_TASK_TYPES = {
-    "fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading",
-    "fill_in_the_blanks_listening", "highlight_correct_summary",
 }
 
 
@@ -34,20 +29,16 @@ async def generate_pte_stimulus(request: PteStimulusRequest):
     if task_type == "personal_intro":
         return PteStimulusResponse(text="")
 
-    user = prompts.stimulus_tasks.get(task_type)
-    if not user:
+    if task_type not in prompts.stimulus_tasks:
         raise HTTPException(status_code=400, detail=f"No stimulus prompt for taskType: {task_type}")
 
-    is_json = task_type in JSON_TASK_TYPES
-
     try:
-        text = await llm_chain.ainvoke(
-            system=prompts.stimulus_system,
-            user=user,
-            temperature=0.85,
-            max_tokens=800 if is_json else 300,
-            json_mode=is_json,
-            timeout=30.0,
+        text = await generate_stimulus(
+            task_type,
+            mode=request.mode,
+            topic=request.topic,
+            targeting=request.targeting,
+            verbatim=request.verbatim,
         )
     except ValueError as e:
         raise HTTPException(status_code=502, detail=str(e))

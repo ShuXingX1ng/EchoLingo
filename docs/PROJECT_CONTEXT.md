@@ -18,7 +18,7 @@ Target users:
 | Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 115 frontend unit tests (11 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 211 backend tests (123 core + 60 scraper/cleaner + 28 embed_exemplars) |
+| Tests | 115 frontend unit tests (11 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 247 backend tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
@@ -154,6 +154,10 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `backend/scripts/clean_exemplars.py` | CLI wrapper: reads `exemplars_raw/<source>.jsonl` → applies `clean_exemplars()` → writes `exemplars_clean/<source>.jsonl` (gitignored) + prints metrics | — |
 | `backend/scripts/embed_exemplars.py` | Ingestion back-half: reads `status=accept` clean entries, `id=sha256(text)`, embeds via `vector_store.embed_texts` (DashScope, 1024-dim), per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert into `stimulus_exemplars` via direct `psycopg2`/`SUPABASE_DB_URL` (bypasses RLS); `--force`/`--source` | Supabase (service-role direct) |
 | `supabase-migration-004.sql` | `stimulus_exemplars` table — shared retrieval corpus for Stimulus Exemplar-grounded generation; `hnsw vector_cosine_ops` + GIN tsvector + task_type btree indexes; RLS enabled with no policies (PostgREST-deny; backend direct Postgres connection bypasses RLS, ADR 0009 §2) | Supabase pgvector |
+| `backend/services/exemplar_store.py` | Read path over `stimulus_exemplars`: `retrieve(task_type,mode,topic?,targeting?,n)` (`random`=`ORDER BY random()`; `targeted`=task_type+difficulty/`features @> jsonb`; `theme`=single-SQL hybrid dense `embedding <=>` + sparse `plainto_tsquery`, RRF-fused `FULL OUTER JOIN`) + `get_verbatim`; direct `psycopg2` via `asyncio.to_thread`, silent `[]` on any failure (ADR 0008 §4) | Supabase (service-role direct) |
+| `backend/services/originality.py` | Local word-shingle Jaccard guard (4-gram, threshold 0.5): `shingles`/`jaccard`/`max_overlap`/`is_too_similar`; no API calls (ADR 0008 §3) | computed |
+| `backend/services/stimulus_service.py` | Stimulus serving logic behind `POST /api/pte/stimulus`: three-tier fallback (verbatim → exemplar-grounded few-shot generation → empty-bank pure-AI → silent pure-AI) + originality guard (regenerate once if a generation overlaps an injected exemplar above threshold) | computed |
+| `backend/scripts/eval_originality.py` | Offline originality eval: samples generations vs injected exemplars, prints overlap distribution + over-threshold rate; real LLM/embedding/DB calls, NOT wired into CI | — |
 
 Personalization policy:
 
@@ -176,7 +180,7 @@ browser via `NEXT_PUBLIC_API_BASE_URL`.
 | `POST /api/pronunciation` | Azure pronunciation assessment | FormData audio + reference text | `PronunciationAssessmentResult` JSON |
 | `POST /api/read-aloud/stimulus` | Generate a PTE Read Aloud passage (50–70 words) | — | `{ text: string }` |
 | `POST /api/read-aloud/feedback` | AI oral fluency + pronunciation feedback for Read Aloud | `{ stimulus, transcript, pronunciationAssessment? }` | `TaskFeedback` JSON |
-| `POST /api/pte/stimulus` | Generate stimulus for any PTE task type | `{ taskType: PteTaskType }` | `{ text: string }` |
+| `POST /api/pte/stimulus` | Generate stimulus for any PTE task type (Exemplar-grounded when a bank exists, else pure-AI; ADR 0008) | `{ taskType, mode?: random\|targeted\|theme, topic?, targeting?, verbatim? }` | `{ text: string }` |
 | `POST /api/pte/feedback` | AI feedback for any PTE task type | `{ taskType, stimulus, response, pronunciationAssessment? }` | `TaskFeedback` JSON |
 | `POST /api/word-lookup` | Translate a selected word/phrase (dictionary-first, LLM fallback) | `{ query: string }` | `WordLookupResult` JSON (`{ source, text, phonetic, entries, tags }`) |
 

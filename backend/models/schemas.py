@@ -84,6 +84,11 @@ PteTaskType = Literal[
 class PteStimulusRequest(BaseModel):
     """Request for POST /api/pte/stimulus."""
     taskType: str  # validated against PteTaskType in the router
+    # Retrieval strategy (ADR 0009). Mock and plain Task Practice both send "random".
+    mode: Literal["random", "targeted", "theme"] = "random"
+    topic: Optional[str] = None              # theme query (theme mode only)
+    targeting: Optional[Dict[str, Any]] = None  # {difficulty?, features?} for targeted mode
+    verbatim: bool = False                   # private path: serve an Exemplar verbatim
 
 
 class PteStimulusResponse(BaseModel):

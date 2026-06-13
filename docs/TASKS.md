@@ -43,38 +43,40 @@
 | Live Infra Verification | Done | Ran `supabase-migration-003.sql` and `setup_pgvector.sql`; configured `SUPABASE_DB_URL`; seeded 53 RAG rubric chunks using DashScope `text-embedding-v4` (1024 dims); imported 3.4M entries for ECDICT; successfully passed Python integration test for RAG retrieval. |
 | Circuit Breaker & Fallback | Done | Added CircuitBreaker to `api-client.ts`, practice/mock error boundaries. |
 | Phase Data-1: Embed + dedup | Done | `backend/scripts/embed_exemplars.py` — read `status=accept` clean entries, `id=sha256(text)`, DashScope embed, per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert via `psycopg2`/`SUPABASE_DB_URL`; `--force`/`--source`; 28 tests (embed+DB mocked); 211/211 backend pytest, lint 0 |
+| Phase Data-1: Serving + originality guard | Done | `exemplar_store.py` (random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `originality.py` (4-gram shingle Jaccard); `stimulus_service.py` (three-tier fallback + guard); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); router kept thin; `scripts/eval_originality.py` (offline); 36 new tests; 247/247 backend pytest, ruff 0 |
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
 | Frontend unit | 11 files / 115 tests (setup/page + FeedbackPanel tests removed in Phase Cleanup) |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 211 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars) |
+| Backend | 247 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Next Phase
 
-**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — scraper, cleaner, and embed/dedup/upsert ingestion complete; next step is the serving layer (`backend/services/exemplar_store.py`: random/targeted/theme retrieval + RRF).
+**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — full backend ingestion + serving complete (scraper → cleaner → embed/dedup/upsert → retrieval → three-tier generation + originality guard). Only the **frontend** wiring remains: Theme Practice topic input (`mode=theme`) and Targeted Practice via the Daily Plan (`mode=targeted`).
 
 What's done:
-- Backend-unavailable degradation implemented (Circuit Breaker).
-- Practice and Mock ErrorBoundaries added; API client tests updated.
+- Backend-unavailable degradation (Circuit Breaker) + Practice/Mock ErrorBoundaries.
 - Design resolved: `CONTEXT.md` (Stimulus Exemplar, Theme Practice), ADR 0008/0009.
-- `supabase-migration-004.sql` created: `stimulus_exemplars` table with hnsw + GIN + task_type indexes; RLS enabled with no policies (PostgREST-deny pattern).
-- `backend/scripts/scrape_exemplars/` package: `SourceAdapter` ABC + `RawExemplar` dataclass + `WikipediaAdapter` (35 academic topics, rate-limited); `__main__.py` pipeline entry → `exemplars_raw/wikipedia.jsonl`.
-- `backend/scripts/scrape_exemplars/cleaner.py` + `backend/scripts/clean_exemplars.py`: markup strip, English filter, length gates (read_aloud ≤60w; swt 150–300w), SHA-256 dedup, optional DeepSeek gate; 60 tests passing.
-- `backend/scripts/embed_exemplars.py`: read `status=accept` clean entries, `id=sha256(text)`, DashScope embed (reuse `vector_store.embed_texts`), per-`task_type` near-dup drop (cosine ≥ 0.95 vs stored + in-batch), idempotent `ON CONFLICT (id) DO UPDATE` upsert via direct `psycopg2`/`SUPABASE_DB_URL` (bypasses RLS); `--force`/`--source`; 28 tests (embed+DB mocked). Live ingestion run deferred until exemplars are scraped/cleaned and DashScope quota confirmed.
+- `supabase-migration-004.sql`: `stimulus_exemplars` table (hnsw + GIN + task_type indexes; RLS-deny pattern).
+- Scraper package (`scrape_exemplars/` + `WikipediaAdapter`) → `exemplars_raw/` (gitignored).
+- Cleaner (`cleaner.py` + `clean_exemplars.py`): markup strip, English filter, length gates, SHA-256 dedup, optional DeepSeek gate.
+- `embed_exemplars.py`: `id=sha256(text)`, DashScope embed, near-dup drop, idempotent upsert via `psycopg2`/`SUPABASE_DB_URL`.
+- **Serving (this session):** `services/exemplar_store.py` (`retrieve` random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`; silent `[]` on failure); `services/originality.py` (4-gram shingle Jaccard, threshold 0.5); `services/stimulus_service.py` (verbatim → exemplar-grounded few-shot → empty-bank pure-AI → silent pure-AI, regenerate once on guard trip); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); `pte_stimulus.py` kept router-thin; `scripts/eval_originality.py` (offline, not in CI). 36 new tests; 247/247 pytest, ruff 0.
+- Live ingestion run still deferred (needs scraped/cleaned exemplars + DashScope quota confirmed); JSON task types stay pure-AI (empty bank) by design.
 
 What's next:
-- [ ] **Serving** — `backend/services/exemplar_store.py` (`random` / `targeted` / `theme` retrieval + RRF); extend `PteStimulusRequest` with `mode/topic/targeting`; wire three-tier fallback in `pte_stimulus.py`.
-- [ ] **Originality guard** — word-shingle Jaccard check at generation time; offline eval script.
-- [ ] **Frontend** — Theme Practice topic input on `/practice` + `mode=theme`; Targeted Practice reuses Daily Plan with `mode=targeted`.
+- [ ] **Frontend — Theme Practice** — topic input on `/practice` (polished UI + common-theme chips); send `apiPost("/api/pte/stimulus", { taskType, mode: "theme", topic })`. Key file: `src/app/practice/page.tsx`; reuse `apiPost` from `src/lib/api-client.ts`. `task-bank.ts` unchanged (theme is not cached).
+- [ ] **Frontend — Targeted Practice** — surface via the Daily Plan / weakness engine; send `mode: "targeted"` + `targeting: { difficulty?, features? }` derived from `task-weakness.ts`. Key files: `src/lib/task-weakness.ts`, `src/lib/recommendations.ts` (`getPteRecommendations`).
+- [ ] **Live ingestion + originality eval run** — scrape → clean → `embed_exemplars.py`, then `python scripts/eval_originality.py` to confirm the overlap distribution before relying on Exemplar-grounded output.
 
 Key files to open first:
-- `backend/scripts/embed_exemplars.py` (ingestion: id/embed/dedup/upsert conventions to mirror in the read path)
-- `supabase-migration-004.sql` (stimulus_exemplars columns: `embedding vector(1024)`, generated `tsv`, `task_type` filter)
-- `backend/services/vector_store.py` (DashScope `embed_texts` for the theme query vector)
-- `backend/services/rag.py` (existing pgvector retrieval shape + silent-fallback pattern)
+- `src/app/practice/page.tsx` (where the Theme topic input + mode=theme call lands)
+- `src/lib/api-client.ts` (`apiPost` — the only path to FastAPI)
+- `backend/services/stimulus_service.py` (the mode/topic/targeting/verbatim contract the frontend drives)
+- `backend/models/schemas.py` (`PteStimulusRequest` shape)
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
@@ -106,16 +108,19 @@ Key resolved decisions (so we don't re-litigate):
 - [x] **Embed + dedup** — `embed_exemplars.py`: DashScope `text-embedding-v4`,
       near-dup drop (cosine ≥ 0.95 within task_type), idempotent
       `ON CONFLICT (id)` upsert. `--force` re-embed. → 28 tests, embed+DB mocked.
-- [ ] **Serving** — `backend/services/exemplar_store.py` (hybrid SQL + RRF +
-      sampling); extend `PteStimulusRequest` with `mode/topic/targeting/verbatim`;
-      wire three-tier fallback into `pte_stimulus.py` (keep it router-thin).
-- [ ] **Originality guard** — generation-time word-shingle Jaccard vs injected
-      exemplars (over threshold → regenerate once); offline originality eval script.
+- [x] **Serving** — `backend/services/exemplar_store.py` (hybrid SQL + RRF +
+      sampling) + `services/stimulus_service.py`; extended `PteStimulusRequest` with
+      `mode/topic/targeting/verbatim`; three-tier fallback wired into
+      `pte_stimulus.py` (kept router-thin; logic in the service).
+- [x] **Originality guard** — generation-time word-shingle Jaccard (4-gram, >0.5)
+      vs injected exemplars (over threshold → regenerate once) in
+      `services/originality.py`; offline `scripts/eval_originality.py`.
 - [ ] **Frontend** — Theme Practice topic input on `/practice` (polished UI +
       common-theme chips), `mode=theme`; Targeted Practice reuses Daily Plan with
       `mode=targeted`; `task-bank.ts` unchanged (random path only; not used for theme).
-- [ ] **Tests** — cleaning rules, hash idempotency, shingle guard, exemplar_store
-      hybrid/RRF, three-tier fallback; keep lint 0 / typecheck / pytest green.
+- [x] **Tests** — exemplar_store random/targeted/theme + RRF fusion, three-tier
+      fallback, shingle guard regeneration (36 new tests, all external calls mocked);
+      cleaning rules + hash idempotency covered earlier. ruff 0 / pytest 247 green.
 
 ### Later (deferred, recorded per request)
 - [ ] **机经 adapter** — add a recall-content `SourceAdapter` under the gitignored

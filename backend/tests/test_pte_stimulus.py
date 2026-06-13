@@ -9,6 +9,15 @@ from httpx import AsyncClient, ASGITransport
 from main import app
 
 
+@pytest.fixture(autouse=True)
+def _empty_exemplar_bank():
+    """Default these router tests to an empty Exemplar bank (pure-AI fallback tier),
+    so they exercise the legacy generation path without touching the real DB.
+    Tests that need anchors patch retrieve themselves."""
+    with patch("services.stimulus_service.retrieve", new=AsyncMock(return_value=[])):
+        yield
+
+
 @pytest.mark.anyio
 async def test_stimulus_missing_task_type():
     """Request with no body returns 422 (Pydantic validation)."""
