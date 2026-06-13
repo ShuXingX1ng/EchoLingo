@@ -59,7 +59,7 @@ export default function MobileNav() {
 
   const items: NavItem[] = [
     { href: "/", label: t("nav.home"), icon: "home" },
-    { href: "/practice/setup", label: t("nav.practice"), icon: "practice" },
+    { href: "/practice", label: t("nav.practice"), icon: "practice" },
     { href: "/stats", label: t("nav.stats"), icon: "stats" },
     { href: "/history", label: t("nav.history"), icon: "history" },
   ];

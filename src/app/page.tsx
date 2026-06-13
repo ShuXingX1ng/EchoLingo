@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DesktopNav from "@/components/DesktopNav";
-import DailyTasks from "@/components/DailyTasks";
-import LearningPath from "@/components/LearningPath";
 import { useTranslation } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth-context";
 import {
   getDaysUntilExam,
   getReminderSettings,
@@ -14,8 +11,6 @@ import {
   hasPracticedToday,
   type ReminderSettings,
 } from "@/lib/reminders";
-import { generateDailyTasks, type DailyTask } from "@/lib/learning-plan";
-import { getRecommendations, type Recommendation } from "@/lib/recommendations";
 
 type HomeStudyState = {
   reminderSettings: ReminderSettings | null;
@@ -51,10 +46,7 @@ function StatPill({ value, label, highlight = false }: { value: React.ReactNode;
 
 export default function Home() {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const [studyState, setStudyState] = useState<HomeStudyState>(EMPTY_STUDY_STATE);
-  const [tasks, setTasks] = useState<DailyTask[] | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -67,17 +59,6 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setTasks(null);
-      setRecommendations(null);
-      return;
-    }
-    Promise.all([generateDailyTasks(user.id), getRecommendations(user.id)])
-      .then(([t, r]) => { setTasks(t); setRecommendations(r); })
-      .catch(console.error);
-  }, [user]);
 
   const { daysUntilExam, practicedToday, streakDays } = studyState;
 
@@ -229,34 +210,28 @@ export default function Home() {
         {/* ── Daily Tasks + Sidebar ──────────────────────── */}
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
 
-          {/* Left: Tasks + Learning Path */}
+          {/* Left: Practice archive entry */}
           <div className="animate-enter-4 space-y-6">
-            {tasks !== null && <DailyTasks tasks={tasks} />}
-            {recommendations !== null && <LearningPath recommendations={recommendations} />}
-
-            {/* Archive card (shown when no tasks) */}
-            {tasks === null && (
-              <div className="rounded-2xl bg-[var(--surface)] p-6 ring-1 ring-[var(--border)] shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-                  {t("home.practiceHistory")}
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
-                  {t("home.archiveDesc")}
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-                  {t("home.archiveDetailDesc")}
-                </p>
-                <Link
-                  href="/history"
-                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-                >
-                  {t("home.openArchive")}
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
-                  </svg>
-                </Link>
-              </div>
-            )}
+            <div className="rounded-2xl bg-[var(--surface)] p-6 ring-1 ring-[var(--border)] shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+                {t("home.practiceHistory")}
+              </p>
+              <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+                {t("home.archiveDesc")}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t("home.archiveDetailDesc")}
+              </p>
+              <Link
+                href="/history"
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                {t("home.openArchive")}
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                </svg>
+              </Link>
+            </div>
           </div>
 
           {/* Right: Skill Rubric */}

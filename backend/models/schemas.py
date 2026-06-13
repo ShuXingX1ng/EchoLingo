@@ -13,22 +13,6 @@ from pydantic import BaseModel, Field
 # Core Types
 # =============================================================================
 
-class ChatMessage(BaseModel):
-    """Chat message in a speaking session."""
-    id: str
-    role: Literal["examiner", "user"]
-    content: str
-    createdAt: str
-
-
-class ErrorAnnotation(BaseModel):
-    """Error annotation in feedback."""
-    original: str
-    corrected: str
-    type: Literal["grammar", "vocabulary", "fluency", "pronunciation"]
-    explanation: str
-
-
 class PhonemeAssessment(BaseModel):
     """Phoneme-level pronunciation assessment."""
     phoneme: str
@@ -55,45 +39,9 @@ class PronunciationAssessmentResult(BaseModel):
     summary: str
 
 
-class SessionFeedback(BaseModel):
-    """Structured IELTS speaking feedback."""
-    estimatedBand: float
-    fluencyAndCoherence: str
-    lexicalResource: str
-    grammarRangeAndAccuracy: str
-    pronunciation: str
-    pronunciationAssessment: Optional[PronunciationAssessmentResult] = None
-    strengths: List[str]
-    weaknesses: List[str]
-    improvementSuggestions: List[str]
-    improvedSampleAnswer: str
-    errorAnnotations: Optional[List[ErrorAnnotation]] = None
-
-
 # =============================================================================
 # API Request/Response Models
 # =============================================================================
-
-# Examiner API
-class ExaminerRequest(BaseModel):
-    """Request for POST /api/examiner."""
-    mode: Literal["ielts_part_1", "ielts_part_2", "ielts_part_3"]
-    messages: List[ChatMessage]
-
-
-class ExaminerResponse(BaseModel):
-    """Response from POST /api/examiner."""
-    message: str
-
-
-# Feedback API
-class FeedbackRequest(BaseModel):
-    """Request for POST /api/feedback."""
-    mode: Literal["ielts_part_1", "ielts_part_2", "ielts_part_3"]
-    messages: List[ChatMessage]
-
-
-# FeedbackResponse is SessionFeedback
 
 # TTS API
 class TTSRequest(BaseModel):

@@ -18,10 +18,10 @@ Target users:
 | Backend | FastAPI beside Next.js API Routes fallback |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 122 frontend unit tests (13 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 132 backend tests (111 original + 21 new LangGraph graph tests) |
-| Quality gate | lint 0 errors; typecheck currently blocked by stale `.next/types` ref to deleted debug-supabase route (pre-existing, clears on next build); build pass |
+| Tests | 115 frontend unit tests (11 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 123 backend tests (after Phase Cleanup removed the IELTS examiner/feedback suites) |
+| Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
-| UI | Design token system complete — every page (practice tasks, exam, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
+| UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
 
 ## Architecture
 
@@ -83,6 +83,8 @@ Deferred / planned task types (not yet implemented):
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
 - **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing/listening tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity
 - **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
+- **Word Lookup** (Study Aid) — floating helper on Task Practice pages only (never Mock Exam): select text → "译" button or desktop drag-drop → one-shot translation card. Single English words resolve against the bundled ECDICT SQLite dictionary (instant, offline); phrases and dictionary misses fall through to DeepSeek. See ADR 0006.
+- **Vocabulary List** (Study Aid) — explicit save on the Word Lookup card adds a word; `/vocabulary` page (view + delete only, no SRS in v1); Supabase cloud sync from v1 with localStorage fallback; included in `backup.ts`. See ADR 0006.
 - **Min recording guard** — Stop/Done button disabled for first 5s on all 4 spoken task pages (Read Aloud, Repeat Sentence, Answer Short Question, Personal Intro)
 - PTE task-type practice with timed exercises
 - Full mock exam flow covering the original 7-task sequence plus 3 extended Listening tasks
@@ -91,7 +93,7 @@ Deferred / planned task types (not yet implemented):
 - Azure Pronunciation Assessment for Read Aloud and Repeat Sentence
 - History page with Practice Task records, search/filter/export
 - Stats page: task-type weakness, trend, recommended actions
-- Daily learning plan on home page (task-type weakness driven, Supabase-authoritative for logged-in users)
+- Home page: PTE-oriented entry cards (Practice / Mock Exam / Stats) + static practice-archive entry (the IELTS daily-plan subsystem was removed in Phase Cleanup)
 - Supabase auth and cloud sync
 - PWA, dark mode, responsive layout, i18n
 
@@ -99,7 +101,7 @@ Deferred / planned task types (not yet implemented):
 
 Core types live in `src/types/index.ts`.
 
-Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `PronunciationAssessmentResult`, `WordAssessment`, `PhonemeAssessment`
+Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `PronunciationAssessmentResult`, `WordAssessment`, `PhonemeAssessment`, `WordLookupResult`, `WordLookupEntry`, `VocabularyEntry`
 
 ## Data Paths
 
@@ -119,10 +121,17 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |
 | `backend/services/rag.py` | `retrieve_context(task_type) -> str`; queries `rubric_chunks` with task_type filter; silent fallback | computed |
 | `backend/services/feedback_graph.py` | LangGraph `StateGraph` for the PTE feedback pipeline; `FeedbackState` TypedDict; nodes: `retrieve_context`, `call_primary`, `call_judge`, `check_divergence`, `retry_primary`, `finalize`; exposes `run_feedback_graph(request)->dict` | computed |
-| `backend/data/rubrics/` | Hand-written YAML rubric files per task type (5 done: read_aloud, repeat_sentence, write_essay, summarize_written_text, fill_in_the_blanks_reading) | static YAML |
+| `backend/data/rubrics/` | Hand-written YAML rubric files — one per PTE task type (15/15 complete); each file has `task_type`, `description`, `dimensions[]` (name/description/criteria) and `scoring_notes` | static YAML |
 | `backend/scripts/seed_rubrics.py` | One-time script: reads rubric YAMLs → embeds → upserts to Supabase `rubric_chunks` | — |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
-| `src/lib/backup.ts` | Export/import | local JSON/CSV backup |
+| `src/lib/backup.ts` | Export/import (now includes `vocabulary`) | local JSON/CSV backup |
+| `src/lib/word-lookup.ts` | Word Lookup client → `/api/word-lookup` proxy | — |
+| `src/components/WordLookup.tsx` | Floating Word Lookup helper (selection "译" button + desktop drag-drop card); mounted via `src/app/practice/layout.tsx`, excluded from `/mock` | — |
+| `src/lib/unified-vocabulary.ts` | Vocabulary List read/write entry point | Supabase + local fallback |
+| `src/lib/vocabulary.ts` | Local Vocabulary List storage | localStorage |
+| `src/lib/supabase-vocabulary.ts` | Cloud Vocabulary List — `vocabulary` table (migration 003) | Supabase |
+| `backend/services/ecdict.py` | Read-only ECDICT lookup (pos/tag parse); single-word offline path | SQLite `backend/data/ecdict.sqlite` (gitignored) |
+| `backend/scripts/import_ecdict.py` | Downloads ECDICT 1.0.28 sqlite from GitHub into `backend/data/` | — |
 
 Personalization policy:
 
@@ -135,14 +144,13 @@ Personalization policy:
 
 | Endpoint | Purpose | Request | Response |
 |----------|---------|---------|----------|
-| `POST /api/examiner` | Generate task stimulus or next prompt | `{ taskType, context }` | `{ content }` |
-| `POST /api/feedback` | Generate Practice Task feedback | `{ taskType, stimulus, response }` | `TaskFeedback` JSON |
 | `POST /api/tts` | Azure TTS | `{ text, voice, rate }` | WAV audio stream |
 | `POST /api/pronunciation` | Azure pronunciation assessment | FormData audio + reference text | `PronunciationAssessmentResult` JSON |
 | `POST /api/read-aloud/stimulus` | Generate a PTE Read Aloud passage (50–70 words) | — | `{ text: string }` |
 | `POST /api/read-aloud/feedback` | AI oral fluency + pronunciation feedback for Read Aloud | `{ stimulus, transcript, pronunciationAssessment? }` | `TaskFeedback` JSON |
 | `POST /api/pte/stimulus` | Generate stimulus for any PTE task type | `{ taskType: PteTaskType }` | `{ text: string }` |
 | `POST /api/pte/feedback` | AI feedback for any PTE task type | `{ taskType, stimulus, response, pronunciationAssessment? }` | `TaskFeedback` JSON |
+| `POST /api/word-lookup` | Translate a selected word/phrase (dictionary-first, LLM fallback) | `{ query: string }` | `WordLookupResult` JSON (`{ source, text, phonetic, entries, tags }`) |
 
 ## Quality Gates
 

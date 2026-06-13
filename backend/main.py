@@ -1,14 +1,14 @@
 """
 EchoLingo FastAPI Backend
 
-Python backend for EchoLingo IELTS speaking practice platform.
+Python backend for the EchoLingo PTE Academic practice platform.
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import examiner, feedback, tts, pronunciation, pte_stimulus, pte_feedback
+from routers import tts, pronunciation, pte_stimulus, pte_feedback, read_aloud, word_lookup
 
 # Load environment variables
 load_dotenv()
@@ -16,7 +16,7 @@ load_dotenv()
 # Create FastAPI app
 app = FastAPI(
     title="EchoLingo API",
-    description="Backend API for EchoLingo IELTS speaking practice platform",
+    description="Backend API for the EchoLingo PTE Academic practice platform",
     version="1.0.0",
 )
 
@@ -35,12 +35,12 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(examiner.router, prefix="/api", tags=["examiner"])
-app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 app.include_router(tts.router, prefix="/api", tags=["tts"])
 app.include_router(pronunciation.router, prefix="/api", tags=["pronunciation"])
 app.include_router(pte_stimulus.router, prefix="/api", tags=["pte"])
 app.include_router(pte_feedback.router, prefix="/api", tags=["pte"])
+app.include_router(read_aloud.router, prefix="/api", tags=["read-aloud"])
+app.include_router(word_lookup.router, prefix="/api", tags=["word-lookup"])
 
 
 @app.get("/health")

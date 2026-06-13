@@ -18,24 +18,13 @@ def _load(path: str) -> dict:
 
 class Prompts:
     def __init__(self):
-        _ielts_examiner     = _load("ielts/examiner.yaml")
-        _ielts_evaluator    = _load("ielts/evaluator.yaml")
         _pte_stimulus       = _load("pte/stimulus.yaml")
         _pte_fb_tasks       = _load("pte/feedback_tasks.yaml")
         _pte_fb_schemas     = _load("pte/feedback_schemas.yaml")
         _pte_judge          = _load("pte/judge.yaml")
         _pte_retry          = _load("pte/retry_note.yaml")
         _read_aloud         = _load("read_aloud/prompts.yaml")
-
-        # IELTS examiner — system prompt by mode
-        self.examiner_base:       str = _ielts_examiner["base"]
-        self.examiner_part1_ext:  str = _ielts_examiner["part1_extension"]
-        self.examiner_part2_ext:  str = _ielts_examiner["part2_extension"]
-        self.examiner_part3_ext:  str = _ielts_examiner["part3_extension"]
-
-        # IELTS evaluator
-        self.evaluator_system: str = _ielts_evaluator["system"]
-        self.evaluator_user:   str = _ielts_evaluator["user"]
+        _word_lookup        = _load("word_lookup/prompts.yaml")
 
         # PTE stimulus
         self.stimulus_system: str           = _pte_stimulus["system"]
@@ -68,6 +57,10 @@ class Prompts:
         self.read_aloud_feedback_system: str = _read_aloud["feedback"]["system"]
         self.read_aloud_feedback_user:   str = _read_aloud["feedback"]["user"]
 
+        # Word Lookup — DeepSeek fallback for phrases and dictionary misses
+        self.word_lookup_fallback_system: str = _word_lookup["fallback"]["system"]
+        self.word_lookup_fallback_user:   str = _word_lookup["fallback"]["user"]
+
     def build_primary_schema(self, section: str, details_schema: str) -> str:
         """Assemble the full output schema string for the primary LLM call."""
         schema_map = {
@@ -91,16 +84,6 @@ class Prompts:
             for d in diverged
         )
         return self.retry_note_template.replace("<<DIVERGED_LIST>>", diverged_list)
-
-    def examiner_system(self, mode: str) -> str:
-        """Assemble examiner system prompt for the given mode."""
-        mode_map = {
-            "ielts_part_1": self.examiner_part1_ext,
-            "ielts_part_2": self.examiner_part2_ext,
-            "ielts_part_3": self.examiner_part3_ext,
-        }
-        extension = mode_map.get(mode, self.examiner_part1_ext)
-        return f"{self.examiner_base}\n\n{extension}"
 
 
 # Singleton — loaded once at import time

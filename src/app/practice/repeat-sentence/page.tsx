@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import MicrophoneMonitor from "@/components/MicrophoneMonitor"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
@@ -43,6 +44,7 @@ export default function RepeatSentencePage() {
   const [transcript, setTranscript] = useState("")
 
   const startedAtRef = useRef("")
+  const sentenceRef = useRef("")
   const mrRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
@@ -74,6 +76,7 @@ export default function RepeatSentencePage() {
         addStimulusToBank("repeat_sentence", text)
       }
       setSentence(text)
+      sentenceRef.current = text
 
       // TTS synthesis
       const ttsRes = await fetch("/api/tts", {
@@ -173,7 +176,7 @@ export default function RepeatSentencePage() {
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", sentence)
+            form.append("text", sentenceRef.current)
             const res = await fetch("/api/pronunciation", { method: "POST", body: form })
             if (!res.ok) return null
             return await res.json() as PronunciationAssessmentResult
@@ -186,7 +189,7 @@ export default function RepeatSentencePage() {
         const res = await fetch("/api/pte/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "repeat_sentence", stimulus: sentence, response: tx }),
+          body: JSON.stringify({ taskType: "repeat_sentence", stimulus: sentenceRef.current, response: tx }),
         })
         if (!res.ok) return null
         return await res.json() as TaskFeedback
@@ -204,21 +207,18 @@ export default function RepeatSentencePage() {
     }
 
     setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "repeat_sentence",
-        stimulus: { kind: "audio", content: sentence },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
     setPhase("done")
-  }, [sentence])
+
+    saveTask({
+      taskType: "repeat_sentence",
+      stimulus: { kind: "audio", content: sentenceRef.current },
+      response: { kind: "audio", content: tx },
+      feedback: fb,
+      durationSeconds,
+      createdAt: startedAtRef.current,
+      endedAt,
+    }).catch(e => console.warn("saveTask failed:", e))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -235,6 +235,9 @@ export default function RepeatSentencePage() {
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Listen to the sentence, then repeat it verbatim. You have {RECORD_TIME}s to respond.
           </p>
+          <div className="mt-3">
+            <MicrophoneMonitor />
+          </div>
         </div>
 
         {phase === "idle" && (

@@ -7,6 +7,7 @@ Nodes: retrieve_context → (call_primary ‖ call_judge) → check_divergence
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional, TypedDict
@@ -16,6 +17,8 @@ from langgraph.graph import StateGraph, END
 from services.llm_chain import llm_chain
 from services.prompt_loader import prompts
 from services.rag import retrieve_context as rag_retrieve
+
+logger = logging.getLogger(__name__)
 
 SCORED_SPEAKING  = {"read_aloud", "repeat_sentence", "answer_short_question", "describe_image", "re_tell_lecture"}
 SCORED_WRITING   = {"summarize_written_text", "write_essay"}
@@ -221,7 +224,16 @@ async def finalize_node(state: FeedbackState) -> dict:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         result["judgeLog"] = judge_log
-        print(f"[LLM-as-Judge] Divergence logged: {judge_log}")
+        logger.warning("[LLM-as-Judge] Divergence logged: %s", judge_log)
+    # Per-request quality metric: divergence rate vs. RAG grounding can be
+    # compared by aggregating these lines before/after seeding the vector store.
+    logger.info(
+        "[feedback-graph] task_type=%s rag_chars=%d diverged=%d retried=%d",
+        state["task_type"],
+        len(state.get("retrieved_context", "")),
+        len(diverged),
+        state.get("retry_count", 0),
+    )
     return {"final_result": result}
 
 

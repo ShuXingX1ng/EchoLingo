@@ -64,6 +64,16 @@ _Avoid_: extended feedback, metadata
 The Azure-powered word-level and phoneme-level scoring applied to spoken Responses. Used in Read Aloud and Repeat Sentence. Distinct from AI Feedback — it runs in parallel and feeds into Feedback Details. Azure is the authoritative source for pronunciation data on these two task types; Whisper (speech-to-text transcription) is a separate tool used only where Azure Pronunciation Assessment does not apply (e.g. Describe Image, Answer Short Question) to produce a transcript for AI Feedback.
 _Avoid_: pronunciation score, Azure score
 
+### Study Aids
+
+**Word Lookup**:
+A floating helper available on Task Practice pages (never in a Mock Exam) that translates a word or short phrase the learner selects from any on-page text. The learner selects text, then either drags the selection into the helper (desktop) or taps a "译" button beside the selection (all platforms); both routes hit the same translation path. Single English words resolve against the ECDICT dictionary database (instant, offline); phrases — and dictionary misses — fall through to the DeepSeek LLM. It is a learning aid only and does not produce Feedback.
+_Avoid_: translator, dictionary, assistant, chat helper, glossary (reserved for CONTEXT.md term list)
+
+**Vocabulary List**:
+The learner's saved collection of looked-up words. A word enters the Vocabulary List only by explicit action (a save/star control on the Word Lookup card) — looking a word up does not add it. Stored per learner in Supabase when logged in, with localStorage fallback when not. Viewed on the `/vocabulary` page (view and delete only; no spaced-repetition review in v1).
+_Avoid_: word book, saved words, flashcards, SRS deck
+
 ### Progress
 
 **Task-Type Weakness**:

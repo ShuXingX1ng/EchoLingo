@@ -90,6 +90,31 @@ export async function POST(request: Request) {
       (resolve, reject) => {
         recognizer.recognizeOnceAsync(
           (result) => {
+            console.log("Azure recognition result:", {
+              reason: result.reason,
+              reasonText: sdk.ResultReason[result.reason],
+              text: result.text,
+              errorDetails: result.errorDetails,
+            });
+
+            if (result.reason === sdk.ResultReason.Canceled) {
+              const cancellation = sdk.CancellationDetails.fromResult(result);
+              console.error("Azure recognition canceled:", {
+                reason: cancellation.reason,
+                errorDetails: cancellation.errorDetails,
+              });
+              reject(new Error(`Azure recognition canceled: ${cancellation.errorDetails}`));
+              recognizer.close();
+              return;
+            }
+
+            if (result.reason === sdk.ResultReason.NoMatch) {
+              console.warn("Azure NoMatch — no speech detected in audio");
+              reject(new Error("no_speech_detected"));
+              recognizer.close();
+              return;
+            }
+
             const pronunciationResult =
               sdk.PronunciationAssessmentResult.fromResult(result);
             resolve(pronunciationResult);
@@ -149,6 +174,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(assessmentResult);
   } catch (error) {
+    if (error instanceof Error && error.message === "no_speech_detected") {
+      return NextResponse.json(
+        { error: "No speech detected. Please check your microphone and try again." },
+        { status: 422 }
+      );
+    }
     console.error("Pronunciation assessment error:", error);
     return NextResponse.json(
       { error: "Failed to assess pronunciation. Please try again." },

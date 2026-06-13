@@ -5,6 +5,8 @@ import {
   restoreUserProfiles,
   type UserProfile,
 } from "./error-patterns";
+import { getVocabulary, restoreVocabulary } from "./vocabulary";
+import type { VocabularyEntry } from "@/types";
 
 export type BackupData = {
   version: string;
@@ -12,6 +14,7 @@ export type BackupData = {
   sessions: SavedSession[];
   goals: PracticeGoal | null;
   errorPatterns?: UserProfile[];
+  vocabulary?: VocabularyEntry[];
   settings: {
     voiceURI: string | null;
     voiceRate: string | null;
@@ -28,6 +31,7 @@ export function createBackup(): BackupData {
     sessions: getSessions(),
     goals: getGoals(),
     errorPatterns: getAllUserProfiles(),
+    vocabulary: getVocabulary(),
     settings: {
       voiceURI: localStorage.getItem("echolingo_voice_uri"),
       voiceRate: localStorage.getItem("echolingo_voice_rate"),
@@ -82,6 +86,21 @@ export function validateBackup(data: unknown): data is BackupData {
       if (typeof userProfile.practiceCount !== "number") return false;
       if (typeof userProfile.averageBand !== "number") return false;
       if (typeof userProfile.lastUpdated !== "string") return false;
+    }
+  }
+
+  if (backup.vocabulary !== undefined) {
+    if (!Array.isArray(backup.vocabulary)) return false;
+
+    for (const entry of backup.vocabulary) {
+      if (!entry || typeof entry !== "object") return false;
+
+      const v = entry as Record<string, unknown>;
+      if (typeof v.id !== "string") return false;
+      if (typeof v.text !== "string") return false;
+      if (!Array.isArray(v.entries)) return false;
+      if (!Array.isArray(v.tags)) return false;
+      if (typeof v.createdAt !== "string") return false;
     }
   }
 
@@ -140,6 +159,10 @@ export function importBackup(file: File): Promise<ImportResult> {
 
         if (data.errorPatterns) {
           restoreUserProfiles(data.errorPatterns);
+        }
+
+        if (data.vocabulary) {
+          restoreVocabulary(data.vocabulary);
         }
 
         if (data.settings) {

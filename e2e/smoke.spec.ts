@@ -109,7 +109,7 @@ test.describe("P2 — Edge cases", () => {
   });
 
   test("read-aloud page handles stimulus API error", async ({ page }) => {
-    await page.route("**/api/pte/stimulus", (route) =>
+    await page.route("**/api/read-aloud/stimulus", (route) =>
       route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Internal server error" }) })
     );
     await page.goto("/practice/read-aloud");
