@@ -9,6 +9,12 @@ Uses two Wikipedia APIs (both CC BY-SA 4.0):
     in the  90-110-word range → summarize_spoken_text candidates
   - Lead sentence + template rephrase → write_essay prompt candidates
     (NOT verbatim Wikipedia copy — derived topic question)
+  - Individual sentences (10-25 words) from lead/body → repeat_sentence
+  - Individual sentences  (8-18 words) from lead/body → write_from_dictation
+  - Template-derived question prompts → answer_short_question
+    (NOT verbatim Wikipedia — derived from topic title using question frames)
+  - Template-derived image scenario descriptions → describe_image
+    (NOT verbatim Wikipedia — synthetic chart/graph scenarios from topic)
 
 Rate limits: 1 request per second per ARTICLE (two sub-requests per article
 share the same delay slot).  User-Agent identifies the bot.
@@ -26,6 +32,10 @@ from typing import Iterable
 import httpx
 
 from scripts.scrape_exemplars.base import RawExemplar, SourceAdapter
+
+# Regex to split plain text into sentences at sentence-terminal punctuation
+# followed by whitespace and an uppercase letter (or closing quote).
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z"\'])')
 
 LICENSE = "CC BY-SA 4.0"
 USER_AGENT = "EchoLingo/1.0 (PTE Academic practice; educational bot; contact: zzha0701@student.monash.edu)"
@@ -170,6 +180,65 @@ _ESSAY_FRAMES = [
 ]
 
 
+# ── Answer Short Question frames ──────────────────────────────────────────────
+# Original questions derived from topic titles — NOT verbatim Wikipedia text.
+# Designed to match the PTE Academic answer_short_question format (factual,
+# single-word or short-phrase answers expected).
+_ASQ_FRAMES = [
+    "What is the primary focus of the study of {topic}?",
+    "Name one example of {topic} commonly cited in academic contexts.",
+    "In which academic discipline is {topic} most extensively studied?",
+    "What is one major benefit associated with advances in {topic}?",
+    "What is a key challenge currently facing the field of {topic}?",
+    "What concept does the term {topic} most directly relate to?",
+    "Identify one sector significantly affected by developments in {topic}.",
+    "What is the primary goal of research conducted in the area of {topic}?",
+    "What does the study of {topic} primarily seek to explain or understand?",
+    "Name one practical application that has emerged from advances in {topic}.",
+    "What is a common concern raised by critics of {topic}?",
+    "What is one widely recognised consequence of {topic} on modern society?",
+]
+
+# ── Describe Image scenario frames ────────────────────────────────────────────
+# Synthetic image-scenario descriptions derived from topic titles — NOT verbatim
+# Wikipedia text. Designed to describe the kind of chart/graph a PTE candidate
+# might encounter in a Describe Image task. Used as few-shot style anchors.
+_IMAGE_SCENARIO_FRAMES = [
+    (
+        "A bar chart comparing the annual levels of {topic} across five major countries "
+        "between 2000 and 2020, with notable differences between developed and developing nations."
+    ),
+    (
+        "A line graph illustrating changes in the global impact of {topic} over a twenty-year "
+        "period, showing a marked acceleration in growth after 2010."
+    ),
+    (
+        "A pie chart displaying the proportional contribution of different sectors to the "
+        "overall development of {topic} in contemporary society."
+    ),
+    (
+        "A table summarising key statistical indicators related to {topic} across multiple "
+        "geographic regions, highlighting disparities in access and outcomes."
+    ),
+    (
+        "A flow diagram outlining the main stages of a process directly influenced by {topic}, "
+        "from initial conditions through to measurable outcomes."
+    ),
+    (
+        "A map showing the worldwide distribution of {topic}, with shaded regions indicating "
+        "varying levels of intensity, adoption, or impact."
+    ),
+    (
+        "A double bar chart comparing two different approaches to addressing {topic}, measured "
+        "across three time periods over the past decade."
+    ),
+    (
+        "A stacked bar chart illustrating how the composition of resources allocated to {topic} "
+        "has shifted across four consecutive decades."
+    ),
+]
+
+
 def _build_page_url(title: str) -> str:
     safe = title.replace(" ", "_")
     return f"https://en.wikipedia.org/wiki/{safe}"
@@ -214,15 +283,63 @@ def _build_essay_prompt(topic_title: str, frame_index: int) -> str:
     return frame.format(topic=noun)
 
 
+def _build_asq_prompt(topic_title: str, frame_index: int) -> str:
+    """
+    Construct an original answer-short-question prompt from the topic title.
+    Uses rotating frames — NOT Wikipedia text.
+    """
+    noun = _extract_lead_noun(topic_title)
+    frame = _ASQ_FRAMES[frame_index % len(_ASQ_FRAMES)]
+    return frame.format(topic=noun)
+
+
+def _build_image_scenario(topic_title: str, frame_index: int) -> str:
+    """
+    Construct a synthetic image-scenario description from the topic title.
+    Uses rotating frames — NOT Wikipedia text.
+    """
+    noun = _extract_lead_noun(topic_title)
+    frame = _IMAGE_SCENARIO_FRAMES[frame_index % len(_IMAGE_SCENARIO_FRAMES)]
+    return frame.format(topic=noun)
+
+
+def _split_sentences(text: str) -> list[str]:
+    """
+    Split a plain-text paragraph into individual sentences.
+
+    Uses terminal-punctuation + whitespace + uppercase heuristic. Skips
+    very short fragments and lines that look like headings (no terminal punct).
+    """
+    parts = _SENTENCE_SPLIT_RE.split(text)
+    sentences: list[str] = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        # Skip if it doesn't end with sentence-terminal punctuation (likely a heading)
+        if not re.search(r'[.!?]$', part):
+            continue
+        sentences.append(part)
+    return sentences
+
+
 class WikipediaAdapter(SourceAdapter):
     """Fetch academic passages from English Wikipedia.
 
-    Emits five task types per article (where source material exists):
-      - read_aloud            : lead paragraph  (10-60 words)
-      - write_essay           : original prompt derived from topic title (30-80 words)
-      - summarize_written_text: body paragraphs 150-300 words
-      - re_tell_lecture       : body paragraphs 100-150 words
-      - summarize_spoken_text : body paragraphs  80-120 words
+    Emits nine task types per article (where source material exists):
+
+    Text derived from Wikipedia (CC BY-SA 4.0):
+      - read_aloud            : lead paragraph             (10-60 words)
+      - summarize_written_text: body paragraphs           (150-300 words)
+      - re_tell_lecture       : body paragraphs           (100-150 words)
+      - summarize_spoken_text : body paragraphs            (80-120 words)
+      - repeat_sentence       : individual sentences       (8-28 words)
+      - write_from_dictation  : individual short sentences  (6-20 words)
+
+    Original content derived from topic title only (NOT Wikipedia text):
+      - write_essay           : original discussion prompt (30-80 words)
+      - answer_short_question : original factual question   (5-22 words)
+      - describe_image        : synthetic chart/graph brief (15-70 words)
     """
 
     def __init__(
@@ -315,6 +432,7 @@ class WikipediaAdapter(SourceAdapter):
 
             # ── read_aloud candidate: lead paragraph ──────────────────
             lead = self._fetch_lead(topic)
+            cleaned_lead: str | None = None
             if lead:
                 cleaned_lead = _strip_wikitext_noise(lead)
                 if cleaned_lead:
@@ -325,6 +443,29 @@ class WikipediaAdapter(SourceAdapter):
                         license=LICENSE,
                         raw_meta={"title": topic, "section": "lead"},
                     )
+
+                    # ── repeat_sentence / write_from_dictation: sentences from lead ──
+                    # We extract individual sentences from the lead paragraph.
+                    # Both task types come from the same sentences — the length
+                    # gate in the cleaner distinguishes them.
+                    for sent in _split_sentences(cleaned_lead):
+                        wc = _word_count(sent)
+                        if 6 <= wc <= 28:
+                            yield RawExemplar(
+                                task_type="repeat_sentence",
+                                text=sent,
+                                source_url=page_url,
+                                license=LICENSE,
+                                raw_meta={"title": topic, "section": "lead_sentence", "raw_word_count": wc},
+                            )
+                        if 6 <= wc <= 20:
+                            yield RawExemplar(
+                                task_type="write_from_dictation",
+                                text=sent,
+                                source_url=page_url,
+                                license=LICENSE,
+                                raw_meta={"title": topic, "section": "lead_sentence", "raw_word_count": wc},
+                            )
 
             # ── write_essay candidate: original prompt from topic ─────
             # We generate one prompt per topic using a rotating frame template.
@@ -339,7 +480,31 @@ class WikipediaAdapter(SourceAdapter):
                 raw_meta={"title": topic, "section": "prompt", "frame_index": topic_idx % len(_ESSAY_FRAMES)},
             )
 
-            # ── body-section candidates: three task types by word count ──
+            # ── answer_short_question candidate: original question from topic ──
+            # One question per topic, rotating through frames.
+            # NOT verbatim Wikipedia — derived from topic title only.
+            asq_prompt = _build_asq_prompt(topic, frame_index=topic_idx)
+            yield RawExemplar(
+                task_type="answer_short_question",
+                text=asq_prompt,
+                source_url=page_url,
+                license=LICENSE,
+                raw_meta={"title": topic, "section": "question", "frame_index": topic_idx % len(_ASQ_FRAMES)},
+            )
+
+            # ── describe_image candidate: synthetic chart scenario from topic ──
+            # One image brief per topic, rotating through frames.
+            # NOT verbatim Wikipedia — synthetic chart/graph description.
+            image_scenario = _build_image_scenario(topic, frame_index=topic_idx)
+            yield RawExemplar(
+                task_type="describe_image",
+                text=image_scenario,
+                source_url=page_url,
+                license=LICENSE,
+                raw_meta={"title": topic, "section": "image_brief", "frame_index": topic_idx % len(_IMAGE_SCENARIO_FRAMES)},
+            )
+
+            # ── body-section candidates: task types by word count ─────
             for para in self._fetch_sections(topic):
                 wc = _word_count(para)
 
@@ -372,5 +537,27 @@ class WikipediaAdapter(SourceAdapter):
                         license=LICENSE,
                         raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
                     )
+
+                # repeat_sentence / write_from_dictation: sentences from body
+                # Only process paragraphs long enough to contain useful sentences.
+                if wc >= 20:
+                    for sent in _split_sentences(para):
+                        swc = _word_count(sent)
+                        if 6 <= swc <= 28:
+                            yield RawExemplar(
+                                task_type="repeat_sentence",
+                                text=sent,
+                                source_url=page_url,
+                                license=LICENSE,
+                                raw_meta={"title": topic, "section": "body_sentence", "raw_word_count": swc},
+                            )
+                        if 6 <= swc <= 20:
+                            yield RawExemplar(
+                                task_type="write_from_dictation",
+                                text=sent,
+                                source_url=page_url,
+                                license=LICENSE,
+                                raw_meta={"title": topic, "section": "body_sentence", "raw_word_count": swc},
+                            )
 
             time.sleep(self._rate_limit)

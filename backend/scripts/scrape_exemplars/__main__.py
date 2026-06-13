@@ -4,8 +4,12 @@ Scrape pipeline entry point.
 Usage (from backend/):
     python -m scripts.scrape_exemplars                         # wikipedia, default limit
     python -m scripts.scrape_exemplars --adapter wikipedia     # explicit
-    python -m scripts.scrape_exemplars --limit 10              # first 10 topics
+    python -m scripts.scrape_exemplars --adapter jijing        # recalled questions (data file required)
+    python -m scripts.scrape_exemplars --limit 10              # first 10 topics / items
     python -m scripts.scrape_exemplars --force                 # overwrite existing output
+
+Jijing note: place recall data at backend/data/jijing_raw/jijing.jsonl before running
+the jijing adapter. That path is gitignored. See sources/jijing.py for the format.
 """
 
 import argparse
@@ -16,12 +20,14 @@ from pathlib import Path
 # Ensure backend/ is importable when called from repo root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+from scripts.scrape_exemplars.sources.jijing import JijingAdapter
 from scripts.scrape_exemplars.sources.wikipedia import WikipediaAdapter
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "exemplars_raw"
 
 _ADAPTERS = {
     "wikipedia": WikipediaAdapter,
+    "jijing": JijingAdapter,
 }
 
 

@@ -21,10 +21,15 @@ from scripts.scrape_exemplars.base import RawExemplar
 LENGTH_GATES: dict[str, tuple[int, int]] = {
     "read_aloud": (10, 60),
     "summarize_written_text": (150, 300),
-    # New text task types (Phase Data-2)
+    # Text task types (Phase Data-2)
     "write_essay": (30, 80),            # essay-question prompt text (40-60 words target)
     "re_tell_lecture": (100, 150),      # lecture body paragraphs (110-130 words target)
     "summarize_spoken_text": (80, 120), # spoken-text body paragraphs (90-110 words target)
+    # Short-sentence task types (Phase Data-3)
+    "repeat_sentence": (8, 28),         # individual sentences — PTE ~10-25 words
+    "write_from_dictation": (6, 20),    # dictation sentences — PTE ~8-18 words
+    "answer_short_question": (5, 22),   # question prompts — PTE ~8-15 words
+    "describe_image": (15, 70),         # image scenario descriptions — 20-60 words
 }
 
 _CITATION_RE = re.compile(r"\[\d+\]|\[note\s*\d+\]|\[citation needed\]|\[edit\]", re.IGNORECASE)
