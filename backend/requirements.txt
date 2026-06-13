@@ -21,6 +21,7 @@ azure-cognitiveservices-speech>=1.35.0
 
 # Database
 supabase>=2.3.4
+psycopg2-binary>=2.9.9   # direct Postgres connection for stimulus_exemplars ingestion (embed_exemplars.py)
 
 # Environment
 python-dotenv>=1.0.1

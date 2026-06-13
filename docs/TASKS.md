@@ -42,25 +42,39 @@
 | Phase: 前后端彻底分离 | Done | Migrated all Next.js API business routes (`/api/pte/stimulus`, `/api/pte/feedback`, `/api/read-aloud/*`, `/api/tts`, `/api/pronunciation`, `/api/word-lookup`) to FastAPI; deleted Next.js routes; enforced `NEXT_PUBLIC_API_BASE_URL`; removed backend secrets (`LLM_*`, `AZURE_SPEECH_*`) from Next.js config; 112/112 unit tests, lint 0, typecheck/build pass. |
 | Live Infra Verification | Done | Ran `supabase-migration-003.sql` and `setup_pgvector.sql`; configured `SUPABASE_DB_URL`; seeded 53 RAG rubric chunks using DashScope `text-embedding-v4` (1024 dims); imported 3.4M entries for ECDICT; successfully passed Python integration test for RAG retrieval. |
 | Circuit Breaker & Fallback | Done | Added CircuitBreaker to `api-client.ts`, practice/mock error boundaries. |
+| Phase Data-1: Embed + dedup | Done | `backend/scripts/embed_exemplars.py` — read `status=accept` clean entries, `id=sha256(text)`, DashScope embed, per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert via `psycopg2`/`SUPABASE_DB_URL`; `--force`/`--source`; 28 tests (embed+DB mocked); 211/211 backend pytest, lint 0 |
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
 | Frontend unit | 11 files / 115 tests (setup/page + FeedbackPanel tests removed in Phase Cleanup) |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 123 tests (after Phase Cleanup removed 27 IELTS tests) |
+| Backend | 211 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Next Phase
 
-**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — migration
-004 complete; next step is the Wikipedia scraper and cleaning pipeline.
+**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — scraper, cleaner, and embed/dedup/upsert ingestion complete; next step is the serving layer (`backend/services/exemplar_store.py`: random/targeted/theme retrieval + RRF).
 
 What's done:
 - Backend-unavailable degradation implemented (Circuit Breaker).
 - Practice and Mock ErrorBoundaries added; API client tests updated.
 - Design resolved: `CONTEXT.md` (Stimulus Exemplar, Theme Practice), ADR 0008/0009.
 - `supabase-migration-004.sql` created: `stimulus_exemplars` table with hnsw + GIN + task_type indexes; RLS enabled with no policies (PostgREST-deny pattern).
+- `backend/scripts/scrape_exemplars/` package: `SourceAdapter` ABC + `RawExemplar` dataclass + `WikipediaAdapter` (35 academic topics, rate-limited); `__main__.py` pipeline entry → `exemplars_raw/wikipedia.jsonl`.
+- `backend/scripts/scrape_exemplars/cleaner.py` + `backend/scripts/clean_exemplars.py`: markup strip, English filter, length gates (read_aloud ≤60w; swt 150–300w), SHA-256 dedup, optional DeepSeek gate; 60 tests passing.
+- `backend/scripts/embed_exemplars.py`: read `status=accept` clean entries, `id=sha256(text)`, DashScope embed (reuse `vector_store.embed_texts`), per-`task_type` near-dup drop (cosine ≥ 0.95 vs stored + in-batch), idempotent `ON CONFLICT (id) DO UPDATE` upsert via direct `psycopg2`/`SUPABASE_DB_URL` (bypasses RLS); `--force`/`--source`; 28 tests (embed+DB mocked). Live ingestion run deferred until exemplars are scraped/cleaned and DashScope quota confirmed.
+
+What's next:
+- [ ] **Serving** — `backend/services/exemplar_store.py` (`random` / `targeted` / `theme` retrieval + RRF); extend `PteStimulusRequest` with `mode/topic/targeting`; wire three-tier fallback in `pte_stimulus.py`.
+- [ ] **Originality guard** — word-shingle Jaccard check at generation time; offline eval script.
+- [ ] **Frontend** — Theme Practice topic input on `/practice` + `mode=theme`; Targeted Practice reuses Daily Plan with `mode=targeted`.
+
+Key files to open first:
+- `backend/scripts/embed_exemplars.py` (ingestion: id/embed/dedup/upsert conventions to mirror in the read path)
+- `supabase-migration-004.sql` (stimulus_exemplars columns: `embedding vector(1024)`, generated `tsv`, `task_type` filter)
+- `backend/services/vector_store.py` (DashScope `embed_texts` for the theme query vector)
+- `backend/services/rag.py` (existing pgvector retrieval shape + silent-fallback pattern)
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
@@ -81,17 +95,17 @@ Key resolved decisions (so we don't re-litigate):
 - [x] **Migration 004** — `stimulus_exemplars` table (id `sha256(text)`, task_type,
       text, `embedding vector(1024)`, `tsv tsvector` + GIN, source_url, license,
       status, reason, difficulty, features, word_count, lang, created_at). → `supabase-migration-004.sql`
-- [ ] **Scraper** — `backend/scripts/scrape_exemplars/` with `SourceAdapter` base
+- [x] **Scraper** — `backend/scripts/scrape_exemplars/` with `SourceAdapter` base
       + first adapter (Wikipedia/Simple Wikipedia REST API) → `exemplars_raw/`
       (gitignored). Reuse `Samkarya/online-exam-questions` only as a JSON-parser
       shape reference for a future GitHub adapter.
-- [ ] **Cleaning** — `clean_exemplars.py`: deterministic rules (markup/citation
+- [x] **Cleaning** — `clean_exemplars.py`: deterministic rules (markup/citation
       strip, whitespace, English-only, per-task-type length gate, exact-hash
       dedup) + one cheap DeepSeek accept/reject gate (no rewrite). Print
       accepted/rejected + reject-reason metrics → `exemplars_clean/` (gitignored).
-- [ ] **Embed + dedup** — `embed_exemplars.py`: DashScope `text-embedding-v4`,
+- [x] **Embed + dedup** — `embed_exemplars.py`: DashScope `text-embedding-v4`,
       near-dup drop (cosine ≥ 0.95 within task_type), idempotent
-      `ON CONFLICT (id)` upsert. `--force` re-embed.
+      `ON CONFLICT (id)` upsert. `--force` re-embed. → 28 tests, embed+DB mocked.
 - [ ] **Serving** — `backend/services/exemplar_store.py` (hybrid SQL + RRF +
       sampling); extend `PteStimulusRequest` with `mode/topic/targeting/verbatim`;
       wire three-tier fallback into `pte_stimulus.py` (keep it router-thin).
