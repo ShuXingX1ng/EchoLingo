@@ -8,6 +8,7 @@ import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 420 // 7 minutes
 
@@ -54,6 +55,7 @@ function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | 
 }
 
 export default function FillInTheBlanksListeningPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [rawStimulus, setRawStimulus] = useState("")
@@ -194,28 +196,28 @@ export default function FillInTheBlanksListeningPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Fill in the Blanks (Listening)</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Listening</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteListening')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Fill in the Blanks</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Listen to a passage, then select the correct word from the dropdown for each blank. 7 minutes.
+            {t('practiceTask.fill-in-the-blanks-listening.desc')}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated academic passage will be read aloud. After listening, fill in the blanks using the dropdown options.
+              {t('practiceTask.fill-in-the-blanks-listening.idleDesc')}
             </p>
             <button
               onClick={generate}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
-              Get Passage
+              {t('practiceTask.fill-in-the-blanks-listening.getPassage')}
             </button>
           </div>
         )}
@@ -223,14 +225,14 @@ export default function FillInTheBlanksListeningPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating passage and audio…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks-listening.generating')}</p>
           </div>
         )}
 
         {phase === "ready" && audioUrl && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-              Passage ready — listen carefully
+              {t('practiceTask.common.passageReady')}
             </p>
             <button
               onClick={playPassage}
@@ -239,10 +241,10 @@ export default function FillInTheBlanksListeningPage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5.14v14l11-7-11-7z" />
               </svg>
-              Play Passage
+              {t('practiceTask.common.playPassage')}
             </button>
             <p className="text-xs text-[var(--text-muted)]">
-              After the passage ends, you will fill in the blanks using dropdown options.
+              {t('practiceTask.fill-in-the-blanks-listening.afterPassage')}
             </p>
           </div>
         )}
@@ -261,8 +263,8 @@ export default function FillInTheBlanksListeningPage() {
                 />
               ))}
             </div>
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Passage playing…</p>
-            <p className="text-xs text-[var(--text-muted)]">Listen for the words that fill the blanks.</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.common.passagePlaying')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.fill-in-the-blanks-listening.listenTimer')}</p>
             <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
@@ -270,7 +272,7 @@ export default function FillInTheBlanksListeningPage() {
         {phase === "answering" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select the correct words</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.fill-in-the-blanks-listening.selectWords')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
@@ -309,7 +311,7 @@ export default function FillInTheBlanksListeningPage() {
                     onClick={playPassage}
                     className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 underline"
                   >
-                    Replay
+                    {t('practiceTask.highlight-correct-summary.replayPassage')}
                   </button>
                 )}
               </div>
@@ -318,7 +320,7 @@ export default function FillInTheBlanksListeningPage() {
                 disabled={!allAnswered}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
               >
-                Submit Answers
+                {t('practiceTask.common.submitAnswers')}
               </button>
             </div>
           </div>
@@ -327,7 +329,7 @@ export default function FillInTheBlanksListeningPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answers…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks-listening.evaluating')}</p>
           </div>
         )}
 
@@ -336,16 +338,16 @@ export default function FillInTheBlanksListeningPage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
-              stimulusLabel="Passage (with answers)"
+              stimulusLabel={t('practiceTask.fill-in-the-blanks-listening.passageWithAnswers')}
               responseText={buildResponseForFeedback(parsed, selections)}
-              responseLabel="Your Answers"
+              responseLabel={t('practiceTask.fill-in-the-blanks-listening.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -355,7 +357,7 @@ export default function FillInTheBlanksListeningPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

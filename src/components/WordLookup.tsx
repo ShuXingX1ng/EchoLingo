@@ -14,6 +14,16 @@ import type { WordLookupResult } from "@/types"
 
 const MAX_SELECTION = 120 // chars; longer selections are ignored
 
+// Heroicons-style "language / translate" glyph, shared by the floating button
+// and the selection pill so the helper reads as a single tool.
+function TranslateIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path fillRule="evenodd" d="M9 2.25a.75.75 0 0 1 .75.75v1.506a49.38 49.38 0 0 1 5.343.371.75.75 0 1 1-.186 1.489c-.66-.083-1.323-.151-1.99-.206a18.67 18.67 0 0 1-2.969 6.323c.317.384.65.753.998 1.107a.75.75 0 1 1-1.07 1.052A18.902 18.902 0 0 1 9 14.092a18.8 18.8 0 0 1-5.45 5.174.75.75 0 1 1-.752-1.298A17.31 17.31 0 0 0 8.077 13.5a18.52 18.52 0 0 1-1.964-3.166.75.75 0 1 1 1.36-.632 16.99 16.99 0 0 0 1.692 2.722 17.21 17.21 0 0 0 2.642-5.641 47.5 47.5 0 0 0-8.35.05.75.75 0 0 1-.1-1.497 49.03 49.03 0 0 1 4.392-.413V3a.75.75 0 0 1 .75-.75Zm6.318 8.616a.75.75 0 0 1 .68.43l4.5 9.75a.75.75 0 0 1-1.36.629l-1.067-2.31h-5.504l-1.067 2.31a.75.75 0 1 1-1.36-.63l4.5-9.75a.75.75 0 0 1 .68-.429Zm0 2.557L13.61 17.25h3.418l-1.71-3.827Z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
 type Phase = "idle" | "loading" | "result" | "error"
 
 type SelPos = { x: number; y: number; text: string }
@@ -115,9 +125,10 @@ export default function WordLookup() {
           onMouseDown={(e) => e.preventDefault()} // keep selection alive
           onClick={() => runLookup(sel.text)}
           aria-label={`翻译 “${sel.text}”`}
-          className="fixed z-[60] -translate-x-1/2 -translate-y-full -mt-2 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-sm font-medium shadow-lg active:scale-95 transition-transform"
+          className="fixed z-[60] -translate-x-1/2 -translate-y-full -mt-2 inline-flex items-center gap-1 pl-2 pr-2.5 py-1.5 rounded-full bg-emerald-600 text-white text-sm font-medium shadow-lg ring-1 ring-emerald-700/20 active:scale-95 transition-transform"
           style={{ left: sel.x, top: sel.y }}
         >
+          <TranslateIcon className="w-4 h-4" />
           译
         </button>
       )}
@@ -132,9 +143,11 @@ export default function WordLookup() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="关闭"
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 -mr-1 p-1 rounded-md transition-colors"
               >
-                ×
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                  <path d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" />
+                </svg>
               </button>
             </div>
 
@@ -188,13 +201,22 @@ export default function WordLookup() {
                       type="button"
                       onClick={handleSave}
                       disabled={saved}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         saved
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                           : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
                       }`}
                     >
-                      {saved ? "★ 已收藏" : "☆ 收藏"}
+                      {saved ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006Z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.5a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+                        </svg>
+                      )}
+                      {saved ? "已收藏" : "收藏"}
                     </button>
                   </div>
 
@@ -223,11 +245,11 @@ export default function WordLookup() {
         onDrop={onDrop}
         aria-label="查词助手"
         title="选中文字后点“译”，或将选中文字拖到这里"
-        className={`fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg transition-all active:scale-95 ${
+        className={`fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg ring-1 ring-emerald-700/20 transition-all active:scale-95 ${
           dragOver ? "bg-emerald-500 scale-110 ring-4 ring-emerald-300" : "bg-emerald-600 hover:bg-emerald-700"
         }`}
       >
-        译
+        <TranslateIcon className="w-6 h-6" />
       </button>
     </div>
   )

@@ -17,7 +17,7 @@ export default function MockError({
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <DesktopNav active="mock" maxWidth="4xl" />
+      <DesktopNav maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-16 sm:py-24 flex flex-col items-center justify-center text-center">
         <div className="text-5xl mb-6">⚠️</div>
         <h2 className="text-xl font-semibold text-[var(--foreground)] mb-3">

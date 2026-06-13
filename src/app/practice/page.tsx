@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import { useTranslation } from "@/lib/i18n"
 
 type TaskCard = {
   href: string
@@ -11,6 +12,9 @@ type TaskCard = {
   timer: string
   azure: boolean
 }
+
+// Slug used to look up the localized description: practiceHub.desc.<slug>
+const slugOf = (href: string) => href.split("/").pop() ?? ""
 
 const TASK_CARDS: TaskCard[] = [
   {
@@ -138,17 +142,18 @@ const TASK_CARDS: TaskCard[] = [
 const SECTIONS = ["Speaking", "Writing", "Reading", "Listening"] as const
 
 export default function PracticeHubPage() {
+  const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <DesktopNav active="practice" maxWidth="5xl" />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
         <div className="mb-10">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Academic
+            {t("practiceHub.eyebrow")}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Practice</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{t("practiceHub.title")}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Choose a task type to start a practice session with AI-generated stimuli and instant feedback.
+            {t("practiceHub.subtitle")}
           </p>
         </div>
 
@@ -157,7 +162,7 @@ export default function PracticeHubPage() {
           return (
             <div key={section} className="mb-10">
               <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                {section}
+                {t(`practiceHub.section.${section}`)}
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map(card => (
@@ -176,11 +181,11 @@ export default function PracticeHubPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300 mb-4">{card.desc}</p>
+                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300 mb-4">{t(`practiceHub.desc.${slugOf(card.href)}`)}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-400 dark:text-slate-500">⏱ {card.timer}</span>
                       <span className="text-xs font-semibold text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
-                        Start →
+                        {t("practiceHub.start")} →
                       </span>
                     </div>
                   </Link>
@@ -194,18 +199,18 @@ export default function PracticeHubPage() {
         <div className="mt-6 border border-[var(--border-strong)] bg-[var(--surface)] p-6  shadow-[4px_4px_0_rgba(15,23,42,0.08)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400 mb-1">
-              Full Mock Exam
+              {t("practiceHub.mockEyebrow")}
             </p>
-            <p className="text-sm font-medium text-slate-900 dark:text-white">All 7 tasks in PTE order</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white">{t("practiceHub.mockTitle")}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Strict timing enforced — no early stops on speaking tasks.
+              {t("practiceHub.mockDesc")}
             </p>
           </div>
           <Link
             href="/mock"
             className="shrink-0 rounded-xl bg-slate-950 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-[var(--surface)] dark:text-slate-950 dark:hover:bg-slate-200"
           >
-            Start Mock Exam →
+            {t("practiceHub.mockCta")} →
           </Link>
         </div>
 

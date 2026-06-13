@@ -137,16 +137,16 @@ export default function Home() {
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_70%)]" />
               <div className="relative">
                 <span className="mb-3 inline-block text-xs font-semibold uppercase tracking-widest text-emerald-100">
-                  PTE Academic · Recommended
+                  {t("home.practiceCardEyebrow")}
                 </span>
-                <h3 className="font-display text-3xl text-white">Practice</h3>
+                <h3 className="font-display text-3xl text-white">{t("home.practiceCardTitle")}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-emerald-100">
-                  Read Aloud, Repeat Sentence, Write Essay, and 4 more task types — all with AI feedback.
+                  {t("home.practiceCardDesc")}
                 </p>
               </div>
               <div className="relative mt-6 flex items-center justify-between">
                 <span className="text-sm font-semibold text-white group-hover:underline">
-                  Choose task type →
+                  {t("home.practiceCardCta")} →
                 </span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

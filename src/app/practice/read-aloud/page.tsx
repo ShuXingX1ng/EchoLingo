@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import PronunciationFeedback from "@/components/PronunciationFeedback"
+import { useTranslation } from "@/lib/i18n"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
@@ -61,6 +62,7 @@ function ScoreBadge({ score }: { score: number }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ReadAloudPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [stimulus, setStimulus] = useState("")
   const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
@@ -113,10 +115,10 @@ export default function ReadAloudPage() {
       setStimulus(text)
       setPhase("ready")
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to generate passage")
+      setErrorMsg(err instanceof Error ? err.message : t("practiceTask.read-aloud.errorGenerate"))
       setPhase("error")
     }
-  }, [])
+  }, [t])
 
   // ── Prep timer ────────────────────────────────────────────────────────────
 
@@ -155,7 +157,7 @@ export default function ReadAloudPage() {
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mr.start(250)
     } catch {
-      setErrorMsg("Microphone access denied. Please allow microphone and try again.")
+      setErrorMsg(t("practiceTask.common.micDenied"))
       setPhase("error")
       return
     }
@@ -193,7 +195,7 @@ export default function ReadAloudPage() {
         return s - 1
       })
     }, 1000)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -301,19 +303,18 @@ export default function ReadAloudPage() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         {/* Header breadcrumb */}
         <div className="mb-6 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/" className="hover:text-[var(--foreground)]">Home</Link>
+          <Link href="/" className="hover:text-[var(--foreground)]">{t("nav.home")}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Read Aloud</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Speaking
+            {t("practiceTask.common.pteSpeaking")}
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Read Aloud</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Read the passage aloud as clearly and naturally as possible. You will have{" "}
-            {PREP_TIME}s to prepare, then {RECORD_TIME}s to read.
+            {t("practiceTask.read-aloud.desc", { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
           </p>
         </div>
 
@@ -321,7 +322,7 @@ export default function ReadAloudPage() {
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-[var(--text-secondary)] text-sm mb-8 max-w-sm mx-auto">
-              An AI-generated passage will appear. Study it during the preparation phase, then read it aloud when recording starts.
+              {t("practiceTask.read-aloud.idleDesc")}
             </p>
             <button
               onClick={generateStimulus}
@@ -331,7 +332,7 @@ export default function ReadAloudPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Generate Passage
+              {t("practiceTask.read-aloud.generatePassage")}
             </button>
           </div>
         )}
@@ -340,7 +341,7 @@ export default function ReadAloudPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating passage…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t("practiceTask.common.generatingPassage")}</p>
           </div>
         )}
 
@@ -350,7 +351,7 @@ export default function ReadAloudPage() {
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Preparation
+                  {t("practiceTask.common.preparation")}
                 </p>
                 <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
               </div>
@@ -360,12 +361,12 @@ export default function ReadAloudPage() {
             </div>
 
             <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
-              <p>Recording starts automatically when the timer reaches 0.</p>
+              <p>{t("practiceTask.common.recordingStartsAuto")}</p>
               <button
                 onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
               >
-                Start now
+                {t("practiceTask.common.startNow")}
               </button>
             </div>
           </div>
@@ -379,7 +380,7 @@ export default function ReadAloudPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">
-                    Recording
+                    {t("practiceTask.common.recording")}
                   </p>
                 </div>
                 <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={72} />
@@ -399,8 +400,8 @@ export default function ReadAloudPage() {
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
                 {recSeconds > RECORD_TIME - MIN_REC_SECONDS
-                  ? `Hold on… ${recSeconds - (RECORD_TIME - MIN_REC_SECONDS)}s`
-                  : "Stop Recording"}
+                  ? t("practiceTask.common.holdOn", { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                  : t("practiceTask.common.stopRecording")}
               </button>
             </div>
           </div>
@@ -411,10 +412,10 @@ export default function ReadAloudPage() {
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-sm font-medium text-[var(--foreground)] mb-1">
-              Analyzing your reading…
+              {t("practiceTask.read-aloud.analyzing")}
             </p>
             <p className="text-xs text-[var(--text-muted)]">
-              Running AI feedback and pronunciation assessment in parallel
+              {t("practiceTask.read-aloud.analyzingSubtitle")}
             </p>
           </div>
         )}
@@ -424,14 +425,14 @@ export default function ReadAloudPage() {
           <div className="space-y-6">
             {/* Stimulus recap */}
             <div className="border border-[var(--border)] bg-[var(--background)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Passage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{t("practiceTask.common.passage")}</p>
               <p className="text-sm leading-7 text-[var(--text-secondary)] font-serif">{stimulus}</p>
             </div>
 
             {/* Transcript */}
             {transcript && transcript !== "[transcript not captured]" && (
               <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Your Reading</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{t("practiceTask.read-aloud.yourReading")}</p>
                 <p className="text-sm leading-7 text-[var(--text-secondary)] italic">{transcript}</p>
               </div>
             )}
@@ -440,14 +441,14 @@ export default function ReadAloudPage() {
             {feedback.pronunciationAssessment && (
               <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-                  Azure Pronunciation Assessment
+                  {t("practiceTask.read-aloud.azurePronunciation")}
                 </p>
                 <div className="grid grid-cols-4 gap-3 mb-5">
                   {[
-                    { label: "Overall", score: feedback.pronunciationAssessment.score },
-                    { label: "Accuracy", score: feedback.pronunciationAssessment.accuracyScore },
-                    { label: "Fluency", score: feedback.pronunciationAssessment.fluencyScore },
-                    { label: "Completeness", score: feedback.pronunciationAssessment.completenessScore },
+                    { label: t("pronunciation.overall"), score: feedback.pronunciationAssessment.score },
+                    { label: t("pronunciation.accuracy"), score: feedback.pronunciationAssessment.accuracyScore },
+                    { label: t("pronunciation.fluency"), score: feedback.pronunciationAssessment.fluencyScore },
+                    { label: t("pronunciation.completeness"), score: feedback.pronunciationAssessment.completenessScore },
                   ].map(({ label, score }) => (
                     <div key={label} className="text-center">
                       <ScoreBadge score={score} />
@@ -462,7 +463,7 @@ export default function ReadAloudPage() {
             {/* AI feedback */}
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                AI Feedback
+                {t("practiceTask.common.aiFeedback")}
               </p>
 
               <p className="text-sm leading-7 text-[var(--foreground)]">{feedback.summary}</p>
@@ -471,7 +472,7 @@ export default function ReadAloudPage() {
                 <div className="grid gap-4 sm:grid-cols-2 border-t border-[var(--border)] pt-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">
-                      Oral Fluency
+                      {t("practiceTask.read-aloud.oralFluency")}
                     </p>
                     <p className="text-sm leading-6 text-[var(--text-secondary)]">
                       {feedback.details.oralFluency}
@@ -479,7 +480,7 @@ export default function ReadAloudPage() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">
-                      Pronunciation
+                      {t("practiceTask.read-aloud.pronunciation")}
                     </p>
                     <p className="text-sm leading-6 text-[var(--text-secondary)]">
                       {feedback.details.pronunciation}
@@ -491,7 +492,7 @@ export default function ReadAloudPage() {
               {feedback.strengths.length > 0 && (
                 <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 mb-2">
-                    Strengths
+                    {t("practiceTask.common.strengths")}
                   </p>
                   <ul className="space-y-1">
                     {feedback.strengths.map((s, i) => (
@@ -506,7 +507,7 @@ export default function ReadAloudPage() {
               {feedback.weaknesses.length > 0 && (
                 <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-600 dark:text-red-400 mb-2">
-                    Areas to Improve
+                    {t("practiceTask.common.areasToImprove")}
                   </p>
                   <ul className="space-y-1">
                     {feedback.weaknesses.map((w, i) => (
@@ -521,7 +522,7 @@ export default function ReadAloudPage() {
               {feedback.suggestions.length > 0 && (
                 <div className="border-t border-[var(--border)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">
-                    Suggestions
+                    {t("practiceTask.common.suggestions")}
                   </p>
                   <ul className="space-y-1">
                     {feedback.suggestions.map((s, i) => (
@@ -540,13 +541,13 @@ export default function ReadAloudPage() {
                 onClick={generateStimulus}
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
               >
-                Practice Again
+                {t("practiceTask.common.practiceAgain")}
               </button>
               <Link
                 href="/"
                 className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]"
               >
-                Back to Home
+                {t("practiceTask.common.backToHome")}
               </Link>
             </div>
           </div>
@@ -560,7 +561,7 @@ export default function ReadAloudPage() {
               onClick={generateStimulus}
               className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
             >
-              Try Again
+              {t("practiceTask.common.tryAgain")}
             </button>
           </div>
         )}

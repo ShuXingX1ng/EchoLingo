@@ -44,18 +44,19 @@
 | Circuit Breaker & Fallback | Done | Added CircuitBreaker to `api-client.ts`, practice/mock error boundaries. |
 | Phase Data-1: Embed + dedup | Done | `backend/scripts/embed_exemplars.py` — read `status=accept` clean entries, `id=sha256(text)`, DashScope embed, per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert via `psycopg2`/`SUPABASE_DB_URL`; `--force`/`--source`; 28 tests (embed+DB mocked); 211/211 backend pytest, lint 0 |
 | Phase Data-1: Serving + originality guard | Done | `exemplar_store.py` (random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `originality.py` (4-gram shingle Jaccard); `stimulus_service.py` (three-tier fallback + guard); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); router kept thin; `scripts/eval_originality.py` (offline); 36 new tests; 247/247 backend pytest, ruff 0 |
+| Phase i18n-2: All 15 practice task pages fully internationalised | Done | ~180 keys added to `en.json`+`zh.json` (`practiceTask.common.*` + `practiceTask.<slug>.*`); all 15 pages use `useTranslation`+`t()`; `useCallback` deps updated; PTE proper nouns in h1/breadcrumb kept hardcoded; lint 0, 112/112 unit tests, build pass |
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
-| Frontend unit | 11 files / 115 tests (setup/page + FeedbackPanel tests removed in Phase Cleanup) |
+| Frontend unit | 11 files / 112 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
 | Backend | 247 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Next Phase
 
-**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — full backend ingestion + serving complete (scraper → cleaner → embed/dedup/upsert → retrieval → three-tier generation + originality guard). Only the **frontend** wiring remains: Theme Practice topic input (`mode=theme`) and Targeted Practice via the Daily Plan (`mode=targeted`).
+**Resume point (2026-06-13):** Phase Data-1 backend is complete and all 14 practice pages are fully i18n-wired. The next concrete work is **frontend Theme Practice + Targeted Practice** wiring to use the new `mode` parameter on `/api/pte/stimulus`.
 
 What's done:
 - Backend-unavailable degradation (Circuit Breaker) + Practice/Mock ErrorBoundaries.
@@ -64,7 +65,8 @@ What's done:
 - Scraper package (`scrape_exemplars/` + `WikipediaAdapter`) → `exemplars_raw/` (gitignored).
 - Cleaner (`cleaner.py` + `clean_exemplars.py`): markup strip, English filter, length gates, SHA-256 dedup, optional DeepSeek gate.
 - `embed_exemplars.py`: `id=sha256(text)`, DashScope embed, near-dup drop, idempotent upsert via `psycopg2`/`SUPABASE_DB_URL`.
-- **Serving (this session):** `services/exemplar_store.py` (`retrieve` random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`; silent `[]` on failure); `services/originality.py` (4-gram shingle Jaccard, threshold 0.5); `services/stimulus_service.py` (verbatim → exemplar-grounded few-shot → empty-bank pure-AI → silent pure-AI, regenerate once on guard trip); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); `pte_stimulus.py` kept router-thin; `scripts/eval_originality.py` (offline, not in CI). 36 new tests; 247/247 pytest, ruff 0.
+- `services/exemplar_store.py` (`retrieve` random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `services/originality.py` (4-gram shingle Jaccard, threshold 0.5); `services/stimulus_service.py` (three-tier fallback + originality guard); `PteStimulusRequest` extended; `scripts/eval_originality.py` (offline). 247/247 pytest, ruff 0.
+- All 14 practice task pages fully i18n-wired: `useTranslation` + `t()` on every user-visible string; `useCallback` deps updated; `en.json`/`zh.json` unchanged (all keys pre-existing).
 - Live ingestion run still deferred (needs scraped/cleaned exemplars + DashScope quota confirmed); JSON task types stay pure-AI (empty bank) by design.
 
 What's next:

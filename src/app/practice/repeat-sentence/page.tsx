@@ -10,6 +10,7 @@ import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const RECORD_TIME = 15
 const MIN_REC_SECONDS = 5
@@ -36,6 +37,7 @@ function CountdownRing({ seconds, total, size = 64 }: { seconds: number; total: 
 }
 
 export default function RepeatSentencePage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [sentence, setSentence] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -81,10 +83,10 @@ export default function RepeatSentencePage() {
       setRecSec(RECORD_TIME)
       setPhase("ready")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate stimulus")
+      setError(e instanceof Error ? e.message : t('practiceTask.repeat-sentence.errorGenerate'))
       setPhase("error")
     }
-  }, [audioUrl])
+  }, [audioUrl, t])
 
   const playAudio = useCallback(() => {
     if (!audioUrl) return
@@ -110,7 +112,7 @@ export default function RepeatSentencePage() {
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       mr.start(250)
     } catch {
-      setError("Microphone access denied.")
+      setError(t('practiceTask.common.micDeniedShort'))
       setPhase("error")
       return
     }
@@ -136,7 +138,7 @@ export default function RepeatSentencePage() {
         return s - 1
       })
     }, 1000)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -200,22 +202,22 @@ export default function RepeatSentencePage() {
       createdAt: startedAtRef.current,
       endedAt,
     }).catch(e => console.warn("saveTask failed:", e))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Repeat Sentence</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Speaking</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteSpeaking')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Repeat Sentence</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Listen to the sentence, then repeat it verbatim. You have {RECORD_TIME}s to respond.
+            {t('practiceTask.repeat-sentence.desc', { recordTime: String(RECORD_TIME) })}
           </p>
           <div className="mt-3">
             <MicrophoneMonitor />
@@ -225,10 +227,10 @@ export default function RepeatSentencePage() {
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
-              A sentence will be read aloud by Azure TTS. Listen carefully, then repeat it exactly.
+              {t('practiceTask.repeat-sentence.idleDesc')}
             </p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
-              Generate Sentence
+              {t('practiceTask.repeat-sentence.generateSentence')}
             </button>
           </div>
         )}
@@ -236,25 +238,25 @@ export default function RepeatSentencePage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating sentence and audio…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.repeat-sentence.generating')}</p>
           </div>
         )}
 
         {phase === "ready" && audioUrl && (
           <div className="space-y-6">
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">Listen first, then repeat</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">{t('practiceTask.repeat-sentence.listenFirst')}</p>
               <button onClick={playAudio}
                 className="inline-flex items-center gap-3 rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 mb-6">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5.14v14l11-7-11-7z" />
                 </svg>
-                Play Sentence
+                {t('practiceTask.repeat-sentence.playSentence')}
               </button>
-              <p className="text-xs text-slate-400 mb-6">Play the sentence, then click Record to repeat it.</p>
+              <p className="text-xs text-slate-400 mb-6">{t('practiceTask.repeat-sentence.playThenRecord')}</p>
               <button onClick={startRecording}
                 className="rounded-xl border-2 border-emerald-500 px-8 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                Record My Answer
+                {t('practiceTask.repeat-sentence.recordMyAnswer')}
               </button>
             </div>
           </div>
@@ -265,7 +267,7 @@ export default function RepeatSentencePage() {
             <div className="border-2 border-red-400 bg-[var(--surface)] p-8 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Recording — Repeat the sentence now</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t('practiceTask.repeat-sentence.recordingRepeat')}</p>
               </div>
               <CountdownRing seconds={recSec} total={RECORD_TIME} size={80} />
             </div>
@@ -274,8 +276,8 @@ export default function RepeatSentencePage() {
                 disabled={recSec > RECORD_TIME - MIN_REC_SECONDS}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent">
                 {recSec > RECORD_TIME - MIN_REC_SECONDS
-                  ? `Hold on… ${recSec - (RECORD_TIME - MIN_REC_SECONDS)}s`
-                  : "Done"}
+                  ? t('practiceTask.common.holdOn', { sec: String(recSec - (RECORD_TIME - MIN_REC_SECONDS)) })
+                  : t('practiceTask.common.stopRecording')}
               </button>
             </div>
           </div>
@@ -284,20 +286,20 @@ export default function RepeatSentencePage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Analyzing your repetition…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.repeat-sentence.analyzing')}</p>
           </div>
         )}
 
         {phase === "done" && feedback && (
           <div className="space-y-6">
-            <TaskFeedbackDisplay feedback={feedback} stimulus={sentence} stimulusLabel="Original Sentence"
-              responseText={transcript !== "[transcript not captured]" ? transcript : undefined} responseLabel="Your Repetition" />
+            <TaskFeedbackDisplay feedback={feedback} stimulus={sentence} stimulusLabel={t('practiceTask.repeat-sentence.originalSentence')}
+              responseText={transcript !== "[transcript not captured]" ? transcript : undefined} responseLabel={t('practiceTask.repeat-sentence.yourRepetition')} />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -306,7 +308,7 @@ export default function RepeatSentencePage() {
         {phase === "error" && (
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
-            <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">Try Again</button>
+            <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">{t('practiceTask.common.tryAgain')}</button>
           </div>
         )}
       </main>

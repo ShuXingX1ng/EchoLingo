@@ -8,6 +8,7 @@ import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const PREP_TIME = 10
 const RECORD_TIME = 40
@@ -46,6 +47,7 @@ function CountdownRing({ seconds, total, size = 72 }: { seconds: number; total: 
 }
 
 export default function ReTellLecturePage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [lectureText, setLectureText] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -90,10 +92,10 @@ export default function ReTellLecturePage() {
       setRecSeconds(RECORD_TIME)
       setPhase("ready")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate lecture")
+      setError(e instanceof Error ? e.message : t('practiceTask.re-tell-lecture.errorGenerate'))
       setPhase("error")
     }
-  }, [audioUrl])
+  }, [audioUrl, t])
 
   const playLecture = useCallback(() => {
     if (!audioUrl) return
@@ -137,7 +139,7 @@ export default function ReTellLecturePage() {
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       mr.start(250)
     } catch {
-      setError("Microphone access denied.")
+      setError(t('practiceTask.common.micDeniedShort'))
       setPhase("error")
       return
     }
@@ -163,7 +165,7 @@ export default function ReTellLecturePage() {
         return s - 1
       })
     }, 1000)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -216,18 +218,18 @@ export default function ReTellLecturePage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Re-tell Lecture</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Speaking
+            {t('practiceTask.common.pteSpeaking')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Re-tell Lecture</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Listen to a short lecture, then re-tell it in your own words. You have {PREP_TIME}s to prepare and {RECORD_TIME}s to respond.
+            {t('practiceTask.re-tell-lecture.desc', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
           </p>
         </div>
 
@@ -235,7 +237,7 @@ export default function ReTellLecturePage() {
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
-              An AI-generated lecture will be synthesized as audio. Listen carefully, prepare for 10s, then re-tell the key points.
+              {t('practiceTask.re-tell-lecture.idleDesc')}
             </p>
             <button
               onClick={generate}
@@ -244,7 +246,7 @@ export default function ReTellLecturePage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 9.75v4.5m0 0a2.25 2.25 0 01-2.25-2.25m2.25 2.25a2.25 2.25 0 002.25-2.25M9.75 9.75a2.25 2.25 0 00-2.25 2.25m2.25-2.25a2.25 2.25 0 012.25 2.25" />
               </svg>
-              Generate Lecture
+              {t('practiceTask.re-tell-lecture.generateLecture')}
             </button>
           </div>
         )}
@@ -253,8 +255,8 @@ export default function ReTellLecturePage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Generating lecture audio…</p>
-            <p className="text-xs text-[var(--text-muted)]">Writing lecture text and synthesizing speech</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.re-tell-lecture.generatingLecture')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.re-tell-lecture.writingLecture')}</p>
           </div>
         )}
 
@@ -262,7 +264,7 @@ export default function ReTellLecturePage() {
         {phase === "ready" && audioUrl && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-              Lecture ready — listen carefully
+              {t('practiceTask.re-tell-lecture.lectureReady')}
             </p>
             <button
               onClick={playLecture}
@@ -271,10 +273,10 @@ export default function ReTellLecturePage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5.14v14l11-7-11-7z" />
               </svg>
-              Play Lecture
+              {t('practiceTask.re-tell-lecture.playLecture')}
             </button>
             <p className="text-xs text-[var(--text-muted)]">
-              After the lecture ends, you will have {PREP_TIME}s to prepare, then {RECORD_TIME}s to re-tell it.
+              {t('practiceTask.re-tell-lecture.afterLecture', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
             </p>
           </div>
         )}
@@ -294,8 +296,8 @@ export default function ReTellLecturePage() {
                 />
               ))}
             </div>
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Lecture playing…</p>
-            <p className="text-xs text-[var(--text-muted)]">Listen carefully. The preparation timer starts when the lecture ends.</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.re-tell-lecture.lecturePlaying')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.re-tell-lecture.listenTimer')}</p>
             <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
@@ -304,11 +306,11 @@ export default function ReTellLecturePage() {
         {phase === "prep" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-              Preparation — organise your thoughts
+              {t('practiceTask.re-tell-lecture.prepPhase')}
             </p>
             <CountdownRing seconds={prepSeconds} total={PREP_TIME} size={88} />
             <p className="mt-4 text-xs text-[var(--text-muted)]">
-              Recording starts automatically in {prepSeconds}s
+              {t('practiceTask.re-tell-lecture.recordingStartsIn', { sec: String(prepSeconds) })}
             </p>
           </div>
         )}
@@ -320,7 +322,7 @@ export default function ReTellLecturePage() {
               <div className="flex items-center justify-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">
-                  Recording — Re-tell the lecture now
+                  {t('practiceTask.re-tell-lecture.recordingPhase')}
                 </p>
               </div>
               <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={80} />
@@ -335,8 +337,8 @@ export default function ReTellLecturePage() {
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
                 {recSeconds > RECORD_TIME - MIN_REC_SECONDS
-                  ? `Hold on… ${recSeconds - (RECORD_TIME - MIN_REC_SECONDS)}s`
-                  : "Done"}
+                  ? t('practiceTask.common.holdOn', { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                  : t('practiceTask.common.stopRecording')}
               </button>
             </div>
           </div>
@@ -346,7 +348,7 @@ export default function ReTellLecturePage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Analyzing your re-tell…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.re-tell-lecture.analyzing')}</p>
           </div>
         )}
 
@@ -356,19 +358,19 @@ export default function ReTellLecturePage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={lectureText}
-              stimulusLabel="Lecture Text"
+              stimulusLabel={t('practiceTask.re-tell-lecture.lectureText')}
               responseText={transcript !== "[transcript not captured]" ? transcript : undefined}
-              responseLabel="Your Re-tell"
+              responseLabel={t('practiceTask.re-tell-lecture.yourRetell')}
             />
             <div className="flex gap-3 justify-center">
               <button
                 onClick={generate}
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
               >
-                New Lecture
+                {t('practiceTask.re-tell-lecture.newLecture')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -379,7 +381,7 @@ export default function ReTellLecturePage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

@@ -8,6 +8,7 @@ import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 240 // 4 minutes
 
@@ -53,6 +54,7 @@ function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
 }
 
 export default function MultipleChoicePage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [rawStimulus, setRawStimulus] = useState("")
@@ -159,28 +161,28 @@ export default function MultipleChoicePage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Multiple Choice</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteReading')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Multiple Choice</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Read the passage and select the one correct answer from the five options. 4 minutes.
+            {t('practiceTask.multiple-choice.desc')}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated passage with a comprehension question will appear. Read carefully and select the best answer.
+              {t('practiceTask.multiple-choice.idleDesc')}
             </p>
             <button
               onClick={generate}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
-              Get Question
+              {t('practiceTask.multiple-choice.getQuestion')}
             </button>
           </div>
         )}
@@ -188,14 +190,14 @@ export default function MultipleChoicePage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating question…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.multiple-choice.generating')}</p>
           </div>
         )}
 
         {phase === "ready" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.passage')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
@@ -236,7 +238,7 @@ export default function MultipleChoicePage() {
                 disabled={selected === null}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
               >
-                Submit Answer
+                {t('practiceTask.common.submitAnswer')}
               </button>
             </div>
           </div>
@@ -245,7 +247,7 @@ export default function MultipleChoicePage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answer…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.multiple-choice.evaluating')}</p>
           </div>
         )}
 
@@ -254,16 +256,16 @@ export default function MultipleChoicePage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
-              stimulusLabel="Passage & Question"
+              stimulusLabel={t('practiceTask.multiple-choice.passageQuestion')}
               responseText={buildResponseForFeedback(parsed, selected)}
-              responseLabel="Your Answer"
+              responseLabel={t('practiceTask.multiple-choice.yourAnswer')}
             />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -273,7 +275,7 @@ export default function MultipleChoicePage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

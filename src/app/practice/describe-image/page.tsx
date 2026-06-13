@@ -10,6 +10,7 @@ import { apiPost } from "@/lib/api-client"
 import { getRandomImage } from "@/lib/image-bank"
 import type { ImageStimulus } from "@/lib/image-bank"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const PREP_TIME = 25
 const RECORD_TIME = 40
@@ -40,6 +41,7 @@ function CountdownRing({ seconds, total, size = 72 }: { seconds: number; total: 
 }
 
 export default function DescribeImagePage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [image, setImage] = useState<ImageStimulus | null>(null)
   const [imageError, setImageError] = useState(false)
@@ -107,7 +109,7 @@ export default function DescribeImagePage() {
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       mr.start(250)
     } catch {
-      setErrorMsg("Microphone access denied. Please allow microphone and try again.")
+      setErrorMsg(t('practiceTask.common.micDenied'))
       setPhase("error")
       return
     }
@@ -133,7 +135,7 @@ export default function DescribeImagePage() {
         return s - 1
       })
     }, 1000)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -192,18 +194,18 @@ export default function DescribeImagePage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Describe Image</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Speaking
+            {t('practiceTask.common.pteSpeaking')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Describe Image</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Study the image for {PREP_TIME}s, then describe it in detail. You have {RECORD_TIME}s to speak.
+            {t('practiceTask.describe-image.desc', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
           </p>
         </div>
 
@@ -211,7 +213,7 @@ export default function DescribeImagePage() {
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
-              A chart, map, or diagram will appear. Study it during the preparation phase, then describe what you see when recording starts.
+              {t('practiceTask.describe-image.idleDesc')}
             </p>
             <button
               onClick={loadImage}
@@ -220,7 +222,7 @@ export default function DescribeImagePage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              Load Image
+              {t('practiceTask.describe-image.loadImage')}
             </button>
           </div>
         )}
@@ -230,13 +232,13 @@ export default function DescribeImagePage() {
           <div className="space-y-6">
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preparation</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.preparation')}</p>
                 <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
               </div>
               <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
                 <div className="flex items-center justify-center h-48 bg-[var(--background)] text-sm text-[var(--text-secondary)]">
-                  Image failed to load
+                  {t('practiceTask.describe-image.imageFailedToLoad')}
                 </div>
               ) : (
                 <div className="relative w-full" style={{ minHeight: 240 }}>
@@ -253,12 +255,12 @@ export default function DescribeImagePage() {
               )}
             </div>
             <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
-              <p>Recording starts automatically when the timer reaches 0.</p>
+              <p>{t('practiceTask.common.recordingStartsAuto')}</p>
               <button
                 onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)] transition-colors"
               >
-                Start now
+                {t('practiceTask.common.startNow')}
               </button>
             </div>
           </div>
@@ -271,14 +273,14 @@ export default function DescribeImagePage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Recording</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t('practiceTask.common.recording')}</p>
                 </div>
                 <CountdownRing seconds={recSeconds} total={RECORD_TIME} />
               </div>
               <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
                 <div className="flex items-center justify-center h-48 bg-[var(--background)] text-sm text-[var(--text-secondary)]">
-                  Image failed to load
+                  {t('practiceTask.describe-image.imageFailedToLoad')}
                 </div>
               ) : (
                 <div className="relative w-full" style={{ minHeight: 240 }}>
@@ -304,8 +306,8 @@ export default function DescribeImagePage() {
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
                 {recSeconds > RECORD_TIME - MIN_REC_SECONDS
-                  ? `Hold on… ${recSeconds - (RECORD_TIME - MIN_REC_SECONDS)}s`
-                  : "Stop Recording"}
+                  ? t('practiceTask.common.holdOn', { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                  : t('practiceTask.common.stopRecording')}
               </button>
             </div>
           </div>
@@ -315,7 +317,7 @@ export default function DescribeImagePage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Analyzing your description…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.describe-image.analyzing')}</p>
           </div>
         )}
 
@@ -323,7 +325,7 @@ export default function DescribeImagePage() {
         {phase === "done" && feedback && image && (
           <div className="space-y-6">
             <div className="border border-[var(--border)] bg-[var(--background)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">Image</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{t('practiceTask.describe-image.image')}</p>
               <p className="text-sm text-[var(--text-secondary)] mb-2">{image.topic}</p>
               <div className="relative w-full">
                 <Image
@@ -339,19 +341,19 @@ export default function DescribeImagePage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={image.description}
-              stimulusLabel="Image Description"
+              stimulusLabel={t('practiceTask.describe-image.imageDescription')}
               responseText={transcript !== "[transcript not captured]" ? transcript : undefined}
-              responseLabel="Your Description"
+              responseLabel={t('practiceTask.describe-image.yourDescription')}
             />
             <div className="flex gap-3 justify-center">
               <button
                 onClick={loadImage}
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
               >
-                New Image
+                {t('practiceTask.describe-image.newImage')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -362,7 +364,7 @@ export default function DescribeImagePage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{errorMsg}</p>
             <button onClick={loadImage} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

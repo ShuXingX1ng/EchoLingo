@@ -8,6 +8,7 @@ import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 420 // 7 minutes
 
@@ -55,6 +56,7 @@ function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | 
 }
 
 export default function FillInTheBlanksPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [rawStimulus, setRawStimulus] = useState("")
@@ -165,28 +167,28 @@ export default function FillInTheBlanksPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Fill in the Blanks</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteReading')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Fill in the Blanks</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Read the passage and select the correct word from the dropdown for each blank. 7 minutes.
+            {t('practiceTask.fill-in-the-blanks.desc')}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated academic passage will appear with blanks. Choose the best word for each gap from the dropdown options.
+              {t('practiceTask.fill-in-the-blanks.idleDesc')}
             </p>
             <button
               onClick={generate}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
-              Get Passage
+              {t('practiceTask.fill-in-the-blanks.getPassage')}
             </button>
           </div>
         )}
@@ -194,14 +196,14 @@ export default function FillInTheBlanksPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating passage…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks.generating')}</p>
           </div>
         )}
 
         {phase === "ready" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.passage')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
@@ -239,7 +241,7 @@ export default function FillInTheBlanksPage() {
                 disabled={!allAnswered}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
               >
-                Submit Answers
+                {t('practiceTask.common.submitAnswers')}
               </button>
             </div>
           </div>
@@ -248,7 +250,7 @@ export default function FillInTheBlanksPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answers…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks.evaluating')}</p>
           </div>
         )}
 
@@ -257,16 +259,16 @@ export default function FillInTheBlanksPage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
-              stimulusLabel="Passage"
+              stimulusLabel={t('practiceTask.common.passage')}
               responseText={buildResponseForFeedback(parsed, selections)}
-              responseLabel="Your Answers"
+              responseLabel={t('practiceTask.fill-in-the-blanks.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -276,7 +278,7 @@ export default function FillInTheBlanksPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

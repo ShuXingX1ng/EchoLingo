@@ -8,6 +8,7 @@ import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 // PTE: 20 minutes; 1200s
 const TIME_LIMIT = 1200
@@ -17,6 +18,7 @@ const MAX_WORDS = 300
 type Phase = "idle" | "generating" | "writing" | "processing" | "done" | "error"
 
 export default function WriteEssayPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [prompt, setPrompt] = useState("")
   const [userText, setUserText] = useState("")
@@ -66,7 +68,7 @@ export default function WriteEssayPage() {
 
   const handleSubmit = async () => {
     if (timerRef.current) clearInterval(timerRef.current)
-    if (!userText.trim()) { setError("Please write your essay before submitting."); return }
+    if (!userText.trim()) { setError(t('practiceTask.write-essay.emptyEssayError')); return }
     setPhase("processing")
     const endedAt = new Date().toISOString()
     const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
@@ -109,25 +111,25 @@ export default function WriteEssayPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Write Essay</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Writing</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteWriting')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Write Essay</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Write a {MIN_WORDS}–{MAX_WORDS} word essay in response to the prompt. 20 minutes.
+            {t('practiceTask.write-essay.desc', { minWords: String(MIN_WORDS), maxWords: String(MAX_WORDS) })}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated essay question will appear. Write a structured {MIN_WORDS}–{MAX_WORDS} word response.
+              {t('practiceTask.write-essay.idleDesc', { minWords: String(MIN_WORDS), maxWords: String(MAX_WORDS) })}
             </p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
-              Get Essay Question
+              {t('practiceTask.write-essay.getEssayQuestion')}
             </button>
           </div>
         )}
@@ -135,14 +137,14 @@ export default function WriteEssayPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating essay question…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.write-essay.generatingQuestion')}</p>
           </div>
         )}
 
         {phase === "writing" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Essay Question</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.write-essay.essayQuestion')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
@@ -152,15 +154,15 @@ export default function WriteEssayPage() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your Essay</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.write-essay.yourEssay')}</p>
                 <span className={`text-xs tabular-nums font-medium ${wordStatus === "over" ? "text-red-500" : wordStatus === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                  {wordCount} words {wordStatus === "below" ? `(aim for ${MIN_WORDS}+)` : wordStatus === "over" ? `(max ${MAX_WORDS})` : "✓"}
+                  {wordCount} words {wordStatus === "below" ? t('practiceTask.write-essay.wordStatusBelow', { min: String(MIN_WORDS) }) : wordStatus === "over" ? t('practiceTask.write-essay.wordStatusOver', { max: String(MAX_WORDS) }) : "✓"}
                 </span>
               </div>
               <textarea
                 value={userText}
                 onChange={e => setUserText(e.target.value)}
-                placeholder={`Write your essay here. Aim for ${MIN_WORDS}–${MAX_WORDS} words with a clear structure: introduction, body paragraphs, conclusion.`}
+                placeholder={t('practiceTask.write-essay.essayPlaceholder', { minWords: String(MIN_WORDS), maxWords: String(MAX_WORDS) })}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--foreground)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 rows={16}
               />
@@ -168,7 +170,7 @@ export default function WriteEssayPage() {
             <div className="flex justify-end">
               <button onClick={handleSubmit} disabled={!userText.trim()}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
-                Submit Essay
+                {t('practiceTask.write-essay.submitEssay')}
               </button>
             </div>
           </div>
@@ -177,20 +179,20 @@ export default function WriteEssayPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your essay…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.write-essay.evaluatingEssay')}</p>
           </div>
         )}
 
         {phase === "done" && feedback && (
           <div className="space-y-6">
-            <TaskFeedbackDisplay feedback={feedback} stimulus={prompt} stimulusLabel="Essay Question"
-              responseText={userText} responseLabel="Your Essay" />
+            <TaskFeedbackDisplay feedback={feedback} stimulus={prompt} stimulusLabel={t('practiceTask.write-essay.essayQuestion')}
+              responseText={userText} responseLabel={t('practiceTask.write-essay.yourEssay')} />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -199,7 +201,7 @@ export default function WriteEssayPage() {
         {phase === "error" && (
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
-            <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">Try Again</button>
+            <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">{t('practiceTask.common.tryAgain')}</button>
           </div>
         )}
       </main>
