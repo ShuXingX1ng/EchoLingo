@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 const TIME_LIMIT = 180 // 3 minutes
@@ -88,13 +89,8 @@ export default function ReOrderParagraphsPage() {
       if (cached) {
         raw = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "re_order_paragraphs" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate stimulus")
-        raw = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_order_paragraphs" })
+        raw = data.text
         addStimulusToBank("re_order_paragraphs", raw)
       }
       const p = parseStimulus(raw)
@@ -123,16 +119,11 @@ export default function ReOrderParagraphsPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "re_order_paragraphs",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "re_order_paragraphs",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
       })
-      if (res.ok) result = (await res.json()) as TaskFeedback
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

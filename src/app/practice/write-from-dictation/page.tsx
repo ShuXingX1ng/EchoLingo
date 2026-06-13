@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 type Phase = "idle" | "generating" | "ready" | "typing" | "processing" | "done" | "error"
@@ -33,24 +34,13 @@ export default function WriteFromDictationPage() {
       if (cached) {
         text = cached
       } else {
-        const stimRes = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "write_from_dictation" }),
-        })
-        if (!stimRes.ok) throw new Error("Failed to generate sentence")
-        text = ((await stimRes.json()) as { text: string }).text
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_from_dictation" })
+        text = stimData.text
         addStimulusToBank("write_from_dictation", text)
       }
       setSentence(text)
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
       setAudioUrl(URL.createObjectURL(blob))
       setPhase("ready")
     } catch (e) {
@@ -80,12 +70,7 @@ export default function WriteFromDictationPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "write_from_dictation", stimulus: sentence, response: userText }),
-      })
-      if (res.ok) result = await res.json() as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_from_dictation", stimulus: sentence, response: userText })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }

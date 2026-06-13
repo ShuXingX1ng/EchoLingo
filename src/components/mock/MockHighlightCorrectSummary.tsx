@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import type { PracticeTask, TaskFeedback } from "@/types"
 
@@ -103,16 +104,11 @@ export default function MockHighlightCorrectSummary({ onComplete }: { onComplete
 
     let fb: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "highlight_correct_summary",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "highlight_correct_summary",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
       })
-      if (res.ok) fb = await res.json() as TaskFeedback
     } catch { /* best-effort */ }
 
     const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
@@ -177,25 +173,14 @@ export default function MockHighlightCorrectSummary({ onComplete }: { onComplete
         if (cached) {
           raw = cached
         } else {
-          const res = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "highlight_correct_summary" }),
-          })
-          if (!res.ok) throw new Error("Failed to generate stimulus")
-          raw = ((await res.json()) as { text: string }).text
+          const resData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "highlight_correct_summary" })
+          raw = resData.text
           addStimulusToBank("highlight_correct_summary", raw)
         }
         const nextParsed = parseStimulus(raw)
         if (!nextParsed) throw new Error("Invalid stimulus format")
 
-        const ttsRes = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: nextParsed.passage, voice: "en-US-AriaNeural", rate: 0.85 }),
-        })
-        if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-        const blob = await ttsRes.blob()
+        const blob = await apiPostBlob("/api/tts", { text: nextParsed.passage, voice: "en-US-AriaNeural", rate: 0.85 })
 
         parsedRef.current = nextParsed
         rawStimulusRef.current = raw

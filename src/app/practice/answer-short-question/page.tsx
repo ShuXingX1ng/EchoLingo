@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 // PTE: 3s pause before recording starts, 10s to answer
@@ -69,13 +70,8 @@ export default function AnswerShortQuestionPage() {
       if (cached) {
         text = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "answer_short_question" }),
-        })
-        if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
-        text = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "answer_short_question" })
+        text = data.text
         addStimulusToBank("answer_short_question", text)
       }
       // Format: "Question\nAnswer"
@@ -172,12 +168,7 @@ export default function AnswerShortQuestionPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx }),
-      })
-      if (res.ok) result = await res.json() as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }

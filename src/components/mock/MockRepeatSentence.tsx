@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import type { PracticeTask, TaskFeedback, PronunciationAssessmentResult } from "@/types"
@@ -55,23 +56,15 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", stim)
-            const res = await fetch("/api/pronunciation", { method: "POST", body: form })
-            if (!res.ok) return null
-            return await res.json() as PronunciationAssessmentResult
+            form.append("referenceText", stim)
+            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
           } catch { return null }
         })()
       : Promise.resolve(null)
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        const res = await fetch("/api/pte/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "repeat_sentence", stimulus: stim, response: tx }),
-        })
-        if (!res.ok) return null
-        return await res.json() as TaskFeedback
+        return await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "repeat_sentence", stimulus: stim, response: tx })
       } catch { return null }
     })()
 
@@ -186,25 +179,14 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
         if (cached) {
           text = cached
         } else {
-          const stimRes = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "repeat_sentence" }),
-          })
-          if (!stimRes.ok) throw new Error("Failed to generate sentence")
-          text = ((await stimRes.json()) as { text: string }).text
+          const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "repeat_sentence" })
+          text = stimData.text
           addStimulusToBank("repeat_sentence", text)
         }
         sentenceRef.current = text
         setSentence(text)
 
-        const ttsRes = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.9 }),
-        })
-        if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-        const blob = await ttsRes.blob()
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 })
         const url = URL.createObjectURL(blob)
         setAudioUrl(url)
         setPhase("ready")

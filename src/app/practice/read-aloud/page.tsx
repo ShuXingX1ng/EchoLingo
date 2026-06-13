@@ -7,6 +7,7 @@ import PronunciationFeedback from "@/components/PronunciationFeedback"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostForm } from "@/lib/api-client"
 import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 
 // ── Timing constants (seconds) ────────────────────────────────────────────────
@@ -104,9 +105,8 @@ export default function ReadAloudPage() {
       if (cached) {
         text = cached
       } else {
-        const res = await fetch("/api/read-aloud/stimulus", { method: "POST" })
-        if (!res.ok) throw new Error((await res.json()).error ?? "Failed to generate passage")
-        text = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/read-aloud/stimulus", {})
+        text = data.text
         addStimulusToBank("read_aloud", text)
       }
       stimulusRef.current = text
@@ -239,23 +239,18 @@ export default function ReadAloudPage() {
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", stimulusRef.current)
-            const res = await fetch("/api/pronunciation", { method: "POST", body: form })
-            if (!res.ok) return null
-            return await res.json() as PronunciationAssessmentResult
+            form.append("referenceText", stimulusRef.current)
+            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
           } catch { return null }
         })()
       : Promise.resolve(null)
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        const res = await fetch("/api/read-aloud/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stimulus: stimulusRef.current, transcript: capturedTranscript }),
+        return await apiPost<TaskFeedback>("/api/read-aloud/feedback", {
+          stimulus: stimulusRef.current,
+          transcript: capturedTranscript,
         })
-        if (!res.ok) return null
-        return await res.json() as TaskFeedback
       } catch { return null }
     })()
 

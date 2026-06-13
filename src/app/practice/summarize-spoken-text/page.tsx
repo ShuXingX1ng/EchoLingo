@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 const TIME_LIMIT = 600 // 10 minutes to write summary
@@ -51,24 +52,13 @@ export default function SummarizeSpokenTextPage() {
       if (cached) {
         text = cached
       } else {
-        const stimRes = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "summarize_spoken_text" }),
-        })
-        if (!stimRes.ok) throw new Error("Failed to generate passage")
-        text = ((await stimRes.json()) as { text: string }).text
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text" })
+        text = stimData.text
         addStimulusToBank("summarize_spoken_text", text)
       }
       setPassageText(text)
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setPhase("ready")
@@ -109,16 +99,11 @@ export default function SummarizeSpokenTextPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "summarize_spoken_text",
-          stimulus: passageText,
-          response: summary.trim(),
-        }),
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "summarize_spoken_text",
+        stimulus: passageText,
+        response: summary.trim(),
       })
-      if (res.ok) result = (await res.json()) as TaskFeedback
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

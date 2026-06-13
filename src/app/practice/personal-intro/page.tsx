@@ -5,6 +5,7 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import { blobToWav } from "@/lib/wav-encoder"
 import type { TaskFeedback } from "@/types"
 
@@ -144,12 +145,7 @@ export default function PersonalIntroPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "personal_intro", stimulus: FIXED_PROMPT, response: tx }),
-      })
-      if (res.ok) result = await res.json() as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "personal_intro", stimulus: FIXED_PROMPT, response: tx })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

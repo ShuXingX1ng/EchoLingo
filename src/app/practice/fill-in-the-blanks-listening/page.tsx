@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 const TIME_LIMIT = 420 // 7 minutes
@@ -91,13 +92,8 @@ export default function FillInTheBlanksListeningPage() {
       if (cached) {
         raw = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "fill_in_the_blanks_listening" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate stimulus")
-        raw = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "fill_in_the_blanks_listening" })
+        raw = data.text
         addStimulusToBank("fill_in_the_blanks_listening", raw)
       }
       const p = parseStimulus(raw)
@@ -109,13 +105,7 @@ export default function FillInTheBlanksListeningPage() {
         ttsText = ttsText.replace(`[BLANK_${i}]`, b.options[b.correct])
       })
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: ttsText, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text: ttsText, voice: "en-US-AriaNeural", rate: 0.85 })
       const url = URL.createObjectURL(blob)
 
       setRawStimulus(raw)
@@ -160,16 +150,11 @@ export default function FillInTheBlanksListeningPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "fill_in_the_blanks_listening",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "fill_in_the_blanks_listening",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
       })
-      if (res.ok) result = (await res.json()) as TaskFeedback
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import { getRandomImage } from "@/lib/image-bank"
 import type { ImageStimulus } from "@/lib/image-bank"
 import type { PracticeTask, TaskFeedback } from "@/types"
@@ -49,14 +50,7 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
 
     let fb: TaskFeedback
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "describe_image", stimulus: stimulusText, response: tx }),
-      })
-      fb = res.ok
-        ? (await res.json()) as TaskFeedback
-        : { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx })
     } catch {
       fb = { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
     }

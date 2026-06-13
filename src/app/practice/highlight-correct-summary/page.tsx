@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 const TIME_LIMIT = 300 // 5 minutes
@@ -88,25 +89,14 @@ export default function HighlightCorrectSummaryPage() {
       if (cached) {
         raw = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "highlight_correct_summary" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate stimulus")
-        raw = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "highlight_correct_summary" })
+        raw = data.text
         addStimulusToBank("highlight_correct_summary", raw)
       }
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 })
       const url = URL.createObjectURL(blob)
 
       setRawStimulus(raw)
@@ -150,16 +140,11 @@ export default function HighlightCorrectSummaryPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "highlight_correct_summary",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "highlight_correct_summary",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
       })
-      if (res.ok) result = (await res.json()) as TaskFeedback
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

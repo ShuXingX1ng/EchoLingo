@@ -15,12 +15,12 @@ Target users:
 | Area | Status |
 |------|--------|
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4; DM Serif Display + DM Sans via `next/font/google` |
-| Backend | FastAPI beside Next.js API Routes fallback |
+| Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
 | Tests | 115 frontend unit tests (11 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 123 backend tests (after Phase Cleanup removed the IELTS examiner/feedback suites) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
-| Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections |
+| Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
 
 ## Architecture
@@ -37,15 +37,30 @@ Important: before editing Next.js code, read the relevant guide in `node_modules
 
 ### Backend
 
-| Path | Status | Notes |
-|------|--------|-------|
-| Next.js API Routes | Fallback kept | Do not delete yet |
-| Python FastAPI | Implemented | Preferred deployable backend; now includes `POST /api/pte/stimulus` and `POST /api/pte/feedback` |
+**Target architecture (ADR 0007): FastAPI is the single authoritative backend.**
+All business and LLM logic lives in exactly one place — the Python backend.
+Next `src/app/api/*` business routes have been migrated to call FastAPI
+and **deleted**. The browser calls FastAPI directly via
+`NEXT_PUBLIC_API_BASE_URL`, with CORS configured on the backend.
+All third-party secrets (`LLM_API_KEY`, `AZURE_SPEECH_KEY`/`REGION`,
+`DASHSCOPE_API_KEY`, Supabase service-role key) live only in the backend runtime.
 
-Frontend requests go through `src/lib/api-client.ts`:
+| Path | Target end state | Current state |
+|------|------------------|---------------|
+| `src/app/api/pte/stimulus` · `pte/feedback` | Deleted | **Done** — routes deleted; all 42 callers now use `apiPost` via `api-client.ts` |
+| `src/app/api/read-aloud/stimulus` · `read-aloud/feedback` | Deleted | **Done** — routes deleted; `practice/read-aloud/page.tsx` + `MockReadAloud.tsx` now use `apiPost` via `api-client.ts` |
+| `src/app/api/tts` · `pronunciation` | Deleted | **Done** — routes deleted; callers migrated to `apiPostBlob`/`apiPostForm` via `api-client.ts` |
+| `src/app/api/word-lookup` | Deleted | **Done** — route deleted; callers migrated to `apiPost` via `api-client.ts` |
+| Python FastAPI (`backend/routers/*`) | Authoritative | Already implements all of the above via LangGraph + RAG + LLM-as-Judge (ADRs 0005, 0006) |
 
-- `NEXT_PUBLIC_API_BASE_URL` empty → use Next.js `/api/*`
-- `NEXT_PUBLIC_API_BASE_URL` set → call FastAPI backend
+Frontend requests go through `src/lib/api-client.ts`. Target behaviour:
+
+- `NEXT_PUBLIC_API_BASE_URL` is **required**; a missing value fails fast.
+- All requests target the FastAPI base URL directly.
+
+**Backend-unavailable degradation principle (ADR 0007):** health check + friendly
+"temporarily unavailable" UI + bounded-timeout / circuit-breaker implemented — never
+surface a bare `502`.
 
 FastAPI files: `backend/main.py`, `backend/routers/`, `backend/services/`, `backend/middleware/auth.py`, `backend/models/schemas.py`
 
@@ -141,6 +156,12 @@ Personalization policy:
 - localStorage: migration, backup, temporary local state, and graceful UI fallback only.
 
 ## API Endpoints
+
+Same `POST /api/*` paths are served on **both** runtimes today. Per ADR 0007 the
+authoritative implementation is FastAPI (`backend/routers/*`); the Next route of
+the same path is the legacy direct/proxy implementation being migrated away and
+deleted. In the end state these are served only by FastAPI and reached from the
+browser via `NEXT_PUBLIC_API_BASE_URL`.
 
 | Endpoint | Purpose | Request | Response |
 |----------|---------|---------|----------|
@@ -262,7 +283,7 @@ No absolute exam score prediction is made. Predicting a real PTE score from prac
 - Keep payment, subscription, commercial operations, leaderboard, learning groups, and social sharing in future/backlog unless explicitly requested.
 - Do not run CI/E2E against real LLM, Azure, Supabase, or paid external APIs.
 - Prefer mock-first E2E through Playwright `page.route()`.
-- Keep Next.js API Routes until FastAPI deployment and traffic are proven stable.
+- FastAPI is the single authoritative backend (ADR 0007). Do not add new business or LLM logic to Next `src/app/api/*`; Next business routes are being migrated to FastAPI and deleted. All third-party secrets live only in the backend runtime.
 - After meaningful development work, update `docs/DEVELOPMENT_LOG.md`, `docs/PROJECT_CONTEXT.md`, `docs/TASKS.md`.
 - See `CONTEXT.md` at repo root for canonical domain terminology.
 - See `docs/adr/` for key architectural decisions.

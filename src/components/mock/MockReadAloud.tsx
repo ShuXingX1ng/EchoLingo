@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostForm } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback, PronunciationAssessmentResult } from "@/types"
 import CountdownRing from "./CountdownRing"
 
@@ -54,23 +55,18 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", stim)
-            const res = await fetch("/api/pronunciation", { method: "POST", body: form })
-            if (!res.ok) return null
-            return await res.json() as PronunciationAssessmentResult
+            form.append("referenceText", stim)
+            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
           } catch { return null }
         })()
       : Promise.resolve(null)
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        const res = await fetch("/api/read-aloud/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stimulus: stim, transcript: tx }),
+        return await apiPost<TaskFeedback>("/api/read-aloud/feedback", {
+          stimulus: stim,
+          transcript: tx,
         })
-        if (!res.ok) return null
-        return await res.json() as TaskFeedback
       } catch { return null }
     })()
 
@@ -188,9 +184,8 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
         if (cached) {
           text = cached
         } else {
-          const res = await fetch("/api/read-aloud/stimulus", { method: "POST" })
-          if (!res.ok) throw new Error("Failed to generate passage")
-          text = ((await res.json()) as { text: string }).text
+          const data = await apiPost<{ text: string }>("/api/read-aloud/stimulus", {})
+          text = data.text
           addStimulusToBank("read_aloud", text)
         }
         setStimulus(text)

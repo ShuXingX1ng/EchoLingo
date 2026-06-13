@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import type { PracticeTask, TaskFeedback } from "@/types"
 
@@ -47,12 +48,7 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
 
     let fb: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "summarize_written_text", stimulus: stim, response: text }),
-      })
-      if (res.ok) fb = await res.json() as TaskFeedback
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "summarize_written_text", stimulus: stim, response: text })
     } catch { /* best-effort */ }
 
     const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }

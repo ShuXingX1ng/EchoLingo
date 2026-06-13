@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback } from "@/types"
 
 const TIME_LIMIT = 420 // 7 min
@@ -96,16 +97,11 @@ export default function MockFillInTheBlanksReading({ onComplete }: { onComplete:
 
     let fb: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "fill_in_the_blanks_reading",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "fill_in_the_blanks_reading",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
       })
-      if (res.ok) fb = await res.json() as TaskFeedback
     } catch { /* best-effort */ }
 
     const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
@@ -148,13 +144,8 @@ export default function MockFillInTheBlanksReading({ onComplete }: { onComplete:
         if (cached) {
           raw = cached
         } else {
-          const res = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "fill_in_the_blanks_reading" }),
-          })
-          if (!res.ok) throw new Error("Failed to generate stimulus")
-          raw = ((await res.json()) as { text: string }).text
+          const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "fill_in_the_blanks_reading" })
+          raw = data.text
           addStimulusToBank("fill_in_the_blanks_reading", raw)
         }
         const nextParsed = parseStimulus(raw)

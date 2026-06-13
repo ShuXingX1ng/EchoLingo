@@ -24,7 +24,8 @@ test.describe("P0 — Core path smoke tests", () => {
   });
 
   test("read-aloud page loads with Generate Passage button", async ({ page }) => {
-    await mockPteStimulusApi(page, "The global demand for renewable energy continues to grow rapidly.");
+    // No stimulus mock needed: this test only checks the page renders, it never
+    // clicks Generate. (Read Aloud calls /api/read-aloud/stimulus, not /api/pte/stimulus.)
     await page.goto("/practice/read-aloud");
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.getByText("Read Aloud").first()).toBeVisible({ timeout: 10000 });

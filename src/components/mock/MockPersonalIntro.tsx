@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback } from "@/types"
 import CountdownRing from "./CountdownRing"
 
@@ -44,12 +45,7 @@ export default function MockPersonalIntro({ onComplete }: { onComplete: (task: P
     let fb: TaskFeedback | null = null
     try {
       if (audioBlob.size > 0) {
-        const res = await fetch("/api/pte/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "personal_intro", stimulus: PROMPT, response: tx }),
-        })
-        if (res.ok) fb = await res.json() as TaskFeedback
+        fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "personal_intro", stimulus: PROMPT, response: tx })
       }
     } catch { /* best-effort */ }
 

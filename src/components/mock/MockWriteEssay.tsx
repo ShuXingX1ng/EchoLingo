@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
 import type { PracticeTask, TaskFeedback } from "@/types"
 
@@ -49,12 +50,7 @@ export default function MockWriteEssay({ onComplete }: { onComplete: (task: Prac
 
     let fb: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "write_essay", stimulus: stim, response: text }),
-      })
-      if (res.ok) fb = await res.json() as TaskFeedback
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_essay", stimulus: stim, response: text })
     } catch { /* best-effort */ }
 
     const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }

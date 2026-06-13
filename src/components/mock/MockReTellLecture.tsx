@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback } from "@/types"
 import CountdownRing from "./CountdownRing"
 
@@ -48,14 +49,7 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
 
     let fb: TaskFeedback
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "re_tell_lecture", stimulus: stim, response: tx }),
-      })
-      fb = res.ok
-        ? (await res.json()) as TaskFeedback
-        : { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: stim, response: tx })
     } catch {
       fb = { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
     }
@@ -179,25 +173,14 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
         if (cached) {
           text = cached
         } else {
-          const stimRes = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "re_tell_lecture" }),
-          })
-          if (!stimRes.ok) throw new Error("Failed to generate lecture")
-          text = ((await stimRes.json()) as { text: string }).text
+          const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_tell_lecture" })
+          text = stimData.text
           addStimulusToBank("re_tell_lecture", text)
         }
         lectureTextRef.current = text
         setLectureText(text)
 
-        const ttsRes = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-        })
-        if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-        const blob = await ttsRes.blob()
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
         const url = URL.createObjectURL(blob)
         setAudioUrl(url)
         setPhase("ready")

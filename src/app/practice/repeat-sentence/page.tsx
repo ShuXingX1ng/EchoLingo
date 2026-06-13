@@ -8,6 +8,7 @@ import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 
 const RECORD_TIME = 15
@@ -66,26 +67,15 @@ export default function RepeatSentencePage() {
       if (cached) {
         text = cached
       } else {
-        const stimRes = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "repeat_sentence" }),
-        })
-        if (!stimRes.ok) throw new Error("Failed to generate sentence")
-        text = ((await stimRes.json()) as { text: string }).text
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "repeat_sentence" })
+        text = stimData.text
         addStimulusToBank("repeat_sentence", text)
       }
       setSentence(text)
       sentenceRef.current = text
 
       // TTS synthesis
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.9 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setRecSec(RECORD_TIME)
@@ -176,23 +166,15 @@ export default function RepeatSentencePage() {
           try {
             const form = new FormData()
             form.append("audio", wavBlob!, "recording.wav")
-            form.append("text", sentenceRef.current)
-            const res = await fetch("/api/pronunciation", { method: "POST", body: form })
-            if (!res.ok) return null
-            return await res.json() as PronunciationAssessmentResult
+            form.append("referenceText", sentenceRef.current)
+            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
           } catch { return null }
         })()
       : Promise.resolve(null)
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        const res = await fetch("/api/pte/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "repeat_sentence", stimulus: sentenceRef.current, response: tx }),
-        })
-        if (!res.ok) return null
-        return await res.json() as TaskFeedback
+        return await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "repeat_sentence", stimulus: sentenceRef.current, response: tx })
       } catch { return null }
     })()
 

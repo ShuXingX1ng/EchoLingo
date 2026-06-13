@@ -25,6 +25,8 @@ def get_embeddings() -> OpenAIEmbeddings:
         model="text-embedding-v4",
         api_key=os.environ["DASHSCOPE_API_KEY"],
         base_url=os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+        check_embedding_ctx_length=False,
+        chunk_size=10,
     )
 
 
@@ -34,7 +36,7 @@ def get_vecs_collection():
         raise RuntimeError("vecs package is not installed")
     db_url = os.environ["SUPABASE_DB_URL"]
     client = _vecs_module.create_client(db_url)
-    return client.get_or_create_collection(name=COLLECTION_NAME, dimension=1536)
+    return client.get_or_create_collection(name=COLLECTION_NAME, dimension=1024)
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:

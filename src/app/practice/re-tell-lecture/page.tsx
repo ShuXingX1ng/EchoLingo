@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 const PREP_TIME = 10
@@ -76,24 +77,13 @@ export default function ReTellLecturePage() {
       if (cached) {
         text = cached
       } else {
-        const stimRes = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "re_tell_lecture" }),
-        })
-        if (!stimRes.ok) throw new Error("Failed to generate lecture")
-        text = ((await stimRes.json()) as { text: string }).text
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_tell_lecture" })
+        text = stimData.text
         addStimulusToBank("re_tell_lecture", text)
       }
       setLectureText(text)
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setPrepSeconds(PREP_TIME)
@@ -199,14 +189,7 @@ export default function ReTellLecturePage() {
 
     let fb: TaskFeedback
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "re_tell_lecture", stimulus: lectureText, response: tx }),
-      })
-      fb = res.ok
-        ? (await res.json()) as TaskFeedback
-        : { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: lectureText, response: tx })
     } catch {
       fb = { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
     }

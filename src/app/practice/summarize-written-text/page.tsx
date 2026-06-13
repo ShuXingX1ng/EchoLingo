@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 // PTE: 10 minutes; we use 600s
@@ -47,13 +48,8 @@ export default function SummarizeWrittenTextPage() {
       if (cached) {
         text = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "summarize_written_text" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate passage")
-        text = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_written_text" })
+        text = data.text
         addStimulusToBank("summarize_written_text", text)
       }
       setPassage(text)
@@ -74,12 +70,7 @@ export default function SummarizeWrittenTextPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "summarize_written_text", stimulus: passage, response: userText }),
-      })
-      if (res.ok) result = await res.json() as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "summarize_written_text", stimulus: passage, response: userText })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }

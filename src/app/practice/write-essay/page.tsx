@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 
 // PTE: 20 minutes; 1200s
@@ -50,13 +51,8 @@ export default function WriteEssayPage() {
       if (cached) {
         text = cached
       } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "write_essay" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate prompt")
-        text = ((await res.json()) as { text: string }).text
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_essay" })
+        text = data.text
         addStimulusToBank("write_essay", text)
       }
       setPrompt(text)
@@ -77,12 +73,7 @@ export default function WriteEssayPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "write_essay", stimulus: prompt, response: userText }),
-      })
-      if (res.ok) result = await res.json() as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_essay", stimulus: prompt, response: userText })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
