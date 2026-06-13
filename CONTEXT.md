@@ -33,8 +33,12 @@ What the learner submits for a Practice Task. May be spoken audio, typed text, o
 _Avoid_: answer, submission, input
 
 **Task Bank**:
-The pool of Stimuli available for a given Task Type. Text Task Types draw from AI-generated Stimuli; audio Task Types draw from pre-cached Azure TTS recordings.
+The pool of Stimuli available for a given Task Type. Text Task Types draw from AI-generated Stimuli (for the corpus-grounded path, generation is seeded by retrieved **Stimulus Exemplars**); audio Task Types draw from pre-cached Azure TTS recordings. Note: `src/lib/task-bank.ts` is only a client-side localStorage *cache* of already-served Stimuli — it is not the authoritative pool.
 _Avoid_: question bank, content library
+
+**Stimulus Exemplar**:
+A piece of real or open-source PTE-style source text (a "机经" recall item or an open-corpus passage) ingested into Supabase to seed Stimulus generation. It is **retrieval-only**: the corpus-grounded generation path retrieves the most similar Exemplars for a Task Type and uses them as few-shot anchors so the LLM produces an original Stimulus in matching style, difficulty, and topic — the Exemplar text itself is never served verbatim to a learner on the default path. Distinct from **Stimulus** (what the learner actually receives). Stored gitignored / out of the public repo when sourced from copyrighted recall material.
+_Avoid_: scraped question, 机经 (use in prose only), seed (overloaded), sample
 
 ### Modes
 
@@ -43,8 +47,12 @@ A learner-directed session where the learner picks a Task Type and completes one
 _Avoid_: free practice, drill mode
 
 **Mock Exam**:
-A full simulated PTE Academic exam following the official task sequence and strict timing. Covers all supported Task Types in order.
+A full simulated PTE Academic exam following the official task sequence and strict timing. Covers all supported Task Types in order. The learner cannot choose a topic; Stimuli are selected randomly (Exemplar-grounded generation with topic conditioning off) to preserve authenticity.
 _Avoid_: full test, simulation mode
+
+**Theme Practice**:
+A Task Practice variant where the learner types a theme (e.g. "environment", "technology") and the system generates Stimuli on that theme. Backed by hybrid retrieval over **Stimulus Exemplars** — dense (pgvector) + sparse (Postgres `tsvector`) fused with RRF — so the theme keyword drives few-shot selection for topic-controllable generation. The only mode where topic conditioning (and therefore hybrid retrieval) is active.
+_Avoid_: topic mode, custom practice, keyword practice
 
 ### Feedback
 
@@ -81,8 +89,8 @@ A signal derived from a learner's Feedback history for a given Task Type, indica
 _Avoid_: weak area, error pattern (legacy IELTS term), skill gap
 
 **Daily Plan**:
-The home-page set of recommended Practice Tasks, generated from Task-Type Weaknesses for logged-in learners.
-_Avoid_: learning plan, daily tasks
+The home-page set of recommended Practice Tasks, generated from Task-Type Weaknesses for logged-in learners. When surfaced as a dedicated practice entry point it is called **Targeted Practice** — the same weakness-driven engine, not a new concept; Stimulus selection there filters Exemplars by Task Type plus difficulty/feature metadata (no topic, no hybrid retrieval).
+_Avoid_: learning plan, daily tasks, targeted practice (use only as the UI label for the Daily Plan engine)
 
 ## Relationships
 

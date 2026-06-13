@@ -53,17 +53,65 @@
 
 ## Next Phase
 
-**Resume point (2026-06-13):** Phase Data-1: Scraped stimulus bank — Build scraper pipeline for public PTE prep sources to replace/supplement AI generation.
+**Resume point (2026-06-13):** Phase Data-1: Stimulus Exemplar bank — migration
+004 complete; next step is the Wikipedia scraper and cleaning pipeline.
 
 What's done:
 - Backend-unavailable degradation implemented (Circuit Breaker).
-- Practice and Mock ErrorBoundaries added.
-- API client tests updated and passing.
+- Practice and Mock ErrorBoundaries added; API client tests updated.
+- Design resolved: `CONTEXT.md` (Stimulus Exemplar, Theme Practice), ADR 0008/0009.
+- `supabase-migration-004.sql` created: `stimulus_exemplars` table with hnsw + GIN + task_type indexes; RLS enabled with no policies (PostgREST-deny pattern).
 
-What's next:
-- [ ] Identify public PTE prep sources (GitHub question banks, public blogs)
-- [ ] Build scraper + AI-assisted cleaning pipeline
-- [ ] Embed scraped stimuli into Supabase; wire into Task Bank as alternative to AI generation
+Key resolved decisions (so we don't re-litigate):
+- **Exemplars are retrieval-only**; default path generates an original Stimulus
+  seeded by few-shot Exemplars. `verbatim=true` is a backend-only private path.
+- **Code public, copyrighted recall data gitignored** (mirrors ECDICT). First
+  adapter = Wikipedia/Simple Wikipedia (CC, clean); 机经 adapter comes later under
+  the same `SourceAdapter` abstraction + gitignored ingestion.
+- **Three retrieval modes** `random` (Task Practice + Mock) · `targeted` (Daily
+  Plan engine) · `theme` (Theme Practice, the only hybrid-retrieval mode).
+- **Storage** = explicit relational table `stimulus_exemplars` (migration 004),
+  pgvector + `tsvector`, RRF hybrid; RLS enabled with no policies (PostgREST-deny; backend direct Postgres bypasses RLS).
+- **AI generation demoted to fallback** (exemplar-grounded → empty-bank pure-AI →
+  silent pure-AI on failure).
+- **Scope**: text task types (tiers 1–2) first; JSON task types (tier 3) stay
+  pure-AI for now.
+
+### Build order
+- [x] **Migration 004** — `stimulus_exemplars` table (id `sha256(text)`, task_type,
+      text, `embedding vector(1024)`, `tsv tsvector` + GIN, source_url, license,
+      status, reason, difficulty, features, word_count, lang, created_at). → `supabase-migration-004.sql`
+- [ ] **Scraper** — `backend/scripts/scrape_exemplars/` with `SourceAdapter` base
+      + first adapter (Wikipedia/Simple Wikipedia REST API) → `exemplars_raw/`
+      (gitignored). Reuse `Samkarya/online-exam-questions` only as a JSON-parser
+      shape reference for a future GitHub adapter.
+- [ ] **Cleaning** — `clean_exemplars.py`: deterministic rules (markup/citation
+      strip, whitespace, English-only, per-task-type length gate, exact-hash
+      dedup) + one cheap DeepSeek accept/reject gate (no rewrite). Print
+      accepted/rejected + reject-reason metrics → `exemplars_clean/` (gitignored).
+- [ ] **Embed + dedup** — `embed_exemplars.py`: DashScope `text-embedding-v4`,
+      near-dup drop (cosine ≥ 0.95 within task_type), idempotent
+      `ON CONFLICT (id)` upsert. `--force` re-embed.
+- [ ] **Serving** — `backend/services/exemplar_store.py` (hybrid SQL + RRF +
+      sampling); extend `PteStimulusRequest` with `mode/topic/targeting/verbatim`;
+      wire three-tier fallback into `pte_stimulus.py` (keep it router-thin).
+- [ ] **Originality guard** — generation-time word-shingle Jaccard vs injected
+      exemplars (over threshold → regenerate once); offline originality eval script.
+- [ ] **Frontend** — Theme Practice topic input on `/practice` (polished UI +
+      common-theme chips), `mode=theme`; Targeted Practice reuses Daily Plan with
+      `mode=targeted`; `task-bank.ts` unchanged (random path only; not used for theme).
+- [ ] **Tests** — cleaning rules, hash idempotency, shingle guard, exemplar_store
+      hybrid/RRF, three-tier fallback; keep lint 0 / typecheck / pytest green.
+
+### Later (deferred, recorded per request)
+- [ ] **机经 adapter** — add a recall-content `SourceAdapter` under the gitignored
+      ingestion path once a source is chosen (code clean, data never committed).
+- [ ] **JSON task types (tier 3)** — Re-order Paragraphs, FIB (R/L), MCQ, Highlight
+      Correct Summary exemplars; evaluate whether AI generation still wins there.
+- [ ] **Learning-agent direction** — evolve Targeted/Theme practice toward an
+      adaptive learning agent (forward-looking; not in this phase).
+- [ ] **Hybrid retrieval for rubric/feedback** — apply dense+sparse+RRF to
+      `rag.py` where exact scoring terminology matters.
 
 Key files to open first:
 - `src/lib/task-bank.ts`
@@ -73,11 +121,10 @@ Key files to open first:
 
 Legacy history/backup island intentionally retained: `src/lib/history.ts`, `unified-history.ts`, `supabase-history.ts`, `src/components/DataMigration.tsx`, and the `SessionFeedback`/`ChatMessage` types in `src/types/index.ts` — these back the IELTS-session backup/migration path and are not surfaced in the PTE UI (see "Known Technical Debt").
 
-### Phase Data-1: Scraped stimulus bank (backlog)
-- [ ] Identify public PTE prep sources (GitHub question banks, public blogs)
-- [ ] Build scraper + AI-assisted cleaning pipeline
-- [ ] Embed scraped stimuli into Supabase; wire into Task Bank as alternative to AI generation
-- [ ] Evaluate dropping AI stimulus generation once bank reaches critical mass per task type
+### Phase Data-1: Stimulus Exemplar bank
+See **Next Phase → Build order** above for the resolved, ordered plan, and
+ADR 0008 / ADR 0009 for the rationale. (This section intentionally no longer
+duplicates the task list.)
 
 ### Phase Cleanup: IELTS 遗留代码清除 — DONE (2026-06-13)
 全部完成。前端 setup/exam 页面、`api/examiner`+`api/feedback` 路由、`feedback-actions.ts`、home 页 IELTS 每日计划子系统（`learning-plan.ts`、`DailyTasks`、`LearningPath`、`FeedbackPanel`/`FeedbackReview`、死代码 `stats.ts`）已删；`MobileNav` 改指 `/practice`；home 页改为静态 PTE archive 入口。后端 examiner/feedback 路由、`prompts/ielts/`、schemas 中 5 个 IELTS 类、`prompt_loader` 的 IELTS 部分、4 个 IELTS 测试文件删除，另修剪 3 个共享测试文件（`test_error_handling`/`test_health`/`test_middleware_integration`）的 examiner/feedback 用例，CORS 探针改指 `/api/pte/feedback`。

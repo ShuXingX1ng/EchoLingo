@@ -147,6 +147,7 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/supabase-vocabulary.ts` | Cloud Vocabulary List — `vocabulary` table (migration 003) | Supabase |
 | `backend/services/ecdict.py` | Read-only ECDICT lookup (pos/tag parse); single-word offline path | SQLite `backend/data/ecdict.sqlite` (gitignored) |
 | `backend/scripts/import_ecdict.py` | Downloads ECDICT 1.0.28 sqlite from GitHub into `backend/data/` | — |
+| `supabase-migration-004.sql` | `stimulus_exemplars` table — shared retrieval corpus for Stimulus Exemplar-grounded generation; `hnsw vector_cosine_ops` + GIN tsvector + task_type btree indexes; RLS enabled with no policies (PostgREST-deny; backend direct Postgres connection bypasses RLS, ADR 0009 §2) | Supabase pgvector |
 
 Personalization policy:
 
