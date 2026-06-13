@@ -227,10 +227,14 @@ def embed_and_upsert(
                     continue
 
                 print(f"[{task_type}] embedding {len(pending)} item(s) via DashScope…")
-                vectors = [
-                    np.asarray(v, dtype=float)
-                    for v in embed_texts([it.normalized_text for it in pending])
-                ]
+                PROGRESS_BATCH = 100
+                all_vecs: list[list[float]] = []
+                for batch_start in range(0, len(pending), PROGRESS_BATCH):
+                    batch = pending[batch_start : batch_start + PROGRESS_BATCH]
+                    all_vecs.extend(embed_texts([it.normalized_text for it in batch]))
+                    done = min(batch_start + PROGRESS_BATCH, len(pending))
+                    print(f"  [{task_type}] embedded {done}/{len(pending)} …", flush=True)
+                vectors = [np.asarray(v, dtype=float) for v in all_vecs]
 
                 batch_kept: list[np.ndarray] = []
                 for item, vec in zip(pending, vectors):

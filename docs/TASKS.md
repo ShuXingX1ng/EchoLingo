@@ -48,41 +48,43 @@
 | Phase Data-1 Frontend: Theme Practice + Targeted Practice | Done | `practice-mode.ts` (URL param parser + extras builder, 12 tests); `/practice` hub — Theme Practice UI (input + 6 chips, dynamic hrefs), Targeted Practice (top-3 weakness cards); mode/topic pass-through + cache bypass in all 13 practice pages; 18 new i18n keys (en+zh); lint 0, typecheck pass, 124/124 unit tests, build pass |
 | Bug fix: Theme input Enter key + topic pass-through in pure-AI path | Done | (1) `/practice` hub input: added `onKeyDown` Enter handler → smooth-scrolls to task section + added `taskSectionRef` anchor div. (2) `backend/services/stimulus_service.py` pure-AI path (Tier 2/3) now injects topic when `mode=theme` (was silently ignored when exemplar bank empty). |
 | Phase Data-2: Live Exemplar Ingestion | Done | Extended WikipediaAdapter; scraped, cleaned, and embedded 1478 Wikipedia exemplars; verified originality guard and serving layer |
+| Phase Data-3: Expand Ingestion (4 new task types + JijingAdapter) | Done | WikipediaAdapter extended for repeat_sentence, write_from_dictation, answer_short_question, describe_image; JijingAdapter created (public code, gitignored data); 45/45 tests pass; live embed: Upserted=2690, DB now 4168 rows covering all 9 text/audio task types |
+
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
 | Frontend unit | 12 files / 124 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 247 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Backend | 273 tests (123 core + 86 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Current Status (as of 2026-06-14)
 
-Phase Data-1 is **fully complete** — all backend + frontend work done, two bugs fixed today:
-
-1. **Theme topic ignored on pure-AI path** (`stimulus_service.py` Tier 2/3) — fixed. When exemplar bank is empty, topic is now injected into the prompt.
-2. **Enter key no-op on theme input** (`/practice` hub) — fixed. Now smooth-scrolls to task section.
-
-The platform is in a stable, shippable state for all 15 PTE task types with Theme Practice + Targeted Practice fully wired end-to-end.
+Phase Data-3 is **fully complete including live ingestion**. All 9 PTE text/audio task types now have exemplars in Supabase (4168 rows total). `JijingAdapter` infrastructure is in place — data population deferred to when recall data is available.
 
 ## Next Phase
 
-**Resume point (2026-06-14):** Phase Data-3 — Expand Ingestion — ingest remaining text task types and evaluate JSON task types.
+**Resume point (2026-06-14):** Phase Data-3 fully done — 4168 exemplars live in Supabase across all 9 text/audio task types; next is Jijing data population and evaluating JSON task types for exemplar coverage.
 
 What's done:
-- Extended WikipediaAdapter for write_essay, re_tell_lecture, summarize_spoken_text.
-- Scraped 3208 raw exemplars and cleaned them (length gates added).
-- Successfully embedded and upserted 1478 accepted exemplars into Supabase.
-- Evaluated serving layer to ensure generated stimulus uses theme and anchors.
+- `WikipediaAdapter` expanded to emit 9 task types (original 5 + `repeat_sentence`, `write_from_dictation`, `answer_short_question`, `describe_image`).
+- `cleaner.py` `LENGTH_GATES` extended for all 4 new types.
+- `JijingAdapter` created (`sources/jijing.py`); `--adapter jijing` registered in `__main__.py`.
+- `vector_store.py` updated: `dimensions=1024` added to `OpenAIEmbeddings` call (required by DashScope v4 API).
+- Live embed completed: `--limit 10` pipeline → Upserted=2690, near-dup dropped=3; DB now **4168 rows** covering all 9 text/audio task types.
+- 45/45 scraper tests pass.
 
 What's next:
-- [ ] Expand ingestion to remaining text task types (repeat_sentence, write_from_dictation, answer_short_question, describe_image).
-- [ ] Create Machine Jijing (机经) adapter for recall data (clean code, data gitignored).
+- [ ] **Populate JijingAdapter data** — prepare `backend/data/jijing_raw/jijing.jsonl` from PTE recall sources, then run: `python -m scripts.scrape_exemplars --adapter jijing && python scripts/clean_exemplars.py --source jijing && python scripts/embed_exemplars.py --source jijing`
+- [ ] **Evaluate JSON task types** — decide if `fill_in_the_blanks_reading`, `re_order_paragraphs`, `multiple_choice_reading`, `fill_in_the_blanks_listening`, `highlight_correct_summary` benefit from an exemplar bank; currently in `JSON_TASK_TYPES` pure-AI set in `stimulus_service.py`
+- [ ] **Expand exemplar coverage** — optionally re-run `--limit 30` to grow per-task-type counts above current ~260 for `repeat_sentence` (after near-dedup)
 
 Key files to open first:
-- `backend/scripts/scrape_exemplars/base.py`
-- `backend/scripts/scrape_exemplars/sources/wikipedia.py`
+- `backend/scripts/scrape_exemplars/sources/jijing.py` — data format spec + gitignore convention
+- `backend/services/stimulus_service.py` — `JSON_TASK_TYPES` set (line 32) to decide JSON task coverage
+- `backend/scripts/scrape_exemplars/sources/wikipedia.py` — `WikipediaAdapter` with all 9 task types
+- `backend/scripts/scrape_exemplars/cleaner.py` — `LENGTH_GATES` reference
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus

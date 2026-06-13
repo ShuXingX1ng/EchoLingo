@@ -3,7 +3,7 @@ Vector Store Service
 
 Manages the Supabase pgvector connection and DashScope embedding client.
 Uses LangChain's OpenAIEmbeddings with a custom base_url to call
-Alibaba DashScope text-embedding-v4 (OpenAI-compatible API).
+Alibaba DashScope text-embedding-v4 (OpenAI-compatible API, 1024-dim).
 """
 
 import os
@@ -27,6 +27,7 @@ def get_embeddings() -> OpenAIEmbeddings:
         base_url=os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
         check_embedding_ctx_length=False,
         chunk_size=10,
+        dimensions=1024,
     )
 
 
