@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -67,14 +68,17 @@ export default function AnswerShortQuestionPage() {
     setError(""); setFeedback(null); setTranscript("")
     txRef.current = ""
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let text: string
-      const cached = getStimulusFromBank("answer_short_question")
+      const cached = isSeeded ? null : getStimulusFromBank("answer_short_question")
       if (cached) {
         text = cached
       } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "answer_short_question" })
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "answer_short_question", ...extras })
         text = data.text
-        addStimulusToBank("answer_short_question", text)
+        if (!isSeeded) addStimulusToBank("answer_short_question", text)
       }
       // Format: "Question\nAnswer"
       const [q, a] = text.split("\n")

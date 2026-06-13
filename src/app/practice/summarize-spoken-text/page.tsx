@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -49,14 +50,17 @@ export default function SummarizeSpokenTextPage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let text: string
-      const cached = getStimulusFromBank("summarize_spoken_text")
+      const cached = isSeeded ? null : getStimulusFromBank("summarize_spoken_text")
       if (cached) {
         text = cached
       } else {
-        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text" })
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text", ...extras })
         text = stimData.text
-        addStimulusToBank("summarize_spoken_text", text)
+        if (!isSeeded) addStimulusToBank("summarize_spoken_text", text)
       }
       setPassageText(text)
 

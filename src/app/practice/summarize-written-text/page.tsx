@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -45,14 +46,17 @@ export default function SummarizeWrittenTextPage() {
     setPhase("generating")
     setError(""); setFeedback(null); setUserText(""); setSeconds(TIME_LIMIT)
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let text: string
-      const cached = getStimulusFromBank("summarize_written_text")
+      const cached = isSeeded ? null : getStimulusFromBank("summarize_written_text")
       if (cached) {
         text = cached
       } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_written_text" })
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_written_text", ...extras })
         text = data.text
-        addStimulusToBank("summarize_written_text", text)
+        if (!isSeeded) addStimulusToBank("summarize_written_text", text)
       }
       setPassage(text)
       startedAtRef.current = new Date().toISOString()

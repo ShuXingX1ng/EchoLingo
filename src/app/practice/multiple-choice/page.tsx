@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -84,14 +85,17 @@ export default function MultipleChoicePage() {
     setPhase("generating")
     setError(""); setFeedback(null); setSelected(null); setSeconds(TIME_LIMIT)
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let raw: string
-      const cached = getStimulusFromBank("multiple_choice_reading")
+      const cached = isSeeded ? null : getStimulusFromBank("multiple_choice_reading")
       if (cached) {
         raw = cached
       } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "multiple_choice_reading" })
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "multiple_choice_reading", ...extras })
         raw = data.text
-        addStimulusToBank("multiple_choice_reading", raw)
+        if (!isSeeded) addStimulusToBank("multiple_choice_reading", raw)
       }
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")

@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost, apiPostForm } from "@/lib/api-client"
 import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 
@@ -102,10 +103,16 @@ export default function ReadAloudPage() {
     setRecSeconds(RECORD_TIME)
 
     try {
-      const cached = getStimulusFromBank("read_aloud")
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
+      const cached = isSeeded ? null : getStimulusFromBank("read_aloud")
       let text: string
       if (cached) {
         text = cached
+      } else if (isSeeded) {
+        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "read_aloud", ...extras })
+        text = data.text
       } else {
         const data = await apiPost<{ text: string }>("/api/read-aloud/stimulus", {})
         text = data.text

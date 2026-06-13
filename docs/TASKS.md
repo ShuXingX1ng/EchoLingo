@@ -45,18 +45,19 @@
 | Phase Data-1: Embed + dedup | Done | `backend/scripts/embed_exemplars.py` — read `status=accept` clean entries, `id=sha256(text)`, DashScope embed, per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert via `psycopg2`/`SUPABASE_DB_URL`; `--force`/`--source`; 28 tests (embed+DB mocked); 211/211 backend pytest, lint 0 |
 | Phase Data-1: Serving + originality guard | Done | `exemplar_store.py` (random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `originality.py` (4-gram shingle Jaccard); `stimulus_service.py` (three-tier fallback + guard); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); router kept thin; `scripts/eval_originality.py` (offline); 36 new tests; 247/247 backend pytest, ruff 0 |
 | Phase i18n-2: All 15 practice task pages fully internationalised | Done | ~180 keys added to `en.json`+`zh.json` (`practiceTask.common.*` + `practiceTask.<slug>.*`); all 15 pages use `useTranslation`+`t()`; `useCallback` deps updated; PTE proper nouns in h1/breadcrumb kept hardcoded; lint 0, 112/112 unit tests, build pass |
+| Phase Data-1 Frontend: Theme Practice + Targeted Practice | Done | `practice-mode.ts` (URL param parser + extras builder, 12 tests); `/practice` hub — Theme Practice UI (input + 6 chips, dynamic hrefs), Targeted Practice (top-3 weakness cards); mode/topic pass-through + cache bypass in all 13 practice pages; 18 new i18n keys (en+zh); lint 0, typecheck pass, 124/124 unit tests, build pass |
 ## Current Test Baseline
 
 | Suite | Count / Status |
 |-------|----------------|
-| Frontend unit | 11 files / 112 tests |
+| Frontend unit | 12 files / 124 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
 | Backend | 247 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Next Phase
 
-**Resume point (2026-06-13):** Phase Data-1 backend is complete and all 14 practice pages are fully i18n-wired. The next concrete work is **frontend Theme Practice + Targeted Practice** wiring to use the new `mode` parameter on `/api/pte/stimulus`.
+**Resume point (2026-06-14):** Phase Data-1 is now fully complete — backend serving/originality guard (2026-06-13) and frontend Theme Practice + Targeted Practice wiring (2026-06-14) are both done. The next concrete work is **live ingestion** (scrape → clean → embed_exemplars.py) followed by an **originality eval run**.
 
 What's done:
 - Backend-unavailable degradation (Circuit Breaker) + Practice/Mock ErrorBoundaries.
@@ -66,19 +67,24 @@ What's done:
 - Cleaner (`cleaner.py` + `clean_exemplars.py`): markup strip, English filter, length gates, SHA-256 dedup, optional DeepSeek gate.
 - `embed_exemplars.py`: `id=sha256(text)`, DashScope embed, near-dup drop, idempotent upsert via `psycopg2`/`SUPABASE_DB_URL`.
 - `services/exemplar_store.py` (`retrieve` random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `services/originality.py` (4-gram shingle Jaccard, threshold 0.5); `services/stimulus_service.py` (three-tier fallback + originality guard); `PteStimulusRequest` extended; `scripts/eval_originality.py` (offline). 247/247 pytest, ruff 0.
-- All 14 practice task pages fully i18n-wired: `useTranslation` + `t()` on every user-visible string; `useCallback` deps updated; `en.json`/`zh.json` unchanged (all keys pre-existing).
-- Live ingestion run still deferred (needs scraped/cleaned exemplars + DashScope quota confirmed); JSON task types stay pure-AI (empty bank) by design.
+- **Frontend Theme Practice**: `/practice` hub now has topic text input + 6 preset chips (education/environment/technology/health/society/science); when a topic is set, all task card hrefs gain `?mode=theme&topic=<topic>`; `src/lib/practice-mode.ts` (`parsePracticeModeFromUrl` + `buildStimulusExtras`) shared by all 13 practice pages.
+- **Frontend Targeted Practice**: `/practice` hub shows top-3 weakness cards (from `deriveTaskTypeWeakness`+`rankWeaknesses`); links with `?mode=targeted`.
+- **mode/topic pass-through**: all 13 practice pages that call `/api/pte/stimulus` read URL params and include them in the request body; task-bank cache bypassed when `isSeeded` (mode ≠ random); read-aloud special-cased to use `/api/pte/stimulus` in seeded mode, `/api/read-aloud/stimulus` for random.
+- 18 new i18n keys in `en.json`+`zh.json` (`practiceHub.theme.*`, `practiceHub.targeted.*`).
+- 12 new unit tests in `practice-mode.test.ts`. 124/124 unit tests, lint 0, typecheck pass, build pass.
 
 What's next:
-- [ ] **Frontend — Theme Practice** — topic input on `/practice` (polished UI + common-theme chips); send `apiPost("/api/pte/stimulus", { taskType, mode: "theme", topic })`. Key file: `src/app/practice/page.tsx`; reuse `apiPost` from `src/lib/api-client.ts`. `task-bank.ts` unchanged (theme is not cached).
-- [ ] **Frontend — Targeted Practice** — surface via the Daily Plan / weakness engine; send `mode: "targeted"` + `targeting: { difficulty?, features? }` derived from `task-weakness.ts`. Key files: `src/lib/task-weakness.ts`, `src/lib/recommendations.ts` (`getPteRecommendations`).
-- [ ] **Live ingestion + originality eval run** — scrape → clean → `embed_exemplars.py`, then `python scripts/eval_originality.py` to confirm the overlap distribution before relying on Exemplar-grounded output.
+- [ ] **Live ingestion run** — `python -m scripts.scrape_exemplars --source wikipedia --task-type read_aloud`, then `python scripts/clean_exemplars.py`, then `python scripts/embed_exemplars.py`; key file: `backend/scripts/embed_exemplars.py`.
+- [ ] **Originality eval** — `python scripts/eval_originality.py` to confirm overlap distribution is below threshold before relying on exemplar-grounded output; key file: `backend/scripts/eval_originality.py`.
+- [ ] **机经 adapter** — add a recall-content `SourceAdapter` (code clean, data never committed); key file: `backend/scripts/scrape_exemplars/base.py`.
+- [ ] **JSON task types (tier 3)** — evaluate whether Re-order Paragraphs / FIB (R/L) / MCQ / Highlight Correct Summary benefit from Exemplar-grounded generation.
+- [ ] **Learning-agent direction** — evolve Targeted/Theme practice toward an adaptive agent (forward-looking; not in this phase).
 
 Key files to open first:
-- `src/app/practice/page.tsx` (where the Theme topic input + mode=theme call lands)
-- `src/lib/api-client.ts` (`apiPost` — the only path to FastAPI)
-- `backend/services/stimulus_service.py` (the mode/topic/targeting/verbatim contract the frontend drives)
-- `backend/models/schemas.py` (`PteStimulusRequest` shape)
+- `backend/scripts/embed_exemplars.py` (ingestion back-half)
+- `backend/scripts/eval_originality.py` (offline overlap eval)
+- `backend/scripts/scrape_exemplars/base.py` (SourceAdapter ABC for 机经 adapter)
+- `src/lib/practice-mode.ts` (URL param utility shared by all practice pages)
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus

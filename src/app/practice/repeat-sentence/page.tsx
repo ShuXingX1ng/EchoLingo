@@ -8,6 +8,7 @@ import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -64,14 +65,17 @@ export default function RepeatSentencePage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let text: string
-      const cached = getStimulusFromBank("repeat_sentence")
+      const cached = isSeeded ? null : getStimulusFromBank("repeat_sentence")
       if (cached) {
         text = cached
       } else {
-        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "repeat_sentence" })
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "repeat_sentence", ...extras })
         text = stimData.text
-        addStimulusToBank("repeat_sentence", text)
+        if (!isSeeded) addStimulusToBank("repeat_sentence", text)
       }
       setSentence(text)
       sentenceRef.current = text

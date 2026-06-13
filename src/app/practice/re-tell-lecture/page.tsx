@@ -6,6 +6,7 @@ import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -74,14 +75,17 @@ export default function ReTellLecturePage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
+      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+      const extras = buildStimulusExtras(mode, topic)
+      const isSeeded = mode !== "random"
       let text: string
-      const cached = getStimulusFromBank("re_tell_lecture")
+      const cached = isSeeded ? null : getStimulusFromBank("re_tell_lecture")
       if (cached) {
         text = cached
       } else {
-        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_tell_lecture" })
+        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_tell_lecture", ...extras })
         text = stimData.text
-        addStimulusToBank("re_tell_lecture", text)
+        if (!isSeeded) addStimulusToBank("re_tell_lecture", text)
       }
       setLectureText(text)
 

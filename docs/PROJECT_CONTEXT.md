@@ -18,7 +18,7 @@ Target users:
 | Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 115 frontend unit tests (11 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 247 backend tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 247 backend tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
@@ -92,7 +92,7 @@ Deferred / planned task types (not yet implemented):
 ## Core Features (Target State)
 
 - **All 15 PTE task types live**: Speaking, Writing, Reading, and Listening task routes each include stimulus, timed response, AI feedback, `saveTask`
-- **`/practice` hub page** — task-type grid linking all 15 task routes, with Mock Exam CTA
+- **`/practice` hub page** — task-type grid with **Theme Practice** section (topic input + 6 preset chips; sets `?mode=theme&topic=` on task card hrefs) and **Targeted Practice** section (top-3 weakness cards from `task-weakness.ts`; links with `?mode=targeted`); Mock Exam CTA
 - **`/mock` page** — full mock exam orchestrator: intro screen → 15-task PTE sequence covering all 15 task types across all four sections (Speaking & Writing, Reading, Listening; strict timing) → `/mock/summary`
 - **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
 - **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
@@ -131,7 +131,8 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/supabase-error-patterns.ts` | Legacy error-pattern storage | Supabase |
 | `src/lib/wav-encoder.ts` | Convert browser audio Blob → WAV for Azure pronunciation API | computed (Web Audio API) |
 | `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
-| `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type) | localStorage |
+| `src/lib/practice-mode.ts` | Parse `mode` + `topic` from URL search params; build extras object for `apiPost` body; used by all 13 practice pages' `generate` callbacks | computed |
+| `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type); bypassed when `mode=theme` or `mode=targeted` (seeded sessions never read/write the random cache) | localStorage |
 | `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
 | `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |
 | `backend/services/rag.py` | `retrieve_context(task_type) -> str`; queries `rubric_chunks` with task_type filter; silent fallback | computed |
