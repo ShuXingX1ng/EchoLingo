@@ -59,6 +59,7 @@ export default function PracticeHubPage() {
   const [weaknesses, setWeaknesses] = useState<WeaknessCard[]>([])
   const [recLoading, setRecLoading] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
+  const taskSectionRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -136,6 +137,11 @@ export default function PracticeHubPage() {
               type="text"
               value={themeTopic}
               onChange={(e) => setThemeTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && themeTopic.trim()) {
+                  taskSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+              }}
               placeholder={t("practiceHub.theme.inputPlaceholder")}
               className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-20 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-600 dark:focus:ring-emerald-900/30"
             />
@@ -218,6 +224,7 @@ export default function PracticeHubPage() {
         </div>
 
         {/* ── Task sections ────────────────────────────────────────────────────── */}
+        <div ref={taskSectionRef} />
         {SECTIONS.map(section => {
           const cards = TASK_CARDS.filter(c => c.section === section)
           return (

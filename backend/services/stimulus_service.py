@@ -102,6 +102,9 @@ async def generate_stimulus(
 
     # ── Tier 2/3: no anchors → pure-AI generation (legacy path). ──
     if not exemplars:
+        if mode == "theme" and topic:
+            themed_user = f"{base_user}\nThe generated stimulus MUST be about the theme: {topic}."
+            return await _generate(themed_user, is_json)
         return await _generate(base_user, is_json)
 
     # ── Tier 1: Exemplar-grounded generation + originality guard. ──

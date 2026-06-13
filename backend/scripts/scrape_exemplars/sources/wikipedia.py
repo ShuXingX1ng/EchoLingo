@@ -5,6 +5,10 @@ Uses two Wikipedia APIs (both CC BY-SA 4.0):
   - REST summary API  → lead-paragraph plain text  → read_aloud candidates
   - MediaWiki extracts API (explaintext=1) → full plain text → paragraphs
     in the 150-300-word range → summarize_written_text candidates
+    in the 110-130-word range → re_tell_lecture candidates
+    in the  90-110-word range → summarize_spoken_text candidates
+  - Lead sentence + template rephrase → write_essay prompt candidates
+    (NOT verbatim Wikipedia copy — derived topic question)
 
 Rate limits: 1 request per second per ARTICLE (two sub-requests per article
 share the same delay slot).  User-Agent identifies the bot.
@@ -35,46 +39,135 @@ _SKIP_SECTIONS = frozenset(
 )
 
 # Academic topics spanning PTE-relevant domains
+# Target: 60+ unique topics → each article can produce 5 task types
+# → well over 200 candidates per task type before cleaning
 DEFAULT_TOPICS = [
+    # Science & Technology
     "Climate change",
     "Photosynthesis",
-    "Industrial Revolution",
     "DNA",
-    "Globalization",
     "Artificial intelligence",
     "Water cycle",
-    "Democracy",
     "Evolution",
     "Renewable energy",
-    "Urbanization",
     "Biodiversity",
-    "Economics",
     "Internet",
+    "Astronomy",
+    "Agriculture",
+    "Nuclear power",
+    "Vaccination",
+    "Marine biology",
+    "Genetics",
+    "Nanotechnology",
+    "Space exploration",
+    "Quantum mechanics",
+    "Robotics",
+    "Solar energy",
+    "Ocean acidification",
+    "Deforestation",
+    "Environmental science",
+    "Information technology",
+    "Biotechnology",
+    "Neuroscience",
+    "Epidemiology",
+    "Ecology",
+    "Meteorology",
+    "Hydrology",
+    # Society & Humanities
+    "Industrial Revolution",
+    "Globalization",
+    "Democracy",
+    "Urbanization",
     "Human migration",
     "Public health",
-    "Astronomy",
     "Philosophy",
-    "Agriculture",
     "Linguistics",
     "Psychology",
     "Architecture",
-    "Nuclear power",
-    "Vaccination",
     "Transportation",
-    "Marine biology",
-    "Genetics",
+    "Economics",
     "History of science",
-    "Environmental science",
-    "Information technology",
-    "Deforestation",
-    "Ocean acidification",
     "Sustainable development",
-    "Nanotechnology",
-    "Space exploration",
+    "Feminism",
+    "Colonialism",
+    "Capitalism",
+    "Sociology",
+    "Anthropology",
+    "Education",
+    "Media (communication)",
+    "Cultural heritage",
+    "Human rights",
+    "Political philosophy",
+    # Arts & Culture
+    "Literature",
+    "Music",
+    "Film",
+    "Renaissance",
+    "Ancient Rome",
+    "Ancient Greece",
+    "Buddhism",
+    "Islam",
+    "Christianity",
 ]
 
 _REST_BASE = "https://en.wikipedia.org/api/rest_v1"
 _ACTION_BASE = "https://en.wikipedia.org/w/api.php"
+
+# Essay question template frames — each is a standalone discussion prompt (40-60 words).
+# These are ORIGINAL question texts derived only from the topic title; they do NOT copy
+# Wikipedia prose. Designed to match the PTE Academic write_essay format.
+_ESSAY_FRAMES = [
+    (
+        "In recent decades, {topic} has become one of the most widely debated issues in "
+        "academic and public discourse. Discuss the main causes of this phenomenon, the "
+        "consequences it has had on society and the environment, and suggest what measures "
+        "individuals and governments should take to address these challenges effectively."
+    ),
+    (
+        "Many researchers and policymakers argue that {topic} presents both significant "
+        "opportunities and serious risks for modern society. Analyse the key benefits and "
+        "drawbacks associated with {topic}, and discuss the extent to which its positive "
+        "effects outweigh the negative consequences for individuals and communities."
+    ),
+    (
+        "The study of {topic} has grown considerably in importance over the past century. "
+        "Discuss how advances in our understanding of {topic} have influenced economic "
+        "development, social change, and technological innovation, and evaluate whether "
+        "these changes have been predominantly beneficial or detrimental to human progress."
+    ),
+    (
+        "{topic} is widely regarded as a defining issue of the twenty-first century. "
+        "Examine the historical factors that have contributed to the rise of {topic}, "
+        "assess its impact on both developed and developing nations, and propose "
+        "evidence-based strategies that could be adopted at an international level."
+    ),
+    (
+        "Some experts contend that current approaches to managing {topic} are insufficient "
+        "and require fundamental reform. Discuss the key challenges associated with {topic}, "
+        "critically evaluate the strategies currently employed to address them, and suggest "
+        "more effective alternatives that policymakers and communities could adopt."
+    ),
+    (
+        "The relationship between {topic} and sustainable development has attracted "
+        "considerable attention from academics, governments, and civil society organisations. "
+        "Discuss how {topic} affects efforts to achieve long-term sustainability, and "
+        "evaluate the role that education, technology, and international cooperation "
+        "must play in bringing about meaningful change."
+    ),
+    (
+        "Throughout history, {topic} has shaped the way societies organise themselves, "
+        "distribute resources, and define shared values. Discuss the ways in which "
+        "{topic} continues to influence contemporary life, and evaluate whether its "
+        "overall effect on human wellbeing and social cohesion has been positive or negative."
+    ),
+    (
+        "It is often argued that a deeper understanding of {topic} is essential for "
+        "addressing some of the most pressing problems facing the world today. "
+        "Discuss the key insights that the study of {topic} offers, and evaluate how "
+        "these insights can be applied to improve decision-making in both the public "
+        "and private sectors."
+    ),
+]
 
 
 def _build_page_url(title: str) -> str:
@@ -101,8 +194,36 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
+def _extract_lead_noun(title: str) -> str:
+    """
+    Return a clean topic noun from the article title for essay prompt construction.
+    Strips disambiguation suffixes like '(film)', '(physics)', etc.
+    """
+    # Remove parenthetical disambiguation
+    noun = re.sub(r"\s*\([^)]+\)", "", title).strip()
+    return noun.lower()
+
+
+def _build_essay_prompt(topic_title: str, frame_index: int) -> str:
+    """
+    Construct an original essay discussion prompt from the topic title.
+    Uses a rotating frame template — NOT Wikipedia text — to ensure originality.
+    """
+    noun = _extract_lead_noun(topic_title)
+    frame = _ESSAY_FRAMES[frame_index % len(_ESSAY_FRAMES)]
+    return frame.format(topic=noun)
+
+
 class WikipediaAdapter(SourceAdapter):
-    """Fetch academic passages from English Wikipedia."""
+    """Fetch academic passages from English Wikipedia.
+
+    Emits five task types per article (where source material exists):
+      - read_aloud            : lead paragraph  (10-60 words)
+      - write_essay           : original prompt derived from topic title (30-80 words)
+      - summarize_written_text: body paragraphs 150-300 words
+      - re_tell_lecture       : body paragraphs 100-150 words
+      - summarize_spoken_text : body paragraphs  80-120 words
+    """
 
     def __init__(
         self,
@@ -150,7 +271,8 @@ class WikipediaAdapter(SourceAdapter):
             "prop": "extracts",
             "titles": title,
             "explaintext": "1",
-            "exsectionformat": "plain",
+            # Note: do NOT set exsectionformat=plain — that strips section headers,
+            # breaking the split logic below. Default format preserves == headings ==.
             "format": "json",
         }
         data = self._get_json(_ACTION_BASE, params)
@@ -187,7 +309,7 @@ class WikipediaAdapter(SourceAdapter):
     # ------------------------------------------------------------------
 
     def fetch(self) -> Iterable[RawExemplar]:
-        for topic in self._topics:
+        for topic_idx, topic in enumerate(self._topics):
             print(f"  [wikipedia] fetching: {topic}")
             page_url = _build_page_url(topic)
 
@@ -204,18 +326,51 @@ class WikipediaAdapter(SourceAdapter):
                         raw_meta={"title": topic, "section": "lead"},
                     )
 
-            # ── summarize_written_text candidates: body sections ──────
+            # ── write_essay candidate: original prompt from topic ─────
+            # We generate one prompt per topic using a rotating frame template.
+            # This is NOT a verbatim copy of Wikipedia text — it is an original
+            # question derived from the topic title only.
+            essay_prompt = _build_essay_prompt(topic, frame_index=topic_idx)
+            yield RawExemplar(
+                task_type="write_essay",
+                text=essay_prompt,
+                source_url=page_url,
+                license=LICENSE,
+                raw_meta={"title": topic, "section": "prompt", "frame_index": topic_idx % len(_ESSAY_FRAMES)},
+            )
+
+            # ── body-section candidates: three task types by word count ──
             for para in self._fetch_sections(topic):
                 wc = _word_count(para)
-                # Pre-filter extreme outliers to reduce noise (final gate is in cleaner)
-                if wc < 80 or wc > 600:
-                    continue
-                yield RawExemplar(
-                    task_type="summarize_written_text",
-                    text=para,
-                    source_url=page_url,
-                    license=LICENSE,
-                    raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
-                )
+
+                # summarize_written_text: 150-300 words
+                if 120 <= wc <= 400:
+                    yield RawExemplar(
+                        task_type="summarize_written_text",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # re_tell_lecture: 100-150 words (cleaner gate: 100-150)
+                if 80 <= wc <= 200:
+                    yield RawExemplar(
+                        task_type="re_tell_lecture",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # summarize_spoken_text: 80-120 words (cleaner gate: 80-120)
+                if 60 <= wc <= 160:
+                    yield RawExemplar(
+                        task_type="summarize_spoken_text",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
 
             time.sleep(self._rate_limit)

@@ -198,64 +198,74 @@ class TestFetchExisting:
 
 
 # ── embed_and_upsert orchestration ───────────────────────────────────────────────
+# NOTE: embed_and_upsert now takes a *conn* (not a cursor) and commits per task_type.
 
 class TestEmbedAndUpsert:
-    def _cursor_with_existing(self, existing: dict):
+    def _make_conn(self, existing: dict):
+        """Build a mock psycopg2 connection whose cursor returns existing embeddings."""
         cur = MagicMock()
         cur.fetchall.return_value = [(k, format_pgvector(v)) for k, v in existing.items()]
-        return cur
+        # cursor() is used as a context manager
+        cur.__enter__ = lambda s: s
+        cur.__exit__ = MagicMock(return_value=False)
+        conn = MagicMock()
+        conn.cursor.return_value = cur
+        # Expose the underlying cursor so tests can inspect calls
+        conn._cur = cur
+        return conn
 
     def test_fresh_inserts_count(self):
-        cur = self._cursor_with_existing({})
+        conn = self._make_conn({})
         items = [_make("alpha text"), _make("beta text")]
         # Two clearly distinct embeddings.
         with patch("scripts.embed_exemplars.embed_texts", return_value=[[1.0, 0.0], [0.0, 1.0]]):
-            upserted, dropped = embed_and_upsert(cur, items)
+            upserted, dropped = embed_and_upsert(conn, items)
         assert (upserted, dropped) == (2, 0)
+        cur = conn._cur
         upsert_calls = [c for c in cur.execute.call_args_list if c.args[0] is UPSERT_SQL]
         assert len(upsert_calls) == 2
 
     def test_near_duplicate_in_batch_dropped(self):
-        cur = self._cursor_with_existing({})
+        conn = self._make_conn({})
         items = [_make("first"), _make("near dup of first")]
         with patch("scripts.embed_exemplars.embed_texts", return_value=[[1.0, 0.0], [1.0, 0.01]]):
-            upserted, dropped = embed_and_upsert(cur, items)
+            upserted, dropped = embed_and_upsert(conn, items)
         assert upserted == 1
         assert dropped == 1
 
     def test_near_duplicate_against_stored_dropped(self):
         existing = {"stored_id": np.array([1.0, 0.0])}
-        cur = self._cursor_with_existing(existing)
+        conn = self._make_conn(existing)
         items = [_make("new but near stored")]
         with patch("scripts.embed_exemplars.embed_texts", return_value=[[1.0, 0.02]]):
-            upserted, dropped = embed_and_upsert(cur, items)
+            upserted, dropped = embed_and_upsert(conn, items)
         assert (upserted, dropped) == (0, 1)
 
     def test_existing_id_skipped_without_force(self):
         item = _make("already stored")
         existing = {item.id: np.array([0.5, 0.5])}
-        cur = self._cursor_with_existing(existing)
+        conn = self._make_conn(existing)
         embed_mock = MagicMock()
         with patch("scripts.embed_exemplars.embed_texts", embed_mock):
-            upserted, dropped = embed_and_upsert(cur, [item], force=False)
+            upserted, dropped = embed_and_upsert(conn, [item], force=False)
         assert (upserted, dropped) == (0, 0)
         embed_mock.assert_not_called()  # no embedding cost for already-stored items
 
     def test_force_reembeds_existing(self):
         item = _make("already stored")
         existing = {item.id: np.array([1.0, 0.0])}
-        cur = self._cursor_with_existing(existing)
+        conn = self._make_conn(existing)
         # Self-id is excluded from dedup comparison, so a force re-embed upserts.
         with patch("scripts.embed_exemplars.embed_texts", return_value=[[1.0, 0.0]]):
-            upserted, dropped = embed_and_upsert(cur, [item], force=True)
+            upserted, dropped = embed_and_upsert(conn, [item], force=True)
         assert (upserted, dropped) == (1, 0)
 
     def test_per_task_type_isolation(self):
         # A near-identical vector in a different task_type must NOT be a duplicate.
-        cur = self._cursor_with_existing({})
+        conn = self._make_conn({})
         items = [_make("x", task_type="read_aloud"), _make("y", task_type="summarize_written_text")]
         with patch("scripts.embed_exemplars.embed_texts", return_value=[[1.0, 0.0]]) as m:
-            upserted, dropped = embed_and_upsert(cur, items)
+            upserted, dropped = embed_and_upsert(conn, items)
         # embed_texts called once per task_type group.
         assert m.call_count == 2
         assert (upserted, dropped) == (2, 0)

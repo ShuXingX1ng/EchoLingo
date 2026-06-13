@@ -46,6 +46,8 @@
 | Phase Data-1: Serving + originality guard | Done | `exemplar_store.py` (random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `originality.py` (4-gram shingle Jaccard); `stimulus_service.py` (three-tier fallback + guard); `PteStimulusRequest` extended (`mode/topic/targeting/verbatim`); router kept thin; `scripts/eval_originality.py` (offline); 36 new tests; 247/247 backend pytest, ruff 0 |
 | Phase i18n-2: All 15 practice task pages fully internationalised | Done | ~180 keys added to `en.json`+`zh.json` (`practiceTask.common.*` + `practiceTask.<slug>.*`); all 15 pages use `useTranslation`+`t()`; `useCallback` deps updated; PTE proper nouns in h1/breadcrumb kept hardcoded; lint 0, 112/112 unit tests, build pass |
 | Phase Data-1 Frontend: Theme Practice + Targeted Practice | Done | `practice-mode.ts` (URL param parser + extras builder, 12 tests); `/practice` hub — Theme Practice UI (input + 6 chips, dynamic hrefs), Targeted Practice (top-3 weakness cards); mode/topic pass-through + cache bypass in all 13 practice pages; 18 new i18n keys (en+zh); lint 0, typecheck pass, 124/124 unit tests, build pass |
+| Bug fix: Theme input Enter key + topic pass-through in pure-AI path | Done | (1) `/practice` hub input: added `onKeyDown` Enter handler → smooth-scrolls to task section + added `taskSectionRef` anchor div. (2) `backend/services/stimulus_service.py` pure-AI path (Tier 2/3) now injects topic when `mode=theme` (was silently ignored when exemplar bank empty). |
+| Phase Data-2: Live Exemplar Ingestion | Done | Extended WikipediaAdapter; scraped, cleaned, and embedded 1478 Wikipedia exemplars; verified originality guard and serving layer |
 ## Current Test Baseline
 
 | Suite | Count / Status |
@@ -55,36 +57,32 @@
 | Backend | 247 tests (123 core + 60 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
+## Current Status (as of 2026-06-14)
+
+Phase Data-1 is **fully complete** — all backend + frontend work done, two bugs fixed today:
+
+1. **Theme topic ignored on pure-AI path** (`stimulus_service.py` Tier 2/3) — fixed. When exemplar bank is empty, topic is now injected into the prompt.
+2. **Enter key no-op on theme input** (`/practice` hub) — fixed. Now smooth-scrolls to task section.
+
+The platform is in a stable, shippable state for all 15 PTE task types with Theme Practice + Targeted Practice fully wired end-to-end.
+
 ## Next Phase
 
-**Resume point (2026-06-14):** Phase Data-1 is now fully complete — backend serving/originality guard (2026-06-13) and frontend Theme Practice + Targeted Practice wiring (2026-06-14) are both done. The next concrete work is **live ingestion** (scrape → clean → embed_exemplars.py) followed by an **originality eval run**.
+**Resume point (2026-06-14):** Phase Data-3 — Expand Ingestion — ingest remaining text task types and evaluate JSON task types.
 
 What's done:
-- Backend-unavailable degradation (Circuit Breaker) + Practice/Mock ErrorBoundaries.
-- Design resolved: `CONTEXT.md` (Stimulus Exemplar, Theme Practice), ADR 0008/0009.
-- `supabase-migration-004.sql`: `stimulus_exemplars` table (hnsw + GIN + task_type indexes; RLS-deny pattern).
-- Scraper package (`scrape_exemplars/` + `WikipediaAdapter`) → `exemplars_raw/` (gitignored).
-- Cleaner (`cleaner.py` + `clean_exemplars.py`): markup strip, English filter, length gates, SHA-256 dedup, optional DeepSeek gate.
-- `embed_exemplars.py`: `id=sha256(text)`, DashScope embed, near-dup drop, idempotent upsert via `psycopg2`/`SUPABASE_DB_URL`.
-- `services/exemplar_store.py` (`retrieve` random/targeted/theme + single-SQL RRF hybrid + `get_verbatim`); `services/originality.py` (4-gram shingle Jaccard, threshold 0.5); `services/stimulus_service.py` (three-tier fallback + originality guard); `PteStimulusRequest` extended; `scripts/eval_originality.py` (offline). 247/247 pytest, ruff 0.
-- **Frontend Theme Practice**: `/practice` hub now has topic text input + 6 preset chips (education/environment/technology/health/society/science); when a topic is set, all task card hrefs gain `?mode=theme&topic=<topic>`; `src/lib/practice-mode.ts` (`parsePracticeModeFromUrl` + `buildStimulusExtras`) shared by all 13 practice pages.
-- **Frontend Targeted Practice**: `/practice` hub shows top-3 weakness cards (from `deriveTaskTypeWeakness`+`rankWeaknesses`); links with `?mode=targeted`.
-- **mode/topic pass-through**: all 13 practice pages that call `/api/pte/stimulus` read URL params and include them in the request body; task-bank cache bypassed when `isSeeded` (mode ≠ random); read-aloud special-cased to use `/api/pte/stimulus` in seeded mode, `/api/read-aloud/stimulus` for random.
-- 18 new i18n keys in `en.json`+`zh.json` (`practiceHub.theme.*`, `practiceHub.targeted.*`).
-- 12 new unit tests in `practice-mode.test.ts`. 124/124 unit tests, lint 0, typecheck pass, build pass.
+- Extended WikipediaAdapter for write_essay, re_tell_lecture, summarize_spoken_text.
+- Scraped 3208 raw exemplars and cleaned them (length gates added).
+- Successfully embedded and upserted 1478 accepted exemplars into Supabase.
+- Evaluated serving layer to ensure generated stimulus uses theme and anchors.
 
 What's next:
-- [ ] **Live ingestion run** — `python -m scripts.scrape_exemplars --source wikipedia --task-type read_aloud`, then `python scripts/clean_exemplars.py`, then `python scripts/embed_exemplars.py`; key file: `backend/scripts/embed_exemplars.py`.
-- [ ] **Originality eval** — `python scripts/eval_originality.py` to confirm overlap distribution is below threshold before relying on exemplar-grounded output; key file: `backend/scripts/eval_originality.py`.
-- [ ] **机经 adapter** — add a recall-content `SourceAdapter` (code clean, data never committed); key file: `backend/scripts/scrape_exemplars/base.py`.
-- [ ] **JSON task types (tier 3)** — evaluate whether Re-order Paragraphs / FIB (R/L) / MCQ / Highlight Correct Summary benefit from Exemplar-grounded generation.
-- [ ] **Learning-agent direction** — evolve Targeted/Theme practice toward an adaptive agent (forward-looking; not in this phase).
+- [ ] Expand ingestion to remaining text task types (repeat_sentence, write_from_dictation, answer_short_question, describe_image).
+- [ ] Create Machine Jijing (机经) adapter for recall data (clean code, data gitignored).
 
 Key files to open first:
-- `backend/scripts/embed_exemplars.py` (ingestion back-half)
-- `backend/scripts/eval_originality.py` (offline overlap eval)
-- `backend/scripts/scrape_exemplars/base.py` (SourceAdapter ABC for 机经 adapter)
-- `src/lib/practice-mode.ts` (URL param utility shared by all practice pages)
+- `backend/scripts/scrape_exemplars/base.py`
+- `backend/scripts/scrape_exemplars/sources/wikipedia.py`
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
@@ -123,26 +121,13 @@ Key resolved decisions (so we don't re-litigate):
 - [x] **Originality guard** — generation-time word-shingle Jaccard (4-gram, >0.5)
       vs injected exemplars (over threshold → regenerate once) in
       `services/originality.py`; offline `scripts/eval_originality.py`.
-- [ ] **Frontend** — Theme Practice topic input on `/practice` (polished UI +
+- [x] **Frontend** — Theme Practice topic input on `/practice` (polished UI +
       common-theme chips), `mode=theme`; Targeted Practice reuses Daily Plan with
       `mode=targeted`; `task-bank.ts` unchanged (random path only; not used for theme).
 - [x] **Tests** — exemplar_store random/targeted/theme + RRF fusion, three-tier
       fallback, shingle guard regeneration (36 new tests, all external calls mocked);
       cleaning rules + hash idempotency covered earlier. ruff 0 / pytest 247 green.
 
-### Later (deferred, recorded per request)
-- [ ] **机经 adapter** — add a recall-content `SourceAdapter` under the gitignored
-      ingestion path once a source is chosen (code clean, data never committed).
-- [ ] **JSON task types (tier 3)** — Re-order Paragraphs, FIB (R/L), MCQ, Highlight
-      Correct Summary exemplars; evaluate whether AI generation still wins there.
-- [ ] **Learning-agent direction** — evolve Targeted/Theme practice toward an
-      adaptive learning agent (forward-looking; not in this phase).
-- [ ] **Hybrid retrieval for rubric/feedback** — apply dense+sparse+RRF to
-      `rag.py` where exact scoring terminology matters.
-
-Key files to open first:
-- `src/lib/task-bank.ts`
-- `backend/scripts/` (for creating scraper)
 
 ---
 

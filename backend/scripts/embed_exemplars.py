@@ -197,8 +197,17 @@ def upsert_exemplar(cur, item: AcceptedExemplar, vector: list[float] | np.ndarra
 
 # ── Orchestration ───────────────────────────────────────────────────────────────
 
-def embed_and_upsert(cur, accepted: list[AcceptedExemplar], force: bool = False) -> tuple[int, int]:
-    """Embed, near-dedup (per task_type), and upsert. Returns (upserted, near_dup_dropped)."""
+def embed_and_upsert(
+    conn,
+    accepted: list[AcceptedExemplar],
+    force: bool = False,
+) -> tuple[int, int]:
+    """Embed, near-dedup (per task_type), and upsert.
+
+    Each task_type group is committed immediately after processing so that
+    a transient network error for one group does not roll back all others.
+    Returns (upserted, near_dup_dropped).
+    """
     by_task: dict[str, list[AcceptedExemplar]] = defaultdict(list)
     for item in accepted:
         by_task[item.task_type].append(item)
@@ -207,27 +216,39 @@ def embed_and_upsert(cur, accepted: list[AcceptedExemplar], force: bool = False)
     near_dup_dropped = 0
 
     for task_type, group in by_task.items():
-        existing = fetch_existing_embeddings(cur, task_type)
+        try:
+            with conn.cursor() as cur:
+                existing = fetch_existing_embeddings(cur, task_type)
 
-        # Skip items already stored unless --force (id is text-derived, no embed needed).
-        pending = [it for it in group if force or it.id not in existing]
-        if not pending:
-            print(f"[{task_type}] nothing new to embed ({len(group)} already stored).")
-            continue
+                # Skip items already stored unless --force (id is text-derived).
+                pending = [it for it in group if force or it.id not in existing]
+                if not pending:
+                    print(f"[{task_type}] nothing new to embed ({len(group)} already stored).")
+                    continue
 
-        print(f"[{task_type}] embedding {len(pending)} item(s) via DashScope…")
-        vectors = [np.asarray(v, dtype=float) for v in embed_texts([it.normalized_text for it in pending])]
+                print(f"[{task_type}] embedding {len(pending)} item(s) via DashScope…")
+                vectors = [
+                    np.asarray(v, dtype=float)
+                    for v in embed_texts([it.normalized_text for it in pending])
+                ]
 
-        batch_kept: list[np.ndarray] = []
-        for item, vec in zip(pending, vectors):
-            # Compare against stored vectors (excluding this id) + already-kept batch vectors.
-            others = [v for k, v in existing.items() if k != item.id] + batch_kept
-            if is_near_duplicate(vec, others):
-                near_dup_dropped += 1
-                continue
-            upsert_exemplar(cur, item, vec)
-            batch_kept.append(vec)
-            upserted += 1
+                batch_kept: list[np.ndarray] = []
+                for item, vec in zip(pending, vectors):
+                    others = [v for k, v in existing.items() if k != item.id] + batch_kept
+                    if is_near_duplicate(vec, others):
+                        near_dup_dropped += 1
+                        continue
+                    upsert_exemplar(cur, item, vec)
+                    batch_kept.append(vec)
+                    upserted += 1
+
+            # Commit immediately after each task_type so partial results are durable.
+            conn.commit()
+            print(f"[{task_type}] committed {len(batch_kept)} rows.")
+
+        except Exception as exc:
+            print(f"[{task_type}] ERROR: {exc} — skipping this task type, rolling back.")
+            conn.rollback()
 
     return upserted, near_dup_dropped
 
@@ -247,9 +268,7 @@ def run(source: str | None = None, force: bool = False) -> int:
 
     conn = get_connection()
     try:
-        with conn.cursor() as cur:
-            upserted, near_dup_dropped = embed_and_upsert(cur, accepted, force=force)
-        conn.commit()
+        upserted, near_dup_dropped = embed_and_upsert(conn, accepted, force=force)
     finally:
         conn.close()
 
