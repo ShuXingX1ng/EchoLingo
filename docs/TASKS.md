@@ -54,6 +54,7 @@
 | Optimize near-dedup in embed_exemplars.py | Done | Replaced O(n²) Python list copy + loop with BLAS matrix ops; pre-normalised existing matrix + pre-allocated kept buffer; 292/292 tests pass |
 | Architecture deepening (Candidate 1) — extract recording session + stimulus loader | Done | `useRecordingSession` hook, `loadStimulusText` util, shared `CountdownRing`; refactored read-aloud + repeat-sentence pages and Mock components; tsc 0 |
 | Architecture deepening (Candidate 1) — migrate remaining 4 audio pages + 4 Mock components | Done | All 8 audio-recording files now use `useRecordingSession` + `loadStimulusText`; inline recording stacks eliminated; tsc 0 |
+| Architecture deepening (Candidate 1) — migrate all 9 text-input practice pages to `loadStimulusText` | Done | All 9 text-input pages now use `loadStimulusText`; manual cache/API/store blocks removed; `practice-mode.ts` consumed only by `stimulus-loader.ts`; tsc 0 |
 
 ## Current Test Baseline
 
@@ -70,25 +71,25 @@ Migration 005 + Phase Data-4 are **fully complete**. Supabase now has **14,005 r
 
 ## Next Phase
 
-**Resume point (2026-06-15):** Architecture deepening Candidate 1 fully complete — all 6 audio-recording practice pages and all 6 audio-recording Mock components now use `useRecordingSession` + `loadStimulusText`; inline recording stacks eliminated across the board; tsc 0.
+**Resume point (2026-06-15):** Architecture deepening Candidate 1 is fully complete — all 15 practice pages (6 audio + 9 text-input) now use `loadStimulusText`; all 6 audio pages also use `useRecordingSession`; `practice-mode.ts` is now consumed only by `stimulus-loader.ts`; tsc 0.
 
 What's done:
 - `src/hooks/useRecordingSession.ts` — shared hook (MediaRecorder + SpeechRecognition + countdown + cleanup)
-- `src/lib/stimulus-loader.ts` — shared utility (`loadStimulusText`, cache-check → API → cache-store, mode-aware)
+- `src/lib/stimulus-loader.ts` — shared utility (`loadStimulusText`, cache-check → API → cache-store, mode-aware); now used by all 15 practice pages
 - `src/components/CountdownRing.tsx` — shared countdown ring; `mock/CountdownRing.tsx` re-exports it
 - All 6 audio practice pages migrated: `read-aloud`, `repeat-sentence`, `describe-image`, `re-tell-lecture`, `answer-short-question`, `personal-intro`
 - All 6 audio Mock components migrated: `MockReadAloud`, `MockRepeatSentence`, `MockDescribeImage`, `MockReTellLecture`, `MockAnswerShortQuestion`, `MockPersonalIntro`
-- `re-tell-lecture` and `answer-short-question` (page + Mock) also use `loadStimulusText`
+- All 9 text-input practice pages migrated: `write-essay`, `summarize-written-text`, `write-from-dictation`, `re-order-paragraphs`, `fill-in-the-blanks`, `multiple-choice`, `summarize-spoken-text`, `fill-in-the-blanks-listening`, `highlight-correct-summary`
 - DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-accelerated
 
 What's next:
-- [ ] **Migrate text-response pages** to `loadStimulusText`: `write-essay`, `summarize-written-text`, `write-from-dictation`, `re-order-paragraphs`, `fill-in-the-blanks`, `multiple-choice`, `summarize-spoken-text`, `fill-in-the-blanks-listening`, `highlight-correct-summary` — key file: `src/lib/stimulus-loader.ts`
-- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline
+- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline (`scrape → clean → embed`) — key file: `backend/scripts/scrape_exemplars/sources/jijing.py`
+- [ ] **Expand exemplar bank** — run WikipediaAdapter with `--limit` increase for task types still under-represented; check row counts per task type via `SELECT task_type, count(*) FROM stimulus_exemplars GROUP BY task_type`
 
 Key files to open first:
-- `src/lib/stimulus-loader.ts` — the shared utility (check its API before touching any generate callbacks)
-- `src/app/practice/write-essay/page.tsx` — representative text-response page to migrate next
-- `src/app/practice/summarize-written-text/page.tsx` — another text-response page
+- `backend/scripts/scrape_exemplars/sources/jijing.py` — JijingAdapter (public code, private data pattern)
+- `backend/scripts/scrape_exemplars/__main__.py` — pipeline entry point
+- `supabase-migration-005.sql` — composite PK schema (reference before embed)
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus

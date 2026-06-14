@@ -5,8 +5,7 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
+import { loadStimulusText } from "@/lib/stimulus-loader"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -87,18 +86,7 @@ export default function HighlightCorrectSummaryPage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
-      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
-      const extras = buildStimulusExtras(mode, topic)
-      const isSeeded = mode !== "random"
-      let raw: string
-      const cached = isSeeded ? null : getStimulusFromBank("highlight_correct_summary")
-      if (cached) {
-        raw = cached
-      } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "highlight_correct_summary", ...extras })
-        raw = data.text
-        if (!isSeeded) addStimulusToBank("highlight_correct_summary", raw)
-      }
+      const raw = await loadStimulusText({ taskType: "highlight_correct_summary" })
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")
 

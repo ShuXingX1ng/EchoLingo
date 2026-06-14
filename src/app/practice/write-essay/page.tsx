@@ -5,8 +5,7 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
+import { loadStimulusText } from "@/lib/stimulus-loader"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -49,18 +48,7 @@ export default function WriteEssayPage() {
     setPhase("generating")
     setError(""); setFeedback(null); setUserText(""); setSeconds(TIME_LIMIT)
     try {
-      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
-      const extras = buildStimulusExtras(mode, topic)
-      const isSeeded = mode !== "random"
-      let text: string
-      const cached = isSeeded ? null : getStimulusFromBank("write_essay")
-      if (cached) {
-        text = cached
-      } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_essay", ...extras })
-        text = data.text
-        if (!isSeeded) addStimulusToBank("write_essay", text)
-      }
+      const text = await loadStimulusText({ taskType: "write_essay" })
       setPrompt(text)
       startedAtRef.current = new Date().toISOString()
       setPhase("writing")
