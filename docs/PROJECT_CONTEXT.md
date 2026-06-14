@@ -132,6 +132,9 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/wav-encoder.ts` | Convert browser audio Blob → WAV for Azure pronunciation API | computed (Web Audio API) |
 | `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
 | `src/lib/practice-mode.ts` | Parse `mode` + `topic` from URL search params; build extras object for `apiPost` body; used by all 13 practice pages' `generate` callbacks | computed |
+| `src/lib/stimulus-loader.ts` | `loadStimulusText({taskType,randomEndpoint?})` — cache-check → API call → cache-store; mode-aware (seeded path always calls `/api/pte/stimulus`; random path respects `randomEndpoint` override for legacy routes) | computed |
+| `src/hooks/useRecordingSession.ts` | `useRecordingSession({totalSeconds,minSeconds?,onComplete,onError?})` — encapsulates MediaRecorder, SpeechRecognition, countdown timer, cleanup; calls `onComplete(blob,transcript,startedAt)` on countdown expiry or manual stop | computed |
+| `src/components/CountdownRing.tsx` | Shared SVG countdown ring (seconds/total/size props); used by practice pages + Mock components (`src/components/mock/CountdownRing.tsx` re-exports this) | — |
 | `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type); bypassed when `mode=theme` or `mode=targeted` (seeded sessions never read/write the random cache) | localStorage |
 | `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
 | `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |

@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
-import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import { blobToWav } from "@/lib/wav-encoder"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
+import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback, PronunciationAssessmentResult } from "@/types"
-import CountdownRing from "./CountdownRing"
+import CountdownRing from "@/components/CountdownRing"
 
 const RECORD_TIME = 15
 
@@ -16,34 +17,18 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
   const [phase, setPhase] = useState<Phase>("generating")
   const [sentence, setSentence] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const sentenceRef = useRef("")
-  const processAudioRef = useRef<(b: Blob) => void>(() => {})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-    audioRef.current?.pause()
-  }, [])
-
-  const processAudio = useCallback(async (audioBlob: Blob) => {
+  const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
     const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const tx = txRef.current.trim() || "[transcript not captured]"
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
     const stim = sentenceRef.current
 
     let wavBlob: Blob | null = null
@@ -64,12 +49,16 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        return await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "repeat_sentence", stimulus: stim, response: tx })
+        return await apiPost<TaskFeedback>("/api/pte/feedback", {
+          taskType: "repeat_sentence", stimulus: stim, response: tx,
+        })
       } catch { return null }
     })()
 
     const [pronunciationResult, feedbackResult] = await Promise.all([azurePromise, feedbackPromise])
-    const fb: TaskFeedback = feedbackResult ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+    const fb: TaskFeedback = feedbackResult ?? {
+      summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [],
+    }
     if (pronunciationResult) fb.pronunciationAssessment = pronunciationResult
 
     let task: PracticeTask
@@ -80,7 +69,7 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch {
@@ -91,75 +80,25 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       }
     }
 
     setDoneTask(task)
     setPhase("done")
-  }, [])  
+  }, [])
 
-  useEffect(() => { processAudioRef.current = processAudio }, [processAudio])
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") {
-      processAudioRef.current(new Blob([], { type: "audio/webm" }))
-      return
-    }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processAudioRef.current(blob)
-    }
-    mr.stop()
-  }, [])  
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    onComplete: processAudio,
+    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  })
 
   const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
     setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []; txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setErrorMsg("Microphone access denied.")
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => {}
-      srRef.current = rec
-      try { rec.start() } catch {}
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [stopRecording])
+    await recording.start()
+  }, [recording])
 
   const playAndRecord = useCallback((url: string) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
@@ -170,45 +109,31 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
     audio.play().catch(() => startRecording())
   }, [startRecording])
 
-  // Auto-generate on mount
   useEffect(() => {
-    const generate = async () => {
-      try {
-        let text: string
-        const cached = getStimulusFromBank("repeat_sentence")
-        if (cached) {
-          text = cached
-        } else {
-          const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "repeat_sentence" })
-          text = stimData.text
-          addStimulusToBank("repeat_sentence", text)
-        }
+    loadStimulusText({ taskType: "repeat_sentence" })
+      .then(async text => {
         sentenceRef.current = text
         setSentence(text)
-
         const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 })
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
+        setAudioUrl(URL.createObjectURL(blob))
         setPhase("ready")
-      } catch (e) {
+      })
+      .catch(e => {
         setErrorMsg(e instanceof Error ? e.message : "Failed to generate stimulus")
         setPhase("error")
-      }
-    }
-    generate()
-   
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const skipTask = () => {
-    const emptyTask: PracticeTask = {
+    onComplete({
       id: `mock_${Date.now()}`,
       taskType: "repeat_sentence",
       stimulus: { kind: "audio", content: sentence },
       response: { kind: "audio", content: "" },
       durationSeconds: 0,
       createdAt: new Date().toISOString(),
-    }
-    onComplete(emptyTask)
+    })
   }
 
   return (
@@ -244,7 +169,7 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
               Recording — Repeat the sentence now
             </p>
           </div>
-          <CountdownRing seconds={recSec} total={RECORD_TIME} size={80} />
+          <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
           <p className="mt-4 text-xs text-slate-400">Recording stops automatically when time is up</p>
         </div>
       )}
@@ -296,7 +221,8 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
       {phase === "error" && (
         <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
           <p className="text-sm text-red-700 dark:text-red-300 mb-4">{errorMsg}</p>
-          <button onClick={skipTask} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline">
+          <button onClick={skipTask}
+            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline">
             Skip this task
           </button>
         </div>
