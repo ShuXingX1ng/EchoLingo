@@ -52,6 +52,8 @@
 | Phase Data-4: JSON task type exemplar banks | Done | Evaluated all 5 JSON task types; 5 LENGTH_GATES + WikipediaAdapter 14 task types; live embed Upserted=3767, DB now 7935 rows; re_order_paragraphs first 79 rows live; 292/292 tests |
 | Migration 005: composite PK (id, task_type) | Done | `supabase-migration-005.sql` applied; cleaner + embed_exemplars updated; re-pipeline Upserted=6070; DB now **14,005 rows** across all 14 task types; all 5 JSON task types have Exemplar banks |
 | Optimize near-dedup in embed_exemplars.py | Done | Replaced O(n²) Python list copy + loop with BLAS matrix ops; pre-normalised existing matrix + pre-allocated kept buffer; 292/292 tests pass |
+| Architecture deepening (Candidate 1) — extract recording session + stimulus loader | Done | `useRecordingSession` hook, `loadStimulusText` util, shared `CountdownRing`; refactored read-aloud + repeat-sentence pages and Mock components; tsc 0 |
+| Architecture deepening (Candidate 1) — migrate remaining 4 audio pages + 4 Mock components | Done | All 8 audio-recording files now use `useRecordingSession` + `loadStimulusText`; inline recording stacks eliminated; tsc 0 |
 
 ## Current Test Baseline
 
@@ -68,23 +70,25 @@ Migration 005 + Phase Data-4 are **fully complete**. Supabase now has **14,005 r
 
 ## Next Phase
 
-**Resume point (2026-06-15):** Near-dedup optimization done — DB has 14,005 rows; embed pipeline is now BLAS-accelerated. Next is Jijing data population or the first frontend/backend feature phase.
+**Resume point (2026-06-15):** Architecture deepening Candidate 1 fully complete — all 6 audio-recording practice pages and all 6 audio-recording Mock components now use `useRecordingSession` + `loadStimulusText`; inline recording stacks eliminated across the board; tsc 0.
 
 What's done:
-- `WikipediaAdapter` expanded to emit 14 task types: original 9 text/audio + 5 JSON task type passage anchors.
-- `cleaner.py` `LENGTH_GATES` extended for all 5 JSON task types.
-- Migration 005 applied; composite PK `(id, task_type)` live; DB has 14,005 rows across all 14 task types.
-- `embed_exemplars.py` near-dedup refactored — O(n²) Python list copies replaced with pre-normalised BLAS matrix ops; `kept_normed` pre-allocated buffer; 292/292 backend tests pass.
+- `src/hooks/useRecordingSession.ts` — shared hook (MediaRecorder + SpeechRecognition + countdown + cleanup)
+- `src/lib/stimulus-loader.ts` — shared utility (`loadStimulusText`, cache-check → API → cache-store, mode-aware)
+- `src/components/CountdownRing.tsx` — shared countdown ring; `mock/CountdownRing.tsx` re-exports it
+- All 6 audio practice pages migrated: `read-aloud`, `repeat-sentence`, `describe-image`, `re-tell-lecture`, `answer-short-question`, `personal-intro`
+- All 6 audio Mock components migrated: `MockReadAloud`, `MockRepeatSentence`, `MockDescribeImage`, `MockReTellLecture`, `MockAnswerShortQuestion`, `MockPersonalIntro`
+- `re-tell-lecture` and `answer-short-question` (page + Mock) also use `loadStimulusText`
+- DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-accelerated
 
 What's next:
-- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl` (format in `sources/jijing.py`), then run: `python -m scripts.scrape_exemplars --adapter jijing && python scripts/clean_exemplars.py --source jijing && python scripts/embed_exemplars.py --source jijing`
-- [ ] **Next feature phase** — see Future / Backlog section; consult `docs/PROJECT_CONTEXT.md` for current architecture state
+- [ ] **Migrate text-response pages** to `loadStimulusText`: `write-essay`, `summarize-written-text`, `write-from-dictation`, `re-order-paragraphs`, `fill-in-the-blanks`, `multiple-choice`, `summarize-spoken-text`, `fill-in-the-blanks-listening`, `highlight-correct-summary` — key file: `src/lib/stimulus-loader.ts`
+- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline
 
 Key files to open first:
-- `backend/scripts/embed_exemplars.py` — optimized near-dedup pipeline (current)
-- `backend/scripts/scrape_exemplars/sources/jijing.py` — data format spec + gitignore convention
-- `backend/scripts/scrape_exemplars/sources/wikipedia.py` — `WikipediaAdapter` with all 14 task types
-- `backend/services/stimulus_service.py` — `JSON_TASK_TYPES` set + three-tier fallback
+- `src/lib/stimulus-loader.ts` — the shared utility (check its API before touching any generate callbacks)
+- `src/app/practice/write-essay/page.tsx` — representative text-response page to migrate next
+- `src/app/practice/summarize-written-text/page.tsx` — another text-response page
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus

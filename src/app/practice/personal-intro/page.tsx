@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import CountdownRing from "@/components/CountdownRing"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
 import { apiPost } from "@/lib/api-client"
-import { blobToWav } from "@/lib/wav-encoder"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
 
@@ -20,131 +21,23 @@ const FIXED_PROMPT =
 
 type Phase = "idle" | "ready" | "recording" | "processing" | "done" | "error"
 
-function CountdownRing({ seconds, total, size = 80 }: { seconds: number; total: number; size?: number }) {
-  const r = (size - 8) / 2
-  const circ = 2 * Math.PI * r
-  const dash = circ * (seconds / total)
-  const urgent = seconds <= 8
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={6} className="stroke-slate-200 dark:stroke-slate-700" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={6}
-          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-          className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
-          style={{ transition: "stroke-dasharray 0.9s linear" }} />
-      </svg>
-      <span className={`absolute text-xl font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>{seconds}</span>
-    </div>
-  )
-}
-
 export default function PersonalIntroPage() {
   const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
   const [error, setError] = useState("")
   const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [transcript, setTranscript] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-  }, [])
-  useEffect(() => { setPhase("ready") }, [])
-
-  // prep timer
-  useEffect(() => {
-    if (phase !== "ready") return
-    timerRef.current = setInterval(() => {
-      setPrepSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []
-    txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setError(t('practiceTask.common.micDeniedShort'))
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => { /* ignore */ }
-      srRef.current = rec
-      try { rec.start() } catch { /* ignore */ }
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") { processAudio(new Blob([], { type: "audio/webm" })); return }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processAudio(blob)
-    }
-    mr.stop()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const processAudio = useCallback(async (blob: Blob) => {
+  const processAudio = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const tx = txRef.current.trim() || "[transcript not captured]"
     setTranscript(tx)
-
-    // No pronunciation assessment for personal intro
-    let wavBlob: Blob | null = null
-    if (blob.size > 0) { try { wavBlob = await blobToWav(blob) } catch { /* optional */ } }
-    void wavBlob // not used for personal intro
+    const endedAt = new Date().toISOString()
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
 
     let result: TaskFeedback | null = null
     try {
@@ -164,7 +57,7 @@ export default function PersonalIntroPage() {
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch (e) { console.warn("saveTask failed:", e) }
@@ -172,9 +65,45 @@ export default function PersonalIntroPage() {
     setPhase("done")
   }, [])
 
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    minSeconds: MIN_REC_SECONDS,
+    onComplete: processAudio,
+    onError: msg => { setError(msg); setPhase("error") },
+  })
+
+  useEffect(() => () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+  }, [])
+  useEffect(() => { setPhase("ready") }, [])
+
+  // Prep timer
+  useEffect(() => {
+    if (phase !== "ready") return
+    prepTimerRef.current = setInterval(() => {
+      setPrepSec(s => {
+        if (s <= 1) {
+          clearInterval(prepTimerRef.current!)
+          setPhase("recording")
+          recording.start()
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+    return () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+
+  const handleStartNow = () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+    setPhase("recording")
+    recording.start()
+  }
+
   const restart = () => {
     setFeedback(null); setTranscript(""); setError("")
-    setPrepSec(PREP_TIME); setRecSec(RECORD_TIME)
+    setPrepSec(PREP_TIME)
     setPhase("ready")
   }
 
@@ -218,7 +147,7 @@ export default function PersonalIntroPage() {
               <p className="text-base leading-8 text-[var(--foreground)] font-serif">{t('practiceTask.personal-intro.fixedPrompt')}</p>
             </div>
             <div className="text-center">
-              <button onClick={() => { if (timerRef.current) clearInterval(timerRef.current); startRecording() }}
+              <button onClick={handleStartNow}
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)]">
                 {t('practiceTask.personal-intro.startSpeakingNow')}
               </button>
@@ -234,16 +163,16 @@ export default function PersonalIntroPage() {
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t('practiceTask.common.recording')}</p>
                 </div>
-                <CountdownRing seconds={recSec} total={RECORD_TIME} size={72} />
+                <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={72} />
               </div>
               <p className="text-base leading-8 text-[var(--foreground)] font-serif">{t('practiceTask.personal-intro.fixedPrompt')}</p>
             </div>
             <div className="text-center">
-              <button onClick={stopRecording}
-                disabled={recSec > RECORD_TIME - MIN_REC_SECONDS}
+              <button onClick={recording.stop}
+                disabled={!recording.canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent">
-                {recSec > RECORD_TIME - MIN_REC_SECONDS
-                  ? t('practiceTask.common.holdOn', { sec: String(recSec - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!recording.canStop
+                  ? t('practiceTask.common.holdOn', { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
                   : t('practiceTask.common.stopRecording')}
               </button>
             </div>

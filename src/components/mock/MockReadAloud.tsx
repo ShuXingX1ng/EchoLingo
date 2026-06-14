@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
 import { blobToWav } from "@/lib/wav-encoder"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import { apiPost, apiPostForm } from "@/lib/api-client"
 import type { PracticeTask, TaskFeedback, PronunciationAssessmentResult } from "@/types"
-import CountdownRing from "./CountdownRing"
+import CountdownRing from "@/components/CountdownRing"
 
 const PREP_TIME = 35
 const RECORD_TIME = 40
@@ -17,32 +18,20 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
   const [phase, setPhase] = useState<Phase>("generating")
   const [stimulus, setStimulus] = useState("")
   const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stimulusRef = useRef("")
-  const processAudioRef = useRef<(b: Blob) => void>(() => {})
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-  }, [])
+  useEffect(() => () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }, [])
 
-  const processAudio = useCallback(async (audioBlob: Blob) => {
+  const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
     const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const tx = txRef.current.trim() || "[transcript not captured]"
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
     const stim = stimulusRef.current
 
     let wavBlob: Blob | null = null
@@ -63,15 +52,14 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
 
     const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
       try {
-        return await apiPost<TaskFeedback>("/api/read-aloud/feedback", {
-          stimulus: stim,
-          transcript: tx,
-        })
+        return await apiPost<TaskFeedback>("/api/read-aloud/feedback", { stimulus: stim, transcript: tx })
       } catch { return null }
     })()
 
     const [pronunciationResult, feedbackResult] = await Promise.all([azurePromise, feedbackPromise])
-    const fb: TaskFeedback = feedbackResult ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+    const fb: TaskFeedback = feedbackResult ?? {
+      summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [],
+    }
     if (pronunciationResult) fb.pronunciationAssessment = pronunciationResult
 
     let task: PracticeTask
@@ -82,7 +70,7 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch {
@@ -93,122 +81,56 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       }
     }
 
     setDoneTask(task)
     setPhase("done")
-  }, [])  
+  }, [])
 
-  useEffect(() => { processAudioRef.current = processAudio }, [processAudio])
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    onComplete: processAudio,
+    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  })
 
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") {
-      processAudioRef.current(new Blob([], { type: "audio/webm" }))
-      return
-    }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processAudioRef.current(blob)
-    }
-    mr.stop()
-  }, [])  
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []; txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setErrorMsg("Microphone access denied.")
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => {}
-      srRef.current = rec
-      try { rec.start() } catch {}
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [stopRecording])
-
-  const startPrepTimer = useCallback((text: string) => {
-    stimulusRef.current = text
+  const startPrepTimer = useCallback(() => {
     setPrepSec(PREP_TIME)
     setPhase("prep")
-    timerRef.current = setInterval(() => {
+    prepTimerRef.current = setInterval(() => {
       setPrepSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
+        if (s <= 1) { clearInterval(prepTimerRef.current!); recording.start(); return 0 }
         return s - 1
       })
     }, 1000)
-  }, [startRecording])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording.start])
 
-  // Auto-generate on mount
   useEffect(() => {
-    const generate = async () => {
-      try {
-        const cached = getStimulusFromBank("read_aloud")
-        let text: string
-        if (cached) {
-          text = cached
-        } else {
-          const data = await apiPost<{ text: string }>("/api/read-aloud/stimulus", {})
-          text = data.text
-          addStimulusToBank("read_aloud", text)
-        }
+    loadStimulusText({ taskType: "read_aloud", randomEndpoint: "/api/read-aloud/stimulus" })
+      .then(text => {
+        stimulusRef.current = text
         setStimulus(text)
-        startPrepTimer(text)
-      } catch (e) {
+        startPrepTimer()
+      })
+      .catch(e => {
         setErrorMsg(e instanceof Error ? e.message : "Failed to generate passage")
         setPhase("error")
-      }
-    }
-    generate()
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const skipTask = () => {
-    const emptyTask: PracticeTask = {
+    onComplete({
       id: `mock_${Date.now()}`,
       taskType: "read_aloud",
       stimulus: { kind: "text", content: stimulus },
       response: { kind: "audio", content: "" },
       durationSeconds: 0,
       createdAt: new Date().toISOString(),
-    }
-    onComplete(emptyTask)
+    })
   }
 
   return (
@@ -241,7 +163,7 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Recording</p>
               </div>
-              <CountdownRing seconds={recSec} total={RECORD_TIME} size={64} />
+              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={64} />
             </div>
             <p className="text-base leading-8 text-slate-900 dark:text-white font-serif">{stimulus}</p>
           </div>

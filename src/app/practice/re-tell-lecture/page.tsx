@@ -3,11 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import CountdownRing from "@/components/CountdownRing"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
 
@@ -26,27 +27,6 @@ type Phase =
   | "done"
   | "error"
 
-function CountdownRing({ seconds, total, size = 72 }: { seconds: number; total: number; size?: number }) {
-  const r = (size - 6) / 2
-  const circ = 2 * Math.PI * r
-  const dash = circ * (seconds / total)
-  const urgent = seconds <= 5
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={5} className="stroke-slate-200 dark:stroke-slate-700" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={5}
-          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-          className={urgent ? "stroke-red-500" : "stroke-emerald-500"}
-          style={{ transition: "stroke-dasharray 0.9s linear" }} />
-      </svg>
-      <span className={`absolute text-lg font-bold tabular-nums ${urgent ? "text-red-600 dark:text-red-400" : "text-[var(--foreground)]"}`}>
-        {seconds}
-      </span>
-    </div>
-  )
-}
-
 export default function ReTellLecturePage() {
   const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
@@ -55,145 +35,18 @@ export default function ReTellLecturePage() {
   const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
   const [error, setError] = useState("")
   const [prepSeconds, setPrepSeconds] = useState(PREP_TIME)
-  const [recSeconds, setRecSeconds] = useState(RECORD_TIME)
   const [transcript, setTranscript] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setTranscript("")
-    txRef.current = ""
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
-      const extras = buildStimulusExtras(mode, topic)
-      const isSeeded = mode !== "random"
-      let text: string
-      const cached = isSeeded ? null : getStimulusFromBank("re_tell_lecture")
-      if (cached) {
-        text = cached
-      } else {
-        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "re_tell_lecture", ...extras })
-        text = stimData.text
-        if (!isSeeded) addStimulusToBank("re_tell_lecture", text)
-      }
-      setLectureText(text)
-
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
-      const url = URL.createObjectURL(blob)
-      setAudioUrl(url)
-      setPrepSeconds(PREP_TIME)
-      setRecSeconds(RECORD_TIME)
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('practiceTask.re-tell-lecture.errorGenerate'))
-      setPhase("error")
-    }
-  }, [audioUrl, t])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playLecture = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-
-    audio.onended = () => {
-      // Transition to 10s prep phase after lecture finishes
-      setPhase("prep")
-      setPrepSeconds(PREP_TIME)
-      timerRef.current = setInterval(() => {
-        setPrepSeconds(s => {
-          if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
-          return s - 1
-        })
-      }, 1000)
-    }
-
-    setPhase("listening")
-    audio.play().catch(() => {
-      // Autoplay blocked — go back to ready so learner can manually trigger
-      setPhase("ready")
-      audioRef.current = null
-    })
-  }, [audioUrl]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []
-    txRef.current = ""
-    setRecSeconds(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setError(t('practiceTask.common.micDeniedShort'))
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => { /* ignore */ }
-      srRef.current = rec
-      try { rec.start() } catch { /* ignore */ }
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [t]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") { processResponse(new Blob([], { type: "audio/webm" })); return }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processResponse(blob)
-    }
-    mr.stop()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const processResponse = useCallback(async (_blob: Blob) => {
+  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
+    setTranscript(tx)
     const endedAt = new Date().toISOString()
     const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
     )
-    const tx = txRef.current.trim() || "[transcript not captured]"
-    setTranscript(tx)
 
     let fb: TaskFeedback
     try {
@@ -211,13 +64,80 @@ export default function ReTellLecturePage() {
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch (e) { console.warn("saveTask failed:", e) }
 
     setPhase("done")
   }, [lectureText])
+
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    minSeconds: MIN_REC_SECONDS,
+    onComplete: processResponse,
+    onError: msg => { setError(msg); setPhase("error") },
+  })
+
+  useEffect(() => () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+    audioRef.current?.pause()
+  }, [])
+
+  const generate = useCallback(async () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+    setPhase("generating")
+    setError(""); setFeedback(null); setTranscript("")
+    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
+
+    try {
+      const text = await loadStimulusText({ taskType: "re_tell_lecture" })
+      setLectureText(text)
+
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+      const url = URL.createObjectURL(blob)
+      setAudioUrl(url)
+      setPrepSeconds(PREP_TIME)
+      setPhase("ready")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('practiceTask.re-tell-lecture.errorGenerate'))
+      setPhase("error")
+    }
+  }, [audioUrl, t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
+
+  const startPrepTimer = useCallback(() => {
+    setPrepSeconds(PREP_TIME)
+    setPhase("prep")
+    prepTimerRef.current = setInterval(() => {
+      setPrepSeconds(s => {
+        if (s <= 1) {
+          clearInterval(prepTimerRef.current!)
+          setPhase("recording")
+          recording.start()
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+  }, [recording.start]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const playLecture = useCallback(() => {
+    if (!audioUrl) return
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    const audio = new Audio(audioUrl)
+    audioRef.current = audio
+
+    audio.onended = () => startPrepTimer()
+    audio.onerror = () => startPrepTimer()
+
+    setPhase("listening")
+    audio.play().catch(() => {
+      setPhase("ready")
+      audioRef.current = null
+    })
+  }, [audioUrl, startPrepTimer])
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -239,7 +159,6 @@ export default function ReTellLecturePage() {
           </p>
         </div>
 
-        {/* Idle */}
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
@@ -257,7 +176,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Generating */}
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -266,7 +184,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Ready — play button */}
         {phase === "ready" && audioUrl && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
@@ -287,7 +204,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Listening — audio is playing */}
         {phase === "listening" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -308,7 +224,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Prep — 10s countdown after audio ends */}
         {phase === "prep" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
@@ -321,7 +236,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Recording */}
         {phase === "recording" && (
           <div className="space-y-6">
             <div className="border-2 border-red-400 bg-[var(--surface)] p-8 text-center">
@@ -331,26 +245,25 @@ export default function ReTellLecturePage() {
                   {t('practiceTask.re-tell-lecture.recordingPhase')}
                 </p>
               </div>
-              <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={80} />
+              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
             </div>
             <div className="text-center">
               <button
-                onClick={stopRecording}
-                disabled={recSeconds > RECORD_TIME - MIN_REC_SECONDS}
+                onClick={recording.stop}
+                disabled={!recording.canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
-                {recSeconds > RECORD_TIME - MIN_REC_SECONDS
-                  ? t('practiceTask.common.holdOn', { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!recording.canStop
+                  ? t('practiceTask.common.holdOn', { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
                   : t('practiceTask.common.stopRecording')}
               </button>
             </div>
           </div>
         )}
 
-        {/* Processing */}
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -358,7 +271,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Done */}
         {phase === "done" && feedback && (
           <div className="space-y-6">
             <TaskFeedbackDisplay
@@ -382,7 +294,6 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {/* Error */}
         {phase === "error" && (
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
