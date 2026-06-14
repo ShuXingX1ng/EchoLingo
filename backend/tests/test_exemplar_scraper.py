@@ -294,9 +294,9 @@ class TestWikipediaAdapter:
         rs = [r for r in results if r.task_type == "repeat_sentence"]
         assert len(rs) >= 1
 
-    def test_nine_task_types_emitted_per_article(self):
-        """With a body paragraph at the right length, all nine task types can appear."""
-        body = " ".join(["word"] * 130)  # triggers swt / re_tell_lecture / sst
+    def test_fourteen_task_types_emitted_per_article(self):
+        """With a body paragraph at the right length, all fourteen task types can appear."""
+        body = " ".join(["word"] * 130)  # triggers swt/re_tell/sst + all 5 JSON types
         full_text = f"Lead.\n\n== Section ==\n{body}"
         # Lead with a clear sentence for repeat/wfd
         lead = (
@@ -310,11 +310,77 @@ class TestWikipediaAdapter:
         results = self._run_adapter(["Internet"], effects)
         task_types_seen = {r.task_type for r in results}
         expected = {
+            # Text task types (9)
             "read_aloud", "write_essay", "answer_short_question", "describe_image",
             "summarize_written_text", "re_tell_lecture", "summarize_spoken_text",
             "repeat_sentence", "write_from_dictation",
+            # JSON task type passage anchors (5)
+            "fill_in_the_blanks_reading", "multiple_choice_reading",
+            "re_order_paragraphs", "fill_in_the_blanks_listening",
+            "highlight_correct_summary",
         }
         assert expected.issubset(task_types_seen)
+
+    def test_json_task_types_emitted_from_body_paragraph(self):
+        """All five JSON task types are emitted from a 130-word body paragraph."""
+        body = " ".join(["word"] * 130)
+        full_text = f"Lead.\n\n== Overview ==\n{body}"
+        effects = [
+            _make_summary_response("Short lead."),
+            _make_sections_response("Climate", full_text),
+        ]
+        results = self._run_adapter(["Climate"], effects)
+        json_types = {
+            "fill_in_the_blanks_reading", "multiple_choice_reading",
+            "re_order_paragraphs", "fill_in_the_blanks_listening",
+            "highlight_correct_summary",
+        }
+        emitted = {r.task_type for r in results}
+        assert json_types.issubset(emitted)
+
+    def test_json_task_types_not_emitted_from_very_short_paragraph(self):
+        """A 30-word paragraph is too short for any JSON task type anchor."""
+        body = " ".join(["word"] * 30)
+        full_text = f"Lead.\n\n== Overview ==\n{body}"
+        effects = [
+            _make_summary_response("Short lead."),
+            _make_sections_response("Topic", full_text),
+        ]
+        results = self._run_adapter(["Topic"], effects)
+        json_types = {
+            "fill_in_the_blanks_reading", "multiple_choice_reading",
+            "re_order_paragraphs", "fill_in_the_blanks_listening",
+            "highlight_correct_summary",
+        }
+        emitted = {r.task_type for r in results}
+        # None of the JSON task types should appear for a 30-word paragraph
+        assert json_types.isdisjoint(emitted)
+
+    def test_fill_in_the_blanks_reading_not_emitted_for_very_long_paragraph(self):
+        """A 400-word paragraph exceeds the emission window for fib_reading (>320)."""
+        body = " ".join(["word"] * 400)
+        full_text = f"Lead.\n\n== Section ==\n{body}"
+        effects = [
+            _make_summary_response("Short lead."),
+            _make_sections_response("Topic", full_text),
+        ]
+        results = self._run_adapter(["Topic"], effects)
+        fib_r = [r for r in results if r.task_type == "fill_in_the_blanks_reading"]
+        assert len(fib_r) == 0
+
+    def test_json_task_type_section_meta(self):
+        """JSON task type exemplars carry section='body' in raw_meta."""
+        body = " ".join(["word"] * 130)
+        full_text = f"Lead.\n\n== Overview ==\n{body}"
+        effects = [
+            _make_summary_response("Short lead."),
+            _make_sections_response("Topic", full_text),
+        ]
+        results = self._run_adapter(["Topic"], effects)
+        hcs = [r for r in results if r.task_type == "highlight_correct_summary"]
+        assert len(hcs) >= 1
+        assert hcs[0].raw_meta.get("section") == "body"
+        assert hcs[0].license == "CC BY-SA 4.0"
 
 
 # ── _split_sentences ──────────────────────────────────────────────────────────

@@ -30,6 +30,13 @@ LENGTH_GATES: dict[str, tuple[int, int]] = {
     "write_from_dictation": (6, 20),    # dictation sentences — PTE ~8-18 words
     "answer_short_question": (5, 22),   # question prompts — PTE ~8-15 words
     "describe_image": (15, 70),         # image scenario descriptions — 20-60 words
+    # JSON task type passage anchors (Phase Data-4)
+    # Exemplars are the passage/transcript text only; the LLM produces full JSON output.
+    "fill_in_the_blanks_reading": (100, 250),   # academic reading passage, B2-C1 level
+    "multiple_choice_reading": (120, 300),       # longer reading passage with complex ideas
+    "re_order_paragraphs": (60, 150),            # individual paragraph unit to reorder
+    "fill_in_the_blanks_listening": (80, 200),   # lecture transcript, spoken register
+    "highlight_correct_summary": (100, 250),     # lecture excerpt requiring summarisation
 }
 
 _CITATION_RE = re.compile(r"\[\d+\]|\[note\s*\d+\]|\[citation needed\]|\[edit\]", re.IGNORECASE)
@@ -96,13 +103,17 @@ def sha256_hash(text: str) -> str:
 
 
 def dedup_by_hash(exemplars: list[RawExemplar]) -> list[RawExemplar]:
-    """Return exemplars with exact-duplicate texts removed (first occurrence kept)."""
-    seen: set[str] = set()
+    """Return exemplars with exact-duplicate (text, task_type) pairs removed (first kept).
+
+    The same text MAY appear under different task types — each (text, task_type)
+    pair maps to its own row in the DB (composite PK: id + task_type).
+    """
+    seen: set[tuple[str, str]] = set()
     unique: list[RawExemplar] = []
     for ex in exemplars:
-        h = sha256_hash(ex.text)
-        if h not in seen:
-            seen.add(h)
+        key = (sha256_hash(ex.text), ex.task_type)
+        if key not in seen:
+            seen.add(key)
             unique.append(ex)
     return unique
 
@@ -189,7 +200,9 @@ def clean_exemplars(
     Returns all items (accepted and rejected) so the caller can print metrics.
     """
     results: list[CleanExemplar] = []
-    seen_hashes: set[str] = set()
+    # Dedup key is (sha256(text), task_type): the same text is allowed under
+    # different task types because the DB composite PK is (id, task_type).
+    seen_hashes: set[tuple[str, str]] = set()
 
     for raw in raw_items:
         text = strip_markup(raw.text)
@@ -204,11 +217,11 @@ def clean_exemplars(
             results.append(_make_rejected(raw, text, lang, gate_reason))
             continue
 
-        h = sha256_hash(text)
-        if h in seen_hashes:
+        key = (sha256_hash(text), raw.task_type)
+        if key in seen_hashes:
             results.append(_make_rejected(raw, text, lang, "duplicate"))
             continue
-        seen_hashes.add(h)
+        seen_hashes.add(key)
 
         if skip_llm or not os.getenv("LLM_API_KEY"):
             llm_result = {"status": "accept", "reason": "llm_skipped"}

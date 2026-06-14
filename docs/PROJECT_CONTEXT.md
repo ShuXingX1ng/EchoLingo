@@ -18,7 +18,7 @@ Target users:
 | Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 273 backend tests (123 core + 86 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 288 backend tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
@@ -149,7 +149,7 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `backend/services/ecdict.py` | Read-only ECDICT lookup (pos/tag parse); single-word offline path | SQLite `backend/data/ecdict.sqlite` (gitignored) |
 | `backend/scripts/import_ecdict.py` | Downloads ECDICT 1.0.28 sqlite from GitHub into `backend/data/` | — |
 | `backend/scripts/scrape_exemplars/base.py` | `RawExemplar` dataclass + `SourceAdapter` ABC | — |
-| `backend/scripts/scrape_exemplars/sources/wikipedia.py` | `WikipediaAdapter`: emits 9 task types — text extracted from Wikipedia APIs (read_aloud, swt, re_tell_lecture, sst, repeat_sentence, write_from_dictation) + template-derived originals (write_essay, answer_short_question, describe_image); rate-limited, UA-identified | network (gitignored output) |
+| `backend/scripts/scrape_exemplars/sources/wikipedia.py` | `WikipediaAdapter`: emits **14 task types** — text extracted from Wikipedia APIs (read_aloud, swt, re_tell_lecture, sst, repeat_sentence, write_from_dictation) + template-derived originals (write_essay, answer_short_question, describe_image) + 5 JSON task type passage anchors (fill_in_the_blanks_reading, multiple_choice_reading, re_order_paragraphs, fill_in_the_blanks_listening, highlight_correct_summary); rate-limited, UA-identified | network (gitignored output) |
 | `backend/scripts/scrape_exemplars/sources/jijing.py` | `JijingAdapter`: reads gitignored local JSONL (`backend/data/jijing_raw/jijing.jsonl`) of PTE recall questions; public code, private data pattern | local file (gitignored data) |
 | `backend/scripts/scrape_exemplars/__main__.py` | Pipeline entry point: runs a `SourceAdapter` (`wikipedia` or `jijing`) → `backend/data/exemplars_raw/<source>.jsonl` (gitignored) | — |
 | `backend/scripts/scrape_exemplars/cleaner.py` | Deterministic cleaning rules (markup strip, English filter, length gates, SHA-256 dedup) + optional DeepSeek accept/reject gate; exposes `clean_exemplars()` + `print_metrics()` | — |

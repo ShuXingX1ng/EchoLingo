@@ -56,8 +56,7 @@ INSERT INTO stimulus_exemplars
 VALUES
     (%(id)s, %(task_type)s, %(text)s, %(embedding)s, %(source_url)s, %(license)s,
      %(status)s, %(reason)s, %(word_count)s, %(lang)s)
-ON CONFLICT (id) DO UPDATE SET
-    task_type  = EXCLUDED.task_type,
+ON CONFLICT (id, task_type) DO UPDATE SET
     text       = EXCLUDED.text,
     embedding  = EXCLUDED.embedding,
     source_url = EXCLUDED.source_url,
@@ -236,19 +235,56 @@ def embed_and_upsert(
                     print(f"  [{task_type}] embedded {done}/{len(pending)} …", flush=True)
                 vectors = [np.asarray(v, dtype=float) for v in all_vecs]
 
-                batch_kept: list[np.ndarray] = []
+                # Build a single L2-normalised matrix from existing embeddings once
+                # per task_type so the per-item check is one BLAS call instead of
+                # an O(N) Python-level list copy + Python-loop cosine computation.
+                existing_ids = list(existing.keys())
+                dim = len(vectors[0]) if vectors else 1024
+                if existing_ids:
+                    ex_mat = np.vstack([existing[k] for k in existing_ids])
+                    ex_norms = np.linalg.norm(ex_mat, axis=1, keepdims=True)
+                    ex_norms = np.where(ex_norms == 0.0, 1.0, ex_norms)
+                    ex_normed = ex_mat / ex_norms  # (E, D) L2-normalised
+                    id_to_row: dict[str, int] = {id_: i for i, id_ in enumerate(existing_ids)}
+                else:
+                    ex_normed = np.empty((0, dim), dtype=float)
+                    id_to_row = {}
+
+                # Pre-allocate buffer for batch-kept normalised vectors (avoids
+                # repeated np.vstack copies as the buffer grows).
+                kept_normed = np.empty((len(pending), dim), dtype=float)
+                kept_count = 0
+
                 for item, vec in zip(pending, vectors):
-                    others = [v for k, v in existing.items() if k != item.id] + batch_kept
-                    if is_near_duplicate(vec, others):
+                    norm = float(np.linalg.norm(vec))
+                    if norm == 0.0:
                         near_dup_dropped += 1
                         continue
+                    vec_hat = vec / norm
+
+                    # One BLAS call vs all existing stored vectors.
+                    if ex_normed.shape[0] > 0:
+                        sims = ex_normed @ vec_hat
+                        exclude = id_to_row.get(item.id)
+                        if exclude is not None:
+                            sims[exclude] = -2.0  # mask self-comparison in --force mode
+                        if float(sims.max()) >= NEAR_DUP_THRESHOLD:
+                            near_dup_dropped += 1
+                            continue
+
+                    # One BLAS call vs already-kept batch vectors.
+                    if kept_count > 0 and float((kept_normed[:kept_count] @ vec_hat).max()) >= NEAR_DUP_THRESHOLD:
+                        near_dup_dropped += 1
+                        continue
+
                     upsert_exemplar(cur, item, vec)
-                    batch_kept.append(vec)
+                    kept_normed[kept_count] = vec_hat
+                    kept_count += 1
                     upserted += 1
 
             # Commit immediately after each task_type so partial results are durable.
             conn.commit()
-            print(f"[{task_type}] committed {len(batch_kept)} rows.")
+            print(f"[{task_type}] committed {kept_count} rows.")
 
         except Exception as exc:
             print(f"[{task_type}] ERROR: {exc} — skipping this task type, rolling back.")

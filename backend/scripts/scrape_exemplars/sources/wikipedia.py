@@ -326,20 +326,29 @@ def _split_sentences(text: str) -> list[str]:
 class WikipediaAdapter(SourceAdapter):
     """Fetch academic passages from English Wikipedia.
 
-    Emits nine task types per article (where source material exists):
+    Emits fourteen task types per article (where source material exists):
 
     Text derived from Wikipedia (CC BY-SA 4.0):
-      - read_aloud            : lead paragraph             (10-60 words)
-      - summarize_written_text: body paragraphs           (150-300 words)
-      - re_tell_lecture       : body paragraphs           (100-150 words)
-      - summarize_spoken_text : body paragraphs            (80-120 words)
-      - repeat_sentence       : individual sentences       (8-28 words)
-      - write_from_dictation  : individual short sentences  (6-20 words)
+      - read_aloud               : lead paragraph              (10-60 words)
+      - summarize_written_text   : body paragraphs            (150-300 words)
+      - re_tell_lecture          : body paragraphs            (100-150 words)
+      - summarize_spoken_text    : body paragraphs             (80-120 words)
+      - repeat_sentence          : individual sentences         (8-28 words)
+      - write_from_dictation     : individual short sentences   (6-20 words)
+      - fill_in_the_blanks_reading  : passage anchor          (100-250 words)
+      - multiple_choice_reading     : passage anchor          (120-300 words)
+      - re_order_paragraphs         : paragraph unit anchor    (60-150 words)
+      - fill_in_the_blanks_listening: transcript anchor        (80-200 words)
+      - highlight_correct_summary   : transcript anchor       (100-250 words)
 
     Original content derived from topic title only (NOT Wikipedia text):
       - write_essay           : original discussion prompt (30-80 words)
       - answer_short_question : original factual question   (5-22 words)
       - describe_image        : synthetic chart/graph brief (15-70 words)
+
+    For the five JSON task types, exemplars are passage-text anchors only.
+    The LLM still outputs the full JSON structure (blanks, choices, etc.) —
+    the exemplar guides passage difficulty and style, not format.
     """
 
     def __init__(
@@ -559,5 +568,61 @@ class WikipediaAdapter(SourceAdapter):
                                 license=LICENSE,
                                 raw_meta={"title": topic, "section": "body_sentence", "raw_word_count": swc},
                             )
+
+                # ── JSON task type passage anchors (Phase Data-4) ─────────────
+                # Exemplars are the plain passage text; the LLM generates the
+                # full JSON structure (blanks/choices/order) on top of this style.
+                # Emission windows are slightly wider than cleaner LENGTH_GATES
+                # so the gate rather than the adapter acts as the hard filter.
+
+                # fill_in_the_blanks_reading: reading passage 100-250 words
+                if 80 <= wc <= 320:
+                    yield RawExemplar(
+                        task_type="fill_in_the_blanks_reading",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # multiple_choice_reading: longer passage 120-300 words
+                if 100 <= wc <= 380:
+                    yield RawExemplar(
+                        task_type="multiple_choice_reading",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # re_order_paragraphs: individual paragraph unit 60-150 words
+                if 45 <= wc <= 200:
+                    yield RawExemplar(
+                        task_type="re_order_paragraphs",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # fill_in_the_blanks_listening: transcript-style passage 80-200 words
+                if 60 <= wc <= 250:
+                    yield RawExemplar(
+                        task_type="fill_in_the_blanks_listening",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
+
+                # highlight_correct_summary: lecture excerpt 100-250 words
+                if 80 <= wc <= 320:
+                    yield RawExemplar(
+                        task_type="highlight_correct_summary",
+                        text=para,
+                        source_url=page_url,
+                        license=LICENSE,
+                        raw_meta={"title": topic, "section": "body", "raw_word_count": wc},
+                    )
 
             time.sleep(self._rate_limit)
