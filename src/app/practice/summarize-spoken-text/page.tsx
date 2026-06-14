@@ -73,6 +73,8 @@ export default function SummarizeSpokenTextPage() {
       setPhase("error")
     }
   }, [audioUrl, t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const playPassage = useCallback(() => {
     if (!audioUrl) return

@@ -111,6 +111,8 @@ export default function FillInTheBlanksPage() {
       setPhase("error")
     }
   }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!parsed) return

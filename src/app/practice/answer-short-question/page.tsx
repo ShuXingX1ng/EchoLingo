@@ -92,6 +92,8 @@ export default function AnswerShortQuestionPage() {
       setPhase("error")
     }
   }, [t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   // auto-countdown when ready
   useEffect(() => {
