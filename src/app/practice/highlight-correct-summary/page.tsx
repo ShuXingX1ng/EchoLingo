@@ -114,6 +114,8 @@ export default function HighlightCorrectSummaryPage() {
       setPhase("error")
     }
   }, [audioUrl])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const playPassage = useCallback(() => {
     if (!audioUrl) return

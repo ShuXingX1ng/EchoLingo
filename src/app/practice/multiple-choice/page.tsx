@@ -108,6 +108,8 @@ export default function MultipleChoicePage() {
       setPhase("error")
     }
   }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const handleSubmit = useCallback(async () => {
     if (parsed === null || selected === null) return

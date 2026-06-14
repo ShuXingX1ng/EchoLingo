@@ -62,6 +62,7 @@ export default function PersonalIntroPage() {
     streamRef.current?.getTracks().forEach(t => t.stop())
     srRef.current?.stop()
   }, [])
+  useEffect(() => { setPhase("ready") }, [])
 
   // prep timer
   useEffect(() => {

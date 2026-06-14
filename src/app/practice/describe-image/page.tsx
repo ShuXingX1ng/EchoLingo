@@ -79,6 +79,8 @@ export default function DescribeImagePage() {
     setImage(getRandomImage())
     setPhase("ready")
   }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadImage() }, [])
 
   // Auto-start prep timer when ready
   useEffect(() => {

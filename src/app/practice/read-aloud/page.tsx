@@ -90,7 +90,6 @@ export default function ReadAloudPage() {
       speechRecRef.current?.stop()
     }
   }, [])
-
   // ── Stimulus generation ───────────────────────────────────────────────────
 
   const generateStimulus = useCallback(async () => {
@@ -126,6 +125,8 @@ export default function ReadAloudPage() {
       setPhase("error")
     }
   }, [t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generateStimulus() }, [])
 
   // ── Prep timer ────────────────────────────────────────────────────────────
 

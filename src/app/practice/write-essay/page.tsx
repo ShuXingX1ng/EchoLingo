@@ -69,6 +69,8 @@ export default function WriteEssayPage() {
       setPhase("error")
     }
   }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const handleSubmit = async () => {
     if (timerRef.current) clearInterval(timerRef.current)

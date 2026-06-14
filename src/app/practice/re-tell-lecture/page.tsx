@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
@@ -100,6 +100,8 @@ export default function ReTellLecturePage() {
       setPhase("error")
     }
   }, [audioUrl, t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const playLecture = useCallback(() => {
     if (!audioUrl) return
