@@ -49,6 +49,9 @@
 | Bug fix: Theme input Enter key + topic pass-through in pure-AI path | Done | (1) `/practice` hub input: added `onKeyDown` Enter handler → smooth-scrolls to task section + added `taskSectionRef` anchor div. (2) `backend/services/stimulus_service.py` pure-AI path (Tier 2/3) now injects topic when `mode=theme` (was silently ignored when exemplar bank empty). |
 | Phase Data-2: Live Exemplar Ingestion | Done | Extended WikipediaAdapter; scraped, cleaned, and embedded 1478 Wikipedia exemplars; verified originality guard and serving layer |
 | Phase Data-3: Expand Ingestion (4 new task types + JijingAdapter) | Done | WikipediaAdapter extended for repeat_sentence, write_from_dictation, answer_short_question, describe_image; JijingAdapter created (public code, gitignored data); 45/45 tests pass; live embed: Upserted=2690, DB now 4168 rows covering all 9 text/audio task types |
+| Phase Data-4: JSON task type exemplar banks | Done | Evaluated all 5 JSON task types; 5 LENGTH_GATES + WikipediaAdapter 14 task types; live embed Upserted=3767, DB now 7935 rows; re_order_paragraphs first 79 rows live; 292/292 tests |
+| Migration 005: composite PK (id, task_type) | Done | `supabase-migration-005.sql` applied; cleaner + embed_exemplars updated; re-pipeline Upserted=6070; DB now **14,005 rows** across all 14 task types; all 5 JSON task types have Exemplar banks |
+| Optimize near-dedup in embed_exemplars.py | Done | Replaced O(n²) Python list copy + loop with BLAS matrix ops; pre-normalised existing matrix + pre-allocated kept buffer; 292/292 tests pass |
 
 ## Current Test Baseline
 
@@ -56,39 +59,38 @@
 |-------|----------------|
 | Frontend unit | 12 files / 124 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 273 tests (123 core + 86 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Backend | 288 tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
 ## Current Status (as of 2026-06-14)
 
-Phase Data-3 is **fully complete including live ingestion**. All 9 PTE text/audio task types now have exemplars in Supabase (4168 rows total). `JijingAdapter` infrastructure is in place — data population deferred to when recall data is available.
+Migration 005 + Phase Data-4 are **fully complete**. Supabase now has **14,005 rows** across all **14 task types** (all 9 text/audio types + all 5 JSON task types). `JijingAdapter` infrastructure is in place — data population deferred until recall data is available.
 
 ## Next Phase
 
-**Resume point (2026-06-14):** Phase Data-3 fully done — 4168 exemplars live in Supabase across all 9 text/audio task types; next is Jijing data population and evaluating JSON task types for exemplar coverage.
+**Resume point (2026-06-15):** Near-dedup optimization done — DB has 14,005 rows; embed pipeline is now BLAS-accelerated. Next is Jijing data population or the first frontend/backend feature phase.
 
 What's done:
-- `WikipediaAdapter` expanded to emit 9 task types (original 5 + `repeat_sentence`, `write_from_dictation`, `answer_short_question`, `describe_image`).
-- `cleaner.py` `LENGTH_GATES` extended for all 4 new types.
-- `JijingAdapter` created (`sources/jijing.py`); `--adapter jijing` registered in `__main__.py`.
-- `vector_store.py` updated: `dimensions=1024` added to `OpenAIEmbeddings` call (required by DashScope v4 API).
-- Live embed completed: `--limit 10` pipeline → Upserted=2690, near-dup dropped=3; DB now **4168 rows** covering all 9 text/audio task types.
-- 45/45 scraper tests pass.
+- `WikipediaAdapter` expanded to emit 14 task types: original 9 text/audio + 5 JSON task type passage anchors.
+- `cleaner.py` `LENGTH_GATES` extended for all 5 JSON task types.
+- Migration 005 applied; composite PK `(id, task_type)` live; DB has 14,005 rows across all 14 task types.
+- `embed_exemplars.py` near-dedup refactored — O(n²) Python list copies replaced with pre-normalised BLAS matrix ops; `kept_normed` pre-allocated buffer; 292/292 backend tests pass.
 
 What's next:
-- [ ] **Populate JijingAdapter data** — prepare `backend/data/jijing_raw/jijing.jsonl` from PTE recall sources, then run: `python -m scripts.scrape_exemplars --adapter jijing && python scripts/clean_exemplars.py --source jijing && python scripts/embed_exemplars.py --source jijing`
-- [ ] **Evaluate JSON task types** — decide if `fill_in_the_blanks_reading`, `re_order_paragraphs`, `multiple_choice_reading`, `fill_in_the_blanks_listening`, `highlight_correct_summary` benefit from an exemplar bank; currently in `JSON_TASK_TYPES` pure-AI set in `stimulus_service.py`
-- [ ] **Expand exemplar coverage** — optionally re-run `--limit 30` to grow per-task-type counts above current ~260 for `repeat_sentence` (after near-dedup)
+- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl` (format in `sources/jijing.py`), then run: `python -m scripts.scrape_exemplars --adapter jijing && python scripts/clean_exemplars.py --source jijing && python scripts/embed_exemplars.py --source jijing`
+- [ ] **Next feature phase** — see Future / Backlog section; consult `docs/PROJECT_CONTEXT.md` for current architecture state
 
 Key files to open first:
+- `backend/scripts/embed_exemplars.py` — optimized near-dedup pipeline (current)
 - `backend/scripts/scrape_exemplars/sources/jijing.py` — data format spec + gitignore convention
-- `backend/services/stimulus_service.py` — `JSON_TASK_TYPES` set (line 32) to decide JSON task coverage
-- `backend/scripts/scrape_exemplars/sources/wikipedia.py` — `WikipediaAdapter` with all 9 task types
-- `backend/scripts/scrape_exemplars/cleaner.py` — `LENGTH_GATES` reference
+- `backend/scripts/scrape_exemplars/sources/wikipedia.py` — `WikipediaAdapter` with all 14 task types
+- `backend/services/stimulus_service.py` — `JSON_TASK_TYPES` set + three-tier fallback
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
   seeded by few-shot Exemplars. `verbatim=true` is a backend-only private path.
+- **JSON task type exemplars** = passage-text anchors only; LLM still outputs full JSON structure.
+  `json_mode=True` is preserved in `_generate`; few-shot injection is identical to text task types.
 - **Code public, copyrighted recall data gitignored** (mirrors ECDICT). First
   adapter = Wikipedia/Simple Wikipedia (CC, clean); 机经 adapter comes later under
   the same `SourceAdapter` abstraction + gitignored ingestion.
@@ -98,8 +100,6 @@ Key resolved decisions (so we don't re-litigate):
   pgvector + `tsvector`, RRF hybrid; RLS enabled with no policies (PostgREST-deny; backend direct Postgres bypasses RLS).
 - **AI generation demoted to fallback** (exemplar-grounded → empty-bank pure-AI →
   silent pure-AI on failure).
-- **Scope**: text task types (tiers 1–2) first; JSON task types (tier 3) stay
-  pure-AI for now.
 
 ### Build order
 - [x] **Migration 004** — `stimulus_exemplars` table (id `sha256(text)`, task_type,

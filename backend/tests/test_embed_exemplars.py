@@ -182,7 +182,10 @@ class TestUpsert:
         assert params["word_count"] == 2
 
     def test_upsert_sql_is_idempotent(self):
-        assert "ON CONFLICT (id) DO UPDATE" in UPSERT_SQL
+        # Conflict target must be the composite PK (migration 005).
+        assert "ON CONFLICT (id, task_type) DO UPDATE" in UPSERT_SQL
+        # task_type is part of the PK — it must not be overwritten on conflict.
+        assert "task_type  = EXCLUDED.task_type" not in UPSERT_SQL
         # tsv is DB-generated and must never be written.
         assert "tsv" not in UPSERT_SQL.lower()
 

@@ -158,6 +158,58 @@ class TestApplyLengthGate:
         ok, reason = apply_length_gate("anything", "unknown_type")
         assert ok is True
 
+    # JSON task type passage anchor gates (Phase Data-4)
+
+    def test_fib_reading_passes_in_range(self):
+        ok, _ = apply_length_gate(_words(150), "fill_in_the_blanks_reading")
+        assert ok is True
+
+    def test_fib_reading_rejects_too_short(self):
+        ok, reason = apply_length_gate(_words(50), "fill_in_the_blanks_reading")
+        assert ok is False
+        assert "too_short" in reason
+
+    def test_fib_reading_rejects_too_long(self):
+        ok, reason = apply_length_gate(_words(300), "fill_in_the_blanks_reading")
+        assert ok is False
+        assert "too_long" in reason
+
+    def test_multiple_choice_reading_passes_in_range(self):
+        ok, _ = apply_length_gate(_words(200), "multiple_choice_reading")
+        assert ok is True
+
+    def test_multiple_choice_reading_rejects_too_short(self):
+        ok, reason = apply_length_gate(_words(80), "multiple_choice_reading")
+        assert ok is False
+        assert "too_short" in reason
+
+    def test_re_order_paragraphs_passes_in_range(self):
+        ok, _ = apply_length_gate(_words(100), "re_order_paragraphs")
+        assert ok is True
+
+    def test_re_order_paragraphs_rejects_too_short(self):
+        ok, reason = apply_length_gate(_words(30), "re_order_paragraphs")
+        assert ok is False
+        assert "too_short" in reason
+
+    def test_fib_listening_passes_in_range(self):
+        ok, _ = apply_length_gate(_words(130), "fill_in_the_blanks_listening")
+        assert ok is True
+
+    def test_fib_listening_rejects_too_long(self):
+        ok, reason = apply_length_gate(_words(250), "fill_in_the_blanks_listening")
+        assert ok is False
+        assert "too_long" in reason
+
+    def test_highlight_correct_summary_passes_in_range(self):
+        ok, _ = apply_length_gate(_words(180), "highlight_correct_summary")
+        assert ok is True
+
+    def test_highlight_correct_summary_rejects_too_short(self):
+        ok, reason = apply_length_gate(_words(50), "highlight_correct_summary")
+        assert ok is False
+        assert "too_short" in reason
+
 
 # ── dedup_by_hash ─────────────────────────────────────────────────────────────
 
@@ -185,6 +237,24 @@ class TestDedupByHash:
 
     def test_empty_list(self):
         assert dedup_by_hash([]) == []
+
+    def test_same_text_different_task_types_both_kept(self):
+        """Same text is NOT a duplicate when task types differ (composite PK)."""
+        items = [
+            _make_raw("same text here", task_type="read_aloud"),
+            _make_raw("same text here", task_type="fill_in_the_blanks_reading"),
+        ]
+        result = dedup_by_hash(items)
+        assert len(result) == 2
+
+    def test_same_text_same_task_type_is_duplicate(self):
+        """Same (text, task_type) pair IS a duplicate."""
+        items = [
+            _make_raw("same text here", task_type="read_aloud"),
+            _make_raw("same text here", task_type="read_aloud"),
+        ]
+        result = dedup_by_hash(items)
+        assert len(result) == 1
 
 
 # ── clean_exemplars full pipeline ─────────────────────────────────────────────
@@ -266,6 +336,31 @@ class TestCleanExemplarsPipeline:
 
     def test_empty_input_returns_empty(self):
         assert clean_exemplars([], skip_llm=True) == []
+
+    def test_same_text_different_task_types_both_accepted(self):
+        """Same text under two task types must BOTH be accepted (composite PK)."""
+        # 15 words: within read_aloud (10-60) AND repeat_sentence (8-28).
+        text = _words(15)
+        raw = [
+            _make_raw(text, task_type="read_aloud"),
+            _make_raw(text, task_type="repeat_sentence"),
+        ]
+        results = clean_exemplars(raw, skip_llm=True)
+        accepted = [r for r in results if r.status == "accept"]
+        assert len(accepted) == 2
+
+    def test_same_text_same_task_type_is_duplicate_in_pipeline(self):
+        """Same (text, task_type) pair must only produce one accepted row."""
+        text = _words(30)
+        raw = [
+            _make_raw(text, task_type="read_aloud", source_url="url_a"),
+            _make_raw(text, task_type="read_aloud", source_url="url_b"),
+        ]
+        results = clean_exemplars(raw, skip_llm=True)
+        accepted = [r for r in results if r.status == "accept"]
+        assert len(accepted) == 1
+        rejected = [r for r in results if r.status == "reject"]
+        assert rejected[0].reason == "duplicate"
 
 
 # ── print_metrics (smoke test) ────────────────────────────────────────────────
