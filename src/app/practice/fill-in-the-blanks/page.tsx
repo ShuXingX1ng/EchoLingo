@@ -5,8 +5,7 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
+import { loadStimulusText } from "@/lib/stimulus-loader"
 import { apiPost } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -87,18 +86,7 @@ export default function FillInTheBlanksPage() {
     setPhase("generating")
     setError(""); setFeedback(null); setSelections([]); setSeconds(TIME_LIMIT)
     try {
-      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
-      const extras = buildStimulusExtras(mode, topic)
-      const isSeeded = mode !== "random"
-      let raw: string
-      const cached = isSeeded ? null : getStimulusFromBank("fill_in_the_blanks_reading")
-      if (cached) {
-        raw = cached
-      } else {
-        const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "fill_in_the_blanks_reading", ...extras })
-        raw = data.text
-        if (!isSeeded) addStimulusToBank("fill_in_the_blanks_reading", raw)
-      }
+      const raw = await loadStimulusText({ taskType: "fill_in_the_blanks_reading" })
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")
       setRawStimulus(raw)

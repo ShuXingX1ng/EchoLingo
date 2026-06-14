@@ -5,8 +5,7 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import { parsePracticeModeFromUrl, buildStimulusExtras } from "@/lib/practice-mode"
+import { loadStimulusText } from "@/lib/stimulus-loader"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
@@ -32,18 +31,7 @@ export default function WriteFromDictationPage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
-      const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
-      const extras = buildStimulusExtras(mode, topic)
-      const isSeeded = mode !== "random"
-      let text: string
-      const cached = isSeeded ? null : getStimulusFromBank("write_from_dictation")
-      if (cached) {
-        text = cached
-      } else {
-        const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_from_dictation", ...extras })
-        text = stimData.text
-        if (!isSeeded) addStimulusToBank("write_from_dictation", text)
-      }
+      const text = await loadStimulusText({ taskType: "write_from_dictation" })
       setSentence(text)
 
       const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
