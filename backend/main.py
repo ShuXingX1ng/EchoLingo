@@ -4,14 +4,14 @@ EchoLingo FastAPI Backend
 Python backend for the EchoLingo PTE Academic practice platform.
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import tts, pronunciation, pte_stimulus, pte_feedback, read_aloud, word_lookup
-
-# Load environment variables
+# Load environment variables before any service modules are imported
 load_dotenv()
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routers import tts, pronunciation, pte_stimulus, pte_feedback, read_aloud, word_lookup
 
 # Create FastAPI app
 app = FastAPI(

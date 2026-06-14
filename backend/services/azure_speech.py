@@ -4,7 +4,9 @@ Azure Speech Service
 Encapsulates Azure Speech SDK for TTS and Pronunciation Assessment.
 """
 
+import asyncio
 import os
+import tempfile
 from typing import List, Optional
 from dataclasses import dataclass
 import azure.cognitiveservices.speech as speechsdk
@@ -86,8 +88,9 @@ class AzureSpeechService:
         # Create synthesizer
         synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
 
-        # Synthesize
-        result = synthesizer.speak_ssml_async(ssml).get()
+        # Synthesize — run blocking SDK call off the event loop thread
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: synthesizer.speak_ssml_async(ssml).get())
 
         if (
             result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted
@@ -123,30 +126,37 @@ class AzureSpeechService:
         speech_config = self._get_speech_config()
         speech_config.speech_recognition_language = "en-US"
 
-        # Create audio config from WAV data
-        audio_config = speechsdk.AudioConfig(stream=speechsdk.PushAudioInputStream())
-        audio_stream = audio_config.stream
-        audio_stream.write(audio_data)
-        audio_stream.close()
+        # Write WAV to a temp file so AudioConfig can parse the RIFF header correctly.
+        # PushAudioInputStream expects raw PCM (no header), so writing the full WAV blob
+        # to it corrupts the audio and causes "No candidate response was captured".
+        tmp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp_path = tmp_file.name
+        try:
+            tmp_file.write(audio_data)
+            tmp_file.flush()
+            tmp_file.close()
 
-        # Create pronunciation assessment config
-        pronunciation_config = speechsdk.PronunciationAssessmentConfig(
-            reference_text=reference_text,
-            grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
-            granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
-            enable_miscue=True,
-        )
+            audio_config = speechsdk.AudioConfig(filename=tmp_path)
 
-        # Create recognizer
-        speech_recognizer = speechsdk.SpeechRecognizer(
-            speech_config=speech_config, audio_config=audio_config
-        )
+            pronunciation_config = speechsdk.PronunciationAssessmentConfig(
+                reference_text=reference_text,
+                grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
+                granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
+                enable_miscue=True,
+            )
 
-        # Apply pronunciation assessment config
-        pronunciation_config.apply_to(speech_recognizer)
+            speech_recognizer = speechsdk.SpeechRecognizer(
+                speech_config=speech_config, audio_config=audio_config
+            )
+            pronunciation_config.apply_to(speech_recognizer)
 
-        # Perform assessment
-        result = speech_recognizer.recognize_once_async().get()
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, lambda: speech_recognizer.recognize_once_async().get())
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
         if result.reason != speechsdk.ResultReason.RecognizedSpeech:
             error_details = (
@@ -156,13 +166,8 @@ class AzureSpeechService:
             )
             raise ValueError(f"Pronunciation assessment failed: {error_details}")
 
-        # Get pronunciation assessment result
         pronunciation_result = speechsdk.PronunciationAssessmentResult(result)
-
-        # Extract word-level details
         words = self._extract_words(pronunciation_result)
-
-        # Generate summary
         summary = self._generate_summary(
             pronunciation_result.pronunciation_score,
             pronunciation_result.accuracy_score,
@@ -186,36 +191,28 @@ class AzureSpeechService:
         """Extract word-level assessment details."""
         words = []
 
-        if not pronunciation_result.detail_result:
+        if not pronunciation_result.words:
             return words
 
-        detail = pronunciation_result.detail_result
-        if "Words" not in detail:
-            return words
+        for word_data in pronunciation_result.words:
+            accuracy = round(word_data.accuracy_score or 0)
+            error_type = word_data.error_type or "None"
 
-        for word_data in detail["Words"]:
             word_assessment = WordAssessment(
-                word=word_data.get("Word", ""),
-                score=word_data.get("PronunciationAssessment", {}).get(
-                    "AccuracyScore", 0
-                ),
-                accuracyScore=word_data.get("PronunciationAssessment", {}).get(
-                    "AccuracyScore", 0
-                ),
-                errorType=word_data.get("PronunciationAssessment", {}).get(
-                    "ErrorType", "None"
-                ),
+                word=word_data.word,
+                score=accuracy,
+                accuracyScore=accuracy,
+                errorType=error_type,
             )
 
-            # Extract phoneme-level details if available
-            if "Phonemes" in word_data:
+            if word_data.phonemes:
                 word_assessment.phonemes = [
                     PhonemeAssessment(
-                        phoneme=p.get("Phoneme", ""),
-                        score=0,  # Not available in this format
-                        accuracyScore=0,
+                        phoneme=p.phoneme,
+                        score=round(p.accuracy_score or 0),
+                        accuracyScore=round(p.accuracy_score or 0),
                     )
-                    for p in word_data["Phonemes"]
+                    for p in word_data.phonemes
                 ]
 
             words.append(word_assessment)
