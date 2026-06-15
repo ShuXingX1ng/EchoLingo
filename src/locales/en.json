@@ -430,6 +430,7 @@
   "practiceHub.theme.chip.society": "Society",
   "practiceHub.theme.chip.science": "Science",
   "practiceHub.theme.active": "Themed: {topic}",
+  "practiceHub.theme.activeHint": "Starting any task below will generate themed stimuli.",
   "practiceHub.theme.clear": "Clear",
   "practiceHub.targeted.eyebrow": "Targeted Practice",
   "practiceHub.targeted.desc": "Task types where you need the most work, ranked by recent performance.",

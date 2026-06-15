@@ -430,6 +430,7 @@
   "practiceHub.theme.chip.society": "社会",
   "practiceHub.theme.chip.science": "科学",
   "practiceHub.theme.active": "主题：{topic}",
+  "practiceHub.theme.activeHint": "开始下面任何任务都将生成该主题的题目。",
   "practiceHub.theme.clear": "清除",
   "practiceHub.targeted.eyebrow": "重点练习",
   "practiceHub.targeted.desc": "根据近期表现，以下任务类型最需要加强练习。",
