@@ -1,71 +1,51 @@
 import type { PracticeTask } from "@/types"
 import * as localHistory from "./task-history"
 import * as cloudHistory from "./supabase-task-history"
+import { createSyncedStore } from "./synced-store"
 
-async function isAuthenticated(): Promise<boolean> {
-  return cloudHistory.isUserLoggedIn()
-}
+type TaskInput = Omit<PracticeTask, "id">
 
-export async function saveTask(task: Omit<PracticeTask, "id">): Promise<PracticeTask> {
-  const isAuthed = await isAuthenticated()
-
-  if (isAuthed) {
-    try {
-      const cloudTask = await cloudHistory.saveTaskToCloud(task)
-      if (cloudTask) {
-        localHistory.saveTask(task)
-        return cloudTask
-      }
-    } catch (error) {
-      console.warn("Cloud task save failed, falling back to local storage:", error)
-    }
+const store = createSyncedStore<PracticeTask, TaskInput>(
+  {
+    save: (item) => localHistory.saveTask(item),
+    listAll: () => localHistory.getTasks(),
+    delete: (id) => localHistory.deleteTask(id),
+    // Mirror the original input (not the cloud copy) so local gets its own id.
+    mirror: (_cloudResult, input) => { localHistory.saveTask(input) },
+  },
+  {
+    isLoggedIn: () => cloudHistory.isUserLoggedIn(),
+    save: (item) => cloudHistory.saveTaskToCloud(item),
+    listAll: () => cloudHistory.getTasksFromCloud(),
+    delete: (id) => cloudHistory.deleteTaskFromCloud(id),
   }
+)
 
-  return localHistory.saveTask(task)
+export async function saveTask(task: TaskInput): Promise<PracticeTask> {
+  return store.save(task)
 }
 
 export async function getTasks(): Promise<PracticeTask[]> {
-  const isAuthed = await isAuthenticated()
-
-  if (isAuthed) {
-    const cloudTasks = await cloudHistory.getTasksFromCloud()
-    if (cloudTasks.length > 0) return cloudTasks
-  }
-
-  return localHistory.getTasks()
+  return store.listAll()
 }
 
 export async function getTaskById(id: string): Promise<PracticeTask | null> {
-  const isAuthed = await isAuthenticated()
-
-  if (isAuthed) {
+  if (await cloudHistory.isUserLoggedIn()) {
     const cloudTask = await cloudHistory.getTaskByIdFromCloud(id)
     if (cloudTask) return cloudTask
   }
-
   return localHistory.getTaskById(id)
 }
 
 export async function deleteTask(id: string): Promise<boolean> {
-  const isAuthed = await isAuthenticated()
-
-  if (isAuthed) {
-    const cloudResult = await cloudHistory.deleteTaskFromCloud(id)
-    localHistory.deleteTask(id)
-    return cloudResult
-  }
-
-  return localHistory.deleteTask(id)
+  return store.delete(id)
 }
 
 export async function getTasksByType(taskType: PracticeTask["taskType"]): Promise<PracticeTask[]> {
-  const isAuthed = await isAuthenticated()
-
-  if (isAuthed) {
+  if (await cloudHistory.isUserLoggedIn()) {
     const cloudTasks = await cloudHistory.getTasksByTypeFromCloud(taskType)
     if (cloudTasks.length > 0) return cloudTasks
   }
-
   return localHistory.getTasksByType(taskType)
 }
 

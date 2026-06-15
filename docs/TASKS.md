@@ -59,6 +59,7 @@
 | Architecture deepening (C1 完成) — `submit(overrides?)` + 3 JSON-stimulus pages + 3 Mock components | Done | Added `overrides?` param to `submit()` in hook; migrated `multiple-choice`, `re-order-paragraphs`, `fill-in-the-blanks` pages + `MockMultipleChoiceReading`, `MockReOrderParagraphs`, `MockFillInTheBlanksReading`; 3 pre-existing `onClick={submit}` callers fixed. 9 pages + 6 Mock components now use the hook. tsc 0. |
 | Architecture deepening (C2) — Read Aloud backend unification | Done | Deleted `backend/routers/read_aloud.py`; removed `read_aloud` from `backend/main.py`; removed `randomEndpoint` from read-aloud page + MockReadAloud (now use `/api/pte/stimulus`); added `process_pronunciation_node` to LangGraph graph; `pron_context` field in `FeedbackState`; 294/294 backend pytest, tsc 0 |
 | Architecture deepening (C3) — Task Type metadata registry | Done | Created `src/lib/task-type-registry.ts` (15-type registry with displayName/category/stimulusFormat/TimerConfig); `src/data/task-types.json` for Python backend; `task-weakness.ts` `ALL_TASK_TYPES` now imported from registry; `pte_feedback.py` + `pte_stimulus.py` load `VALID_TASK_TYPES` from JSON file; 294/294 backend pytest, tsc 0 |
+| Architecture deepening (C4) — `createSyncedStore` factory | Done | New `src/lib/synced-store.ts`; `unified-task-history.ts` + `unified-vocabulary.ts` delegate save/listAll/delete to factory; external signatures unchanged; tsc 0, 124/124 unit tests |
 
 ## Current Test Baseline
 
@@ -81,23 +82,23 @@ DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-
 
 ## Next Phase
 
-**Resume point (2026-06-15):** Architecture Candidates 1–3 complete. Candidate 4 (speculative) is the remaining optional item from the architecture review.
+**Resume point (2026-06-15):** Architecture Candidates 1–4 are all complete.
 
 What's done:
 - C1: `usePracticeTaskRunner` hook covering 9 pages + 6 Mock components; `submit(overrides?)` for JSON-stimulus pages
-- C2: `backend/routers/read_aloud.py` deleted; `process_pronunciation_node` in `feedback_graph.py`; stimulus unified to `/api/pte/stimulus`; `pron_context` field in `FeedbackState`
-- C3: `src/lib/task-type-registry.ts` (TASK_TYPE_REGISTRY + ALL_TASK_TYPES + helpers); `src/data/task-types.json`; `task-weakness.ts` imports from registry; both Python routers load VALID_TASK_TYPES from JSON
+- C2: `backend/routers/read_aloud.py` deleted; `process_pronunciation_node` in `feedback_graph.py`; stimulus unified to `/api/pte/stimulus`
+- C3: `src/lib/task-type-registry.ts` (TASK_TYPE_REGISTRY + ALL_TASK_TYPES + helpers); `src/data/task-types.json`; both Python routers load VALID_TASK_TYPES from JSON
+- C4: `src/lib/synced-store.ts` factory; `unified-task-history.ts` + `unified-vocabulary.ts` delegate to factory; external APIs unchanged
 
 What's next:
-- [ ] **Candidate 4 (speculative)** — review `docs/architecture-review-20260615.html` for C4 scope and decide whether to implement
 - [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline (`scrape → clean → embed`) — key file: `backend/scripts/scrape_exemplars/sources/jijing.py`
 - [ ] **supabase-migration-006.sql** — `practice_tasks` table migration (file already created, needs applying to live DB)
 
 Key files to open first:
-- `src/lib/task-type-registry.ts` — registry with all 15 task types + metadata
-- `src/data/task-types.json` — canonical task type list (used by Python routers)
-- `backend/services/feedback_graph.py` — LangGraph graph with `process_pronunciation_node`
-- `docs/architecture-review-20260615.html` — C4/C5 scope
+- `src/lib/synced-store.ts` — new generic synced-store factory (C4)
+- `src/lib/unified-task-history.ts` — delegates save/listAll/delete to factory
+- `src/lib/unified-vocabulary.ts` — delegates save/listAll/delete to factory
+- `backend/scripts/scrape_exemplars/sources/jijing.py` — JijingAdapter (public code, gitignored data)
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
