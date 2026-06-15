@@ -10,7 +10,7 @@ import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
 
-type Phase = "idle" | "generating" | "ready" | "typing" | "processing" | "done" | "error"
+type Phase = "idle" | "generating" | "ready" | "listening" | "typing" | "processing" | "done" | "error"
 
 export default function WriteFromDictationPage() {
   const { t } = useTranslation()
@@ -55,7 +55,12 @@ export default function WriteFromDictationPage() {
       if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
       setPhase("typing")
     }
-    audio.play().catch(() => { setHasPlayed(true); setPhase("typing") })
+    setPhase("listening")
+    audio.play().catch(() => {
+      setHasPlayed(true)
+      setPhase("typing")
+      audioRef.current = null
+    })
   }, [audioUrl])
 
   const handleSubmit = useCallback(async () => {
@@ -66,7 +71,7 @@ export default function WriteFromDictationPage() {
 
     let result: TaskFeedback | null = null
     try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_from_dictation", stimulus: sentence, response: userText })
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_from_dictation", stimulus: sentence, response: userText }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
@@ -137,6 +142,26 @@ export default function WriteFromDictationPage() {
               {t('practiceTask.write-from-dictation.playSentence')}
             </button>
             <p className="mt-4 text-xs text-slate-400">{t('practiceTask.write-from-dictation.typingStartsAfter')}</p>
+          </div>
+        )}
+
+        {phase === "listening" && (
+          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              {[0, 1, 2, 3, 4].map(i => (
+                <span
+                  key={i}
+                  className="inline-block w-1 rounded-full bg-emerald-500"
+                  style={{
+                    height: `${16 + (i % 3) * 8}px`,
+                    animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate`,
+                  }}
+                />
+              ))}
+            </div>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.common.passagePlaying')}</p>
+            <p className="text-xs text-slate-400">{t('practiceTask.write-from-dictation.listenCarefully')}</p>
+            <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
 
