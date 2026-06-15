@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Arial, sans-serif">
+  <rect width="640" height="400" fill="#ffffff"/>
+
+  <text x="320" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a2e">Access to Safe Drinking Water by Region (2020)</text>
+  <text x="320" y="46" text-anchor="middle" font-size="11" fill="#666">Population with access to safely managed water (%)</text>
+
+  <line x1="190" y1="65" x2="580" y2="65"  stroke="#e8e8e8" stroke-width="1"/>
+  <line x1="190" y1="65" x2="190" y2="335" stroke="#333" stroke-width="1.5"/>
+  <line x1="190" y1="335" x2="580" y2="335" stroke="#333" stroke-width="1.5"/>
+
+  <line x1="268" y1="65" x2="268" y2="335" stroke="#e8e8e8" stroke-width="1"/>
+  <line x1="346" y1="65" x2="346" y2="335" stroke="#e8e8e8" stroke-width="1"/>
+  <line x1="424" y1="65" x2="424" y2="335" stroke="#e8e8e8" stroke-width="1"/>
+  <line x1="502" y1="65" x2="502" y2="335" stroke="#e8e8e8" stroke-width="1"/>
+  <line x1="580" y1="65" x2="580" y2="335" stroke="#e8e8e8" stroke-width="1"/>
+
+  <text x="190" y="350" text-anchor="middle" font-size="10" fill="#666">0</text>
+  <text x="268" y="350" text-anchor="middle" font-size="10" fill="#666">20%</text>
+  <text x="346" y="350" text-anchor="middle" font-size="10" fill="#666">40%</text>
+  <text x="424" y="350" text-anchor="middle" font-size="10" fill="#666">60%</text>
+  <text x="502" y="350" text-anchor="middle" font-size="10" fill="#666">80%</text>
+  <text x="580" y="350" text-anchor="middle" font-size="10" fill="#666">100%</text>
+
+  <!-- Europe and N.America 96% = 374px -->
+  <rect x="190" y="85"  width="374" height="28" fill="#2980b9" rx="2"/>
+  <text x="180" y="104" text-anchor="end" font-size="10" fill="#444">Europe and N.Am.</text>
+  <text x="560" y="104" font-size="10" fill="#fff" text-anchor="end">96%</text>
+
+  <!-- East Asia and Pacific 78% = 304px -->
+  <rect x="190" y="125" width="304" height="28" fill="#27ae60" rx="2"/>
+  <text x="180" y="144" text-anchor="end" font-size="10" fill="#444">E. Asia and Pacific</text>
+  <text x="490" y="144" font-size="10" fill="#fff" text-anchor="end">78%</text>
+
+  <!-- Latin America 74% = 289px -->
+  <rect x="190" y="165" width="289" height="28" fill="#27ae60" rx="2"/>
+  <text x="180" y="184" text-anchor="end" font-size="10" fill="#444">Latin America</text>
+  <text x="475" y="184" font-size="10" fill="#fff" text-anchor="end">74%</text>
+
+  <!-- South Asia 55% = 214px -->
+  <rect x="190" y="205" width="214" height="28" fill="#f39c12" rx="2"/>
+  <text x="180" y="224" text-anchor="end" font-size="10" fill="#444">South Asia</text>
+  <text x="400" y="224" font-size="10" fill="#fff" text-anchor="end">55%</text>
+
+  <!-- Middle East and N.Africa 49% = 191px -->
+  <rect x="190" y="245" width="191" height="28" fill="#e67e22" rx="2"/>
+  <text x="180" y="264" text-anchor="end" font-size="10" fill="#444">Mid. East and N.Af.</text>
+  <text x="377" y="264" font-size="10" fill="#fff" text-anchor="end">49%</text>
+
+  <!-- Sub-Saharan Africa 28% = 109px -->
+  <rect x="190" y="285" width="109" height="28" fill="#e74c3c" rx="2"/>
+  <text x="180" y="304" text-anchor="end" font-size="10" fill="#444">Sub-Sah. Africa</text>
+  <text x="295" y="304" font-size="10" fill="#fff" text-anchor="end">28%</text>
+
+  <text x="580" y="390" text-anchor="end" font-size="9" fill="#aaa">Source: WHO/UNICEF JMP, 2020</text>
+</svg>
