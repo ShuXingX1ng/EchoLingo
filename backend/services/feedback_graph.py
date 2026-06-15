@@ -31,6 +31,7 @@ class FeedbackState(TypedDict):
     stimulus: str
     response: str
     pron_assessment: Optional[dict]
+    pron_context: str
     retrieved_context: str
     primary_result: Optional[dict]
     judge_result: Optional[dict]
@@ -118,15 +119,18 @@ def _find_divergences(primary: dict, judge: dict) -> list:
     ]
 
 
+def _format_pron_context(pron: Optional[dict]) -> str:
+    if not pron:
+        return ""
+    return (
+        f"\n\nAzure Pronunciation scores — Overall: {pron.get('score')}, "
+        f"Accuracy: {pron.get('accuracyScore')}, Fluency: {pron.get('fluencyScore')}, "
+        f"Completeness: {pron.get('completenessScore')}"
+    )
+
+
 def _build_user_content(state: FeedbackState) -> str:
-    pron = state.get("pron_assessment")
-    pron_ctx = ""
-    if pron:
-        pron_ctx = (
-            f"\n\nAzure Pronunciation scores — Overall: {pron.get('score')}, "
-            f"Accuracy: {pron.get('accuracyScore')}, Fluency: {pron.get('fluencyScore')}, "
-            f"Completeness: {pron.get('completenessScore')}"
-        )
+    pron_ctx = state.get("pron_context", "")
     if state.get("stimulus"):
         return f"Stimulus:\n{state['stimulus']}\n\nCandidate response:\n{state['response'].strip()}{pron_ctx}"
     return f"Candidate response:\n{state['response'].strip()}{pron_ctx}"
@@ -139,6 +143,11 @@ def _build_user_content(state: FeedbackState) -> str:
 async def retrieve_context_node(state: FeedbackState) -> dict:
     ctx = await rag_retrieve(state["task_type"])
     return {"retrieved_context": ctx}
+
+
+async def process_pronunciation_node(state: FeedbackState) -> dict:
+    """Format the pronunciation assessment dict into a context string for the LLM nodes."""
+    return {"pron_context": _format_pron_context(state.get("pron_assessment"))}
 
 
 async def call_primary_node(state: FeedbackState) -> dict:
@@ -245,6 +254,7 @@ def _build_graph():
     builder = StateGraph(FeedbackState)
 
     builder.add_node("retrieve_context", retrieve_context_node)
+    builder.add_node("process_pronunciation", process_pronunciation_node)
     builder.add_node("call_primary", call_primary_node)
     builder.add_node("call_judge", call_judge_node)
     builder.add_node("check_divergence", check_divergence_node)
@@ -252,9 +262,11 @@ def _build_graph():
     builder.add_node("finalize", finalize_node)
 
     builder.set_entry_point("retrieve_context")
-    # Fan-out: retrieve_context → call_primary ‖ call_judge (parallel)
-    builder.add_edge("retrieve_context", "call_primary")
-    builder.add_edge("retrieve_context", "call_judge")
+    # retrieve_context → process_pronunciation (format pron data before LLM calls)
+    builder.add_edge("retrieve_context", "process_pronunciation")
+    # Fan-out: process_pronunciation → call_primary ‖ call_judge (parallel)
+    builder.add_edge("process_pronunciation", "call_primary")
+    builder.add_edge("process_pronunciation", "call_judge")
     # Fan-in: both complete → check_divergence
     builder.add_edge("call_primary", "check_divergence")
     builder.add_edge("call_judge", "check_divergence")
@@ -280,6 +292,7 @@ async def run_feedback_graph(request) -> dict:
         "stimulus": request.stimulus or "",
         "response": request.response.strip(),
         "pron_assessment": request.pronunciationAssessment,
+        "pron_context": "",
         "retrieved_context": "",
         "primary_result": None,
         "judge_result": None,

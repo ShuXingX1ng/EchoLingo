@@ -11,7 +11,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import tts, pronunciation, pte_stimulus, pte_feedback, read_aloud, word_lookup
+from routers import tts, pronunciation, pte_stimulus, pte_feedback, word_lookup
 
 # Create FastAPI app
 app = FastAPI(
@@ -39,7 +39,6 @@ app.include_router(tts.router, prefix="/api", tags=["tts"])
 app.include_router(pronunciation.router, prefix="/api", tags=["pronunciation"])
 app.include_router(pte_stimulus.router, prefix="/api", tags=["pte"])
 app.include_router(pte_feedback.router, prefix="/api", tags=["pte"])
-app.include_router(read_aloud.router, prefix="/api", tags=["read-aloud"])
 app.include_router(word_lookup.router, prefix="/api", tags=["word-lookup"])
 
 

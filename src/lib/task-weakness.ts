@@ -1,22 +1,5 @@
 import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
-
-const ALL_TASK_TYPES: PteTaskType[] = [
-  "read_aloud",
-  "repeat_sentence",
-  "answer_short_question",
-  "summarize_written_text",
-  "write_essay",
-  "personal_intro",
-  "write_from_dictation",
-  "describe_image",
-  "re_tell_lecture",
-  "fill_in_the_blanks_reading",
-  "re_order_paragraphs",
-  "multiple_choice_reading",
-  "summarize_spoken_text",
-  "fill_in_the_blanks_listening",
-  "highlight_correct_summary",
-]
+import { ALL_TASK_TYPES } from "@/lib/task-type-registry"
 
 // Overall performance score from a single task (0–100).
 // Uses actual dimension scores when available (Phase 6); falls back to strengths/weaknesses heuristic.

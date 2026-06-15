@@ -57,6 +57,8 @@
 | Architecture deepening (Candidate 1) — migrate all 9 text-input practice pages to `loadStimulusText` | Done | All 9 text-input pages now use `loadStimulusText`; manual cache/API/store blocks removed; `practice-mode.ts` consumed only by `stimulus-loader.ts`; tsc 0 |
 | Architecture deepening (C1 收尾) — `usePracticeTaskRunner` hook + 3 page + 3 Mock migrations | Done | Hook encapsulates phase SM / timer / stimulus / feedback / saveTask / audio recording. `write-essay`, `summarize-written-text`, `read-aloud` pages migrated; `MockWriteEssay`, `MockSummarizeWrittenText`, `MockReadAloud` migrated with `savedTask`→`onComplete`. JSON-stimulus + TTS-stimulus pages remain self-managed. tsc 0. |
 | Architecture deepening (C1 完成) — `submit(overrides?)` + 3 JSON-stimulus pages + 3 Mock components | Done | Added `overrides?` param to `submit()` in hook; migrated `multiple-choice`, `re-order-paragraphs`, `fill-in-the-blanks` pages + `MockMultipleChoiceReading`, `MockReOrderParagraphs`, `MockFillInTheBlanksReading`; 3 pre-existing `onClick={submit}` callers fixed. 9 pages + 6 Mock components now use the hook. tsc 0. |
+| Architecture deepening (C2) — Read Aloud backend unification | Done | Deleted `backend/routers/read_aloud.py`; removed `read_aloud` from `backend/main.py`; removed `randomEndpoint` from read-aloud page + MockReadAloud (now use `/api/pte/stimulus`); added `process_pronunciation_node` to LangGraph graph; `pron_context` field in `FeedbackState`; 294/294 backend pytest, tsc 0 |
+| Architecture deepening (C3) — Task Type metadata registry | Done | Created `src/lib/task-type-registry.ts` (15-type registry with displayName/category/stimulusFormat/TimerConfig); `src/data/task-types.json` for Python backend; `task-weakness.ts` `ALL_TASK_TYPES` now imported from registry; `pte_feedback.py` + `pte_stimulus.py` load `VALID_TASK_TYPES` from JSON file; 294/294 backend pytest, tsc 0 |
 
 ## Current Test Baseline
 
@@ -64,34 +66,38 @@
 |-------|----------------|
 | Frontend unit | 12 files / 124 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 288 tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Backend | 294 tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality + 6 new graph tests) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
-## Current Status (as of 2026-06-14)
+## Current Status (as of 2026-06-15)
 
-Migration 005 + Phase Data-4 are **fully complete**. Supabase now has **14,005 rows** across all **14 task types** (all 9 text/audio types + all 5 JSON task types). `JijingAdapter` infrastructure is in place — data population deferred until recall data is available.
+Architecture Candidates 1, 2, and 3 are **fully complete**.
+
+- C1: `usePracticeTaskRunner` — 9 practice pages + 6 Mock components migrated; `submit(overrides?)` contract in place.
+- C2: Read Aloud backend unified — `read_aloud.py` deleted; `process_pronunciation_node` added to LangGraph graph; read-aloud stimulus now served by `/api/pte/stimulus`.
+- C3: Task Type registry — `src/lib/task-type-registry.ts` is the single metadata source; `src/data/task-types.json` consumed by Python backend to populate `VALID_TASK_TYPES` dynamically.
+
+DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-accelerated.
 
 ## Next Phase
 
-**Resume point (2026-06-15):** Architecture Candidate 1 fully complete. All compatible practice pages + Mock components now use `usePracticeTaskRunner`. Remaining out-of-scope pages (TTS-audio-stimulus, fixed-prompt) stay self-managed.
+**Resume point (2026-06-15):** Architecture Candidates 1–3 complete. Candidate 4 (speculative) is the remaining optional item from the architecture review.
 
 What's done:
-- `src/hooks/usePracticeTaskRunner.ts` — `submit(overrides?)` added; hook covers 9 pages + 6 Mock components
-- All text-stimulus pages: `write-essay`, `summarize-written-text` (text), `read-aloud` (audio)
-- All JSON-stimulus pages: `multiple-choice`, `re-order-paragraphs`, `fill-in-the-blanks` (local timer + parsed state; hook provides phase/stimulus/feedback/generate/submit/savedTask)
-- Corresponding Mock components: `MockWriteEssay`, `MockSummarizeWrittenText`, `MockReadAloud`, `MockMultipleChoiceReading`, `MockReOrderParagraphs`, `MockFillInTheBlanksReading`
-- TTS-stimulus pages (fill-in-the-blanks-listening, highlight-correct-summary, summarize-spoken-text, write-from-dictation) and personal-intro/repeat-sentence/answer-short-question remain self-managed — incompatible with hook's `generate()`
-- DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-accelerated
+- C1: `usePracticeTaskRunner` hook covering 9 pages + 6 Mock components; `submit(overrides?)` for JSON-stimulus pages
+- C2: `backend/routers/read_aloud.py` deleted; `process_pronunciation_node` in `feedback_graph.py`; stimulus unified to `/api/pte/stimulus`; `pron_context` field in `FeedbackState`
+- C3: `src/lib/task-type-registry.ts` (TASK_TYPE_REGISTRY + ALL_TASK_TYPES + helpers); `src/data/task-types.json`; `task-weakness.ts` imports from registry; both Python routers load VALID_TASK_TYPES from JSON
 
 What's next:
+- [ ] **Candidate 4 (speculative)** — review `docs/architecture-review-20260615.html` for C4 scope and decide whether to implement
 - [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline (`scrape → clean → embed`) — key file: `backend/scripts/scrape_exemplars/sources/jijing.py`
-- [ ] **Expand exemplar bank** — run WikipediaAdapter with `--limit` increase for under-represented task types; check via `SELECT task_type, count(*) FROM stimulus_exemplars GROUP BY task_type`
 - [ ] **supabase-migration-006.sql** — `practice_tasks` table migration (file already created, needs applying to live DB)
 
 Key files to open first:
-- `src/hooks/usePracticeTaskRunner.ts` — full hook with `submit(overrides?)` contract
-- `backend/scripts/scrape_exemplars/sources/jijing.py` — JijingAdapter (public code, private data pattern)
-- `backend/scripts/scrape_exemplars/__main__.py` — pipeline entry point
+- `src/lib/task-type-registry.ts` — registry with all 15 task types + metadata
+- `src/data/task-types.json` — canonical task type list (used by Python routers)
+- `backend/services/feedback_graph.py` — LangGraph graph with `process_pronunciation_node`
+- `docs/architecture-review-20260615.html` — C4/C5 scope
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus

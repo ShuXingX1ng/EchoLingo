@@ -1,0 +1,19 @@
+{
+  "taskTypes": [
+    "read_aloud",
+    "repeat_sentence",
+    "answer_short_question",
+    "personal_intro",
+    "describe_image",
+    "re_tell_lecture",
+    "summarize_written_text",
+    "write_essay",
+    "write_from_dictation",
+    "fill_in_the_blanks_reading",
+    "re_order_paragraphs",
+    "multiple_choice_reading",
+    "summarize_spoken_text",
+    "fill_in_the_blanks_listening",
+    "highlight_correct_summary"
+  ]
+}

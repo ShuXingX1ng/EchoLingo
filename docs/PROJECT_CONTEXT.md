@@ -18,7 +18,7 @@ Target users:
 | Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 288 backend tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality) |
+| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 294 backend tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality + 6 new graph tests) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
@@ -48,7 +48,7 @@ All third-party secrets (`LLM_API_KEY`, `AZURE_SPEECH_KEY`/`REGION`,
 | Path | Target end state | Current state |
 |------|------------------|---------------|
 | `src/app/api/pte/stimulus` · `pte/feedback` | Deleted | **Done** — routes deleted; all 42 callers now use `apiPost` via `api-client.ts` |
-| `src/app/api/read-aloud/stimulus` · `read-aloud/feedback` | Deleted | **Done** — routes deleted; `practice/read-aloud/page.tsx` + `MockReadAloud.tsx` now use `apiPost` via `api-client.ts` |
+| `src/app/api/read-aloud/stimulus` · `read-aloud/feedback` | Deleted | **Done** — Next routes deleted; `backend/routers/read_aloud.py` also deleted (C2); `practice/read-aloud/page.tsx` + `MockReadAloud.tsx` now use `/api/pte/stimulus` + `/api/pte/feedback` |
 | `src/app/api/tts` · `pronunciation` | Deleted | **Done** — routes deleted; callers migrated to `apiPostBlob`/`apiPostForm` via `api-client.ts` |
 | `src/app/api/word-lookup` | Deleted | **Done** — route deleted; callers migrated to `apiPost` via `api-client.ts` |
 | Python FastAPI (`backend/routers/*`) | Authoritative | Already implements all of the above via LangGraph + RAG + LLM-as-Judge (ADRs 0005, 0006) |
@@ -140,7 +140,9 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
 | `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |
 | `backend/services/rag.py` | `retrieve_context(task_type) -> str`; queries `rubric_chunks` with task_type filter; silent fallback | computed |
-| `backend/services/feedback_graph.py` | LangGraph `StateGraph` for the PTE feedback pipeline; `FeedbackState` TypedDict; nodes: `retrieve_context`, `call_primary`, `call_judge`, `check_divergence`, `retry_primary`, `finalize`; exposes `run_feedback_graph(request)->dict` | computed |
+| `src/lib/task-type-registry.ts` | Single source of truth for all 15 PTE task type metadata (`displayName`, `category`, `stimulusFormat`, `TimerConfig`); exports `TASK_TYPE_REGISTRY`, `ALL_TASK_TYPES`, `getTaskTypeMetadata`, `getTaskTypesByCategory` | static |
+| `src/data/task-types.json` | Canonical task type slug list consumed by Python backend routers to populate `VALID_TASK_TYPES`; generated from `task-type-registry.ts` and committed to git | static JSON |
+| `backend/services/feedback_graph.py` | LangGraph `StateGraph` for the PTE feedback pipeline; `FeedbackState` TypedDict; nodes: `retrieve_context`, `process_pronunciation` (formats pron scores → `pron_context` string), `call_primary`, `call_judge`, `check_divergence`, `retry_primary`, `finalize`; graph order: retrieve → process_pron → (primary ‖ judge) → divergence → …; exposes `run_feedback_graph(request)->dict` | computed |
 | `backend/data/rubrics/` | Hand-written YAML rubric files — one per PTE task type (15/15 complete); each file has `task_type`, `description`, `dimensions[]` (name/description/criteria) and `scoring_notes` | static YAML |
 | `backend/scripts/seed_rubrics.py` | One-time script: reads rubric YAMLs → embeds → upserts to Supabase `rubric_chunks` | — |
 | `src/lib/recordings.ts` | Audio recordings | IndexedDB |
@@ -184,8 +186,6 @@ browser via `NEXT_PUBLIC_API_BASE_URL`.
 |----------|---------|---------|----------|
 | `POST /api/tts` | Azure TTS | `{ text, voice, rate }` | WAV audio stream |
 | `POST /api/pronunciation` | Azure pronunciation assessment | FormData audio + reference text | `PronunciationAssessmentResult` JSON |
-| `POST /api/read-aloud/stimulus` | Generate a PTE Read Aloud passage (50–70 words) | — | `{ text: string }` |
-| `POST /api/read-aloud/feedback` | AI oral fluency + pronunciation feedback for Read Aloud | `{ stimulus, transcript, pronunciationAssessment? }` | `TaskFeedback` JSON |
 | `POST /api/pte/stimulus` | Generate stimulus for any PTE task type (Exemplar-grounded when a bank exists, else pure-AI; ADR 0008) | `{ taskType, mode?: random\|targeted\|theme, topic?, targeting?, verbatim? }` | `{ text: string }` |
 | `POST /api/pte/feedback` | AI feedback for any PTE task type | `{ taskType, stimulus, response, pronunciationAssessment? }` | `TaskFeedback` JSON |
 | `POST /api/word-lookup` | Translate a selected word/phrase (dictionary-first, LLM fallback) | `{ query: string }` | `WordLookupResult` JSON (`{ source, text, phonetic, entries, tags }`) |
