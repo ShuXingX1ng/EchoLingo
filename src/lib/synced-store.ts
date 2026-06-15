@@ -25,39 +25,54 @@ export interface SyncedStore<T, TInput> {
   delete(id: string): Promise<boolean>
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("cloud_timeout")), ms)),
+  ])
+}
+
 export function createSyncedStore<T, TInput>(
   local: LocalAdapter<T, TInput>,
   cloud: CloudAdapter<T, TInput>
 ): SyncedStore<T, TInput> {
   return {
     async save(item) {
-      if (await cloud.isLoggedIn()) {
-        try {
-          const result = await cloud.save(item)
+      try {
+        if (await withTimeout(cloud.isLoggedIn(), 5000)) {
+          const result = await withTimeout(cloud.save(item), 8000)
           if (result) {
             local.mirror(result, item)
             return result
           }
-        } catch (error) {
-          console.warn("Cloud save failed, falling back to local:", error)
         }
+      } catch (error) {
+        console.warn("Cloud save failed, falling back to local:", error)
       }
       return local.save(item)
     },
 
     async listAll() {
-      if (await cloud.isLoggedIn()) {
-        const results = await cloud.listAll()
-        if (results.length > 0) return results
+      try {
+        if (await withTimeout(cloud.isLoggedIn(), 5000)) {
+          const results = await withTimeout(cloud.listAll(), 8000)
+          if (results.length > 0) return results
+        }
+      } catch {
+        // cloud unreachable or timed out — fall through to local
       }
       return local.listAll()
     },
 
     async delete(id) {
-      if (await cloud.isLoggedIn()) {
-        const ok = await cloud.delete(id)
-        local.delete(id)
-        return ok
+      try {
+        if (await withTimeout(cloud.isLoggedIn(), 5000)) {
+          const ok = await withTimeout(cloud.delete(id), 8000)
+          local.delete(id)
+          return ok
+        }
+      } catch {
+        // fall through to local-only delete
       }
       return local.delete(id)
     },
