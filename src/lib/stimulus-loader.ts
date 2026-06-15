@@ -11,6 +11,7 @@ interface LoadStimulusOptions {
    * { taskType } when omitted.
    */
   randomEndpoint?: string
+  timeoutMs?: number
 }
 
 /**
@@ -21,7 +22,7 @@ interface LoadStimulusOptions {
  *
  * Must be called in a browser context (reads window.location.search).
  */
-export async function loadStimulusText({ taskType, randomEndpoint }: LoadStimulusOptions): Promise<string> {
+export async function loadStimulusText({ taskType, randomEndpoint, timeoutMs }: LoadStimulusOptions): Promise<string> {
   const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
   const isSeeded = mode !== "random"
   const extras = buildStimulusExtras(mode, topic)
@@ -32,15 +33,16 @@ export async function loadStimulusText({ taskType, randomEndpoint }: LoadStimulu
   }
 
   let text: string
+  const opts = timeoutMs ? { timeoutMs } : undefined
 
   if (isSeeded) {
-    const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType, ...extras })
+    const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType, ...extras }, opts)
     text = data.text
   } else if (randomEndpoint) {
-    const data = await apiPost<{ text: string }>(randomEndpoint, {})
+    const data = await apiPost<{ text: string }>(randomEndpoint, {}, opts)
     text = data.text
   } else {
-    const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType })
+    const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType }, opts)
     text = data.text
   }
 

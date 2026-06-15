@@ -50,7 +50,7 @@ export default function ReTellLecturePage() {
 
     let fb: TaskFeedback
     try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: lectureText, response: tx })
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: lectureText, response: tx }, { timeoutMs: 90000 })
     } catch {
       fb = { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
     }
@@ -94,7 +94,7 @@ export default function ReTellLecturePage() {
       const text = await loadStimulusText({ taskType: "re_tell_lecture" })
       setLectureText(text)
 
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setPrepSeconds(PREP_TIME)

@@ -91,19 +91,20 @@ function handleFetchError(err: unknown) {
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit & { timeoutMs?: number } = {}
 ): Promise<T> {
+  const { timeoutMs = 15000, ...fetchOptions } = options
   circuitBreaker.checkState();
   const url = getApiUrl(endpoint)
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     const response = await fetch(url, {
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
     })
     clearTimeout(timeoutId)
 
@@ -131,7 +132,7 @@ export async function apiRequest<T>(
 export async function apiPost<T>(
   endpoint: string,
   body: unknown,
-  options: RequestInit = {}
+  options: RequestInit & { timeoutMs?: number } = {}
 ): Promise<T> {
   return apiRequest<T>(endpoint, {
     method: "POST",
@@ -188,21 +189,22 @@ export async function apiPostForm<T>(
 export async function apiPostBlob(
   endpoint: string,
   body: unknown,
-  options: RequestInit = {}
+  options: RequestInit & { timeoutMs?: number } = {}
 ): Promise<Blob> {
+  const { timeoutMs = 15000, ...fetchOptions } = options
   circuitBreaker.checkState();
   const url = getApiUrl(endpoint)
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
     })
     clearTimeout(timeoutId)
 
