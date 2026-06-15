@@ -4,10 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
 import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 240 // 4 minutes
@@ -18,7 +15,6 @@ type ParsedStimulus = {
   options: string[]
   correct: number
 }
-type Phase = "idle" | "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -47,103 +43,62 @@ function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
   const selectedText = p.options[selected]
   const correctText = p.options[p.correct]
   const isCorrect = selected === p.correct
-  if (isCorrect) {
-    return `Selected: ${selectedText} ✓ (correct)`
-  }
+  if (isCorrect) return `Selected: ${selectedText} ✓ (correct)`
   return `Selected: ${selectedText} ✗ (incorrect — correct answer: ${correctText})`
 }
 
 export default function MultipleChoicePage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
+  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
+    taskType: "multiple_choice_reading",
+    responseKind: "text",
+  })
+
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
   const [selected, setSelected] = useState<number | null>(null)
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
   const [seconds, setSeconds] = useState(TIME_LIMIT)
 
-  const startedAtRef = useRef("")
+  const parsedRef = useRef<ParsedStimulus | null>(null)
+  const selectedRef = useRef<number | null>(null)
+  const submittedResponseRef = useRef("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
 
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
+  useEffect(() => { selectedRef.current = selected }, [selected])
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
+  // Parse JSON stimulus when hook loads it
   useEffect(() => {
-    if (phase !== "ready") return
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelected(null)
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
+
+  const handleSubmit = useCallback(async () => {
+    const p = parsedRef.current
+    if (!p) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    const finalSelected = selectedRef.current ?? 0
+    const feedbackStimulus = buildStimulusForFeedback(p)
+    const feedbackResponse = buildResponseForFeedback(p, finalSelected)
+    submittedResponseRef.current = feedbackResponse
+    await submit({ feedbackStimulus, feedbackResponse })
+  }, [submit])
+
+  // Timer while the user is answering
+  useEffect(() => {
+    if (phase !== "writing") return
     timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
       })
     }, 1000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setSelected(null); setSeconds(TIME_LIMIT)
-    try {
-      const raw = await loadStimulusText({ taskType: "multiple_choice_reading" })
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-      setRawStimulus(raw)
-      setParsed(p)
-      startedAtRef.current = new Date().toISOString()
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const handleSubmit = useCallback(async () => {
-    if (parsed === null || selected === null) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
-
-    const stimulusForFeedback = buildStimulusForFeedback(parsed)
-    const responseForFeedback = buildResponseForFeedback(parsed, selected)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "multiple_choice_reading",
-        stimulus: stimulusForFeedback,
-        response: responseForFeedback,
-      })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "multiple_choice_reading",
-        stimulus: { kind: "text", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [parsed, selected, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -167,28 +122,14 @@ export default function MultipleChoicePage() {
           </p>
         </div>
 
-        {phase === "idle" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-[var(--text-secondary)] mb-8">
-              {t('practiceTask.multiple-choice.idleDesc')}
-            </p>
-            <button
-              onClick={generate}
-              className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            >
-              {t('practiceTask.multiple-choice.getQuestion')}
-            </button>
-          </div>
-        )}
-
-        {phase === "generating" && (
+        {(phase === "idle" || phase === "generating") && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.multiple-choice.generating')}</p>
           </div>
         )}
 
-        {phase === "ready" && parsed && (
+        {phase === "writing" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.passage')}</p>
@@ -245,13 +186,13 @@ export default function MultipleChoicePage() {
           </div>
         )}
 
-        {phase === "done" && feedback && parsed && selected !== null && (
+        {phase === "done" && feedback && parsed && (
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
               stimulusLabel={t('practiceTask.multiple-choice.passageQuestion')}
-              responseText={buildResponseForFeedback(parsed, selected)}
+              responseText={submittedResponseRef.current}
               responseLabel={t('practiceTask.multiple-choice.yourAnswer')}
             />
             <div className="flex gap-3 justify-center">

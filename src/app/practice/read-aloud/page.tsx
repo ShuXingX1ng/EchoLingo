@@ -1,23 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
 import PronunciationFeedback from "@/components/PronunciationFeedback"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
 import { useTranslation } from "@/lib/i18n"
-import { saveTask } from "@/lib/unified-task-history"
-import { blobToWav } from "@/lib/wav-encoder"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import { apiPost, apiPostForm } from "@/lib/api-client"
-import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 
 const PREP_TIME = 35
 const RECORD_TIME = 40
 const MIN_REC_SECONDS = 5
-
-type Phase = "idle" | "generating" | "ready" | "recording" | "processing" | "done" | "error"
 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 80
@@ -34,136 +26,18 @@ function ScoreBadge({ score }: { score: number }) {
 
 export default function ReadAloudPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [stimulus, setStimulus] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [errorMsg, setErrorMsg] = useState("")
-  const [prepSeconds, setPrepSeconds] = useState(PREP_TIME)
-  const [transcript, setTranscript] = useState("")
-
-  const stimulusRef = useRef("")
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    setTranscript(tx)
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    let wavBlob: Blob | null = null
-    if (audioBlob.size > 0) {
-      try { wavBlob = await blobToWav(audioBlob) } catch { /* Azure optional */ }
-    }
-
-    const azurePromise: Promise<PronunciationAssessmentResult | null> = wavBlob
-      ? (async () => {
-          try {
-            const form = new FormData()
-            form.append("audio", wavBlob!, "recording.wav")
-            form.append("referenceText", stimulusRef.current)
-            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
-          } catch { return null }
-        })()
-      : Promise.resolve(null)
-
-    const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
-      try {
-        return await apiPost<TaskFeedback>("/api/read-aloud/feedback", {
-          stimulus: stimulusRef.current,
-          transcript: tx,
-        })
-      } catch { return null }
-    })()
-
-    const [pronunciationResult, feedbackResult] = await Promise.all([azurePromise, feedbackPromise])
-
-    const mergedFeedback: TaskFeedback = feedbackResult ?? {
-      summary: "Feedback could not be generated. Please try again.",
-      strengths: [], weaknesses: [], suggestions: [],
-    }
-    if (pronunciationResult) {
-      mergedFeedback.pronunciationAssessment = pronunciationResult
-      if (tx === "[transcript not captured]" && pronunciationResult.words.length > 0) {
-        setTranscript(pronunciationResult.words.map(w => w.word).join(" "))
-      }
-    }
-
-    setFeedback(mergedFeedback)
-
-    try {
-      await saveTask({
-        taskType: "read_aloud",
-        stimulus: { kind: "text", content: stimulusRef.current },
-        response: { kind: "audio", content: tx },
-        feedback: mergedFeedback,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch (err) { console.warn("Failed to save task:", err) }
-
-    setPhase("done")
-  }, [])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    minSeconds: MIN_REC_SECONDS,
-    onComplete: processAudio,
-    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  const {
+    phase, stimulus, seconds, error: errorMsg, feedback, transcript,
+    recSeconds, canStop, startRecording, stopRecording, generate,
+  } = usePracticeTaskRunner({
+    taskType: "read_aloud",
+    responseKind: "audio",
+    prepTime: PREP_TIME,
+    recordTime: RECORD_TIME,
+    minRecSeconds: MIN_REC_SECONDS,
+    withPronunciation: true,
+    randomEndpoint: "/api/read-aloud/stimulus",
   })
-
-  useEffect(() => () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }, [])
-
-  const generateStimulus = useCallback(async () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    setPhase("generating")
-    setErrorMsg("")
-    setFeedback(null)
-    setTranscript("")
-    setPrepSeconds(PREP_TIME)
-
-    try {
-      const text = await loadStimulusText({
-        taskType: "read_aloud",
-        randomEndpoint: "/api/read-aloud/stimulus",
-      })
-      stimulusRef.current = text
-      setStimulus(text)
-      setPhase("ready")
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : t("practiceTask.read-aloud.errorGenerate"))
-      setPhase("error")
-    }
-  }, [t])
-
-  // Auto-generate on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generateStimulus() }, [])
-
-  // Prep countdown — starts when phase becomes "ready"
-  useEffect(() => {
-    if (phase !== "ready") return
-    prepTimerRef.current = setInterval(() => {
-      setPrepSeconds(s => {
-        if (s <= 1) { clearInterval(prepTimerRef.current!); recording.start(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
-
-  const handleStartNow = () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    recording.start()
-  }
-
-  // Sync phase with recording session state
-  useEffect(() => {
-    if (phase === "ready" && recording.recSeconds < RECORD_TIME) setPhase("recording")
-  }, [phase, recording.recSeconds])
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -192,7 +66,7 @@ export default function ReadAloudPage() {
               {t("practiceTask.read-aloud.idleDesc")}
             </p>
             <button
-              onClick={generateStimulus}
+              onClick={generate}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,14 +91,14 @@ export default function ReadAloudPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {t("practiceTask.common.preparation")}
                 </p>
-                <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
+                <CountdownRing seconds={seconds} total={PREP_TIME} />
               </div>
               <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">{stimulus}</p>
             </div>
             <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <p>{t("practiceTask.common.recordingStartsAuto")}</p>
               <button
-                onClick={handleStartNow}
+                onClick={startRecording}
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
               >
                 {t("practiceTask.common.startNow")}
@@ -243,21 +117,21 @@ export default function ReadAloudPage() {
                     {t("practiceTask.common.recording")}
                   </p>
                 </div>
-                <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={72} />
+                <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={72} />
               </div>
               <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">{stimulus}</p>
             </div>
             <div className="text-center">
               <button
-                onClick={recording.stop}
-                disabled={!recording.canStop}
+                onClick={stopRecording}
+                disabled={!canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
-                {!recording.canStop
-                  ? t("practiceTask.common.holdOn", { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!canStop
+                  ? t("practiceTask.common.holdOn", { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
                   : t("practiceTask.common.stopRecording")}
               </button>
             </div>
@@ -383,7 +257,7 @@ export default function ReadAloudPage() {
 
             <div className="flex gap-3 justify-center pt-2">
               <button
-                onClick={generateStimulus}
+                onClick={generate}
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
               >
                 {t("practiceTask.common.practiceAgain")}
@@ -402,7 +276,7 @@ export default function ReadAloudPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{errorMsg}</p>
             <button
-              onClick={generateStimulus}
+              onClick={generate}
               className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
             >
               {t("practiceTask.common.tryAgain")}

@@ -4,17 +4,13 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
 import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 420 // 7 minutes
 
 type BlankDef = { options: string[]; correct: number }
 type ParsedStimulus = { passage: string; blanks: BlankDef[] }
-type Phase = "idle" | "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -57,103 +53,61 @@ function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | 
 
 export default function FillInTheBlanksPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
+  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
+    taskType: "fill_in_the_blanks_reading",
+    responseKind: "text",
+  })
+
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
   const [selections, setSelections] = useState<(string | null)[]>([])
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
   const [seconds, setSeconds] = useState(TIME_LIMIT)
 
-  const startedAtRef = useRef("")
+  const parsedRef = useRef<ParsedStimulus | null>(null)
+  const selectionsRef = useRef<(string | null)[]>([])
+  const submittedResponseRef = useRef("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
 
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
+  useEffect(() => { selectionsRef.current = selections }, [selections])
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
+  // Parse JSON stimulus when hook loads it
   useEffect(() => {
-    if (phase !== "ready") return
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelections(new Array(p.blanks.length).fill(null))
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
+
+  const handleSubmit = useCallback(async () => {
+    const p = parsedRef.current
+    if (!p) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    const feedbackStimulus = buildStimulusForFeedback(p)
+    const feedbackResponse = buildResponseForFeedback(p, selectionsRef.current)
+    submittedResponseRef.current = feedbackResponse
+    await submit({ feedbackStimulus, feedbackResponse })
+  }, [submit])
+
+  // Timer while the user is answering
+  useEffect(() => {
+    if (phase !== "writing") return
     timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
       })
     }, 1000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setSelections([]); setSeconds(TIME_LIMIT)
-    try {
-      const raw = await loadStimulusText({ taskType: "fill_in_the_blanks_reading" })
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-      setRawStimulus(raw)
-      setParsed(p)
-      setSelections(new Array(p.blanks.length).fill(null))
-      startedAtRef.current = new Date().toISOString()
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const handleSubmit = useCallback(async () => {
-    if (!parsed) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
-
-    const stimulusForFeedback = buildStimulusForFeedback(parsed)
-    const responseForFeedback = buildResponseForFeedback(parsed, selections)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "fill_in_the_blanks_reading",
-        stimulus: stimulusForFeedback,
-        response: responseForFeedback,
-      })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "fill_in_the_blanks_reading",
-        stimulus: { kind: "text", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [parsed, selections, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 60
   const allAnswered = parsed ? selections.every((s) => s !== null) : false
-
   const segments = parsed ? splitPassage(parsed.passage) : []
 
   return (
@@ -173,28 +127,14 @@ export default function FillInTheBlanksPage() {
           </p>
         </div>
 
-        {phase === "idle" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-[var(--text-secondary)] mb-8">
-              {t('practiceTask.fill-in-the-blanks.idleDesc')}
-            </p>
-            <button
-              onClick={generate}
-              className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            >
-              {t('practiceTask.fill-in-the-blanks.getPassage')}
-            </button>
-          </div>
-        )}
-
-        {phase === "generating" && (
+        {(phase === "idle" || phase === "generating") && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks.generating')}</p>
           </div>
         )}
 
-        {phase === "ready" && parsed && (
+        {phase === "writing" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.passage')}</p>
@@ -254,7 +194,7 @@ export default function FillInTheBlanksPage() {
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
               stimulusLabel={t('practiceTask.common.passage')}
-              responseText={buildResponseForFeedback(parsed, selections)}
+              responseText={submittedResponseRef.current}
               responseLabel={t('practiceTask.fill-in-the-blanks.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">
