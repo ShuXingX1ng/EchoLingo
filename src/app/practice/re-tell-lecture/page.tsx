@@ -86,6 +86,7 @@ export default function ReTellLecturePage() {
 
   const generate = useCallback(async () => {
     if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
     setError(""); setFeedback(null); setTranscript("")
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }

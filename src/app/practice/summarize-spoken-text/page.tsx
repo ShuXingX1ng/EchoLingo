@@ -44,6 +44,7 @@ export default function SummarizeSpokenTextPage() {
   }, [phase])
 
   const generate = useCallback(async () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
     setError(""); setFeedback(null); setSummary(""); setPlayed(false); setSeconds(TIME_LIMIT)
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }

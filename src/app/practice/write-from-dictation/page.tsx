@@ -26,6 +26,7 @@ export default function WriteFromDictationPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const generate = useCallback(async () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
     setError(""); setFeedback(null); setUserText(""); setHasPlayed(false)
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
