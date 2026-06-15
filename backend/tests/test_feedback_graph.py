@@ -40,6 +40,7 @@ def _base_state(**overrides) -> fg.FeedbackState:
         "stimulus": "The quick brown fox.",
         "response": "The quick brown fox.",
         "pron_assessment": None,
+        "pron_context": "",
         "retrieved_context": "",
         "primary_result": None,
         "judge_result": None,
@@ -92,6 +93,28 @@ async def test_retrieve_context_node_returns_empty_on_error():
         result = await fg.retrieve_context_node(state)
 
     assert result == {"retrieved_context": ""}
+
+
+# ---------------------------------------------------------------------------
+# process_pronunciation_node
+# ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_process_pronunciation_node_no_assessment():
+    state = _base_state(pron_assessment=None)
+    result = await fg.process_pronunciation_node(state)
+    assert result == {"pron_context": ""}
+
+
+@pytest.mark.anyio
+async def test_process_pronunciation_node_formats_scores():
+    pron = {"score": 85, "accuracyScore": 82, "fluencyScore": 88, "completenessScore": 91}
+    state = _base_state(pron_assessment=pron)
+    result = await fg.process_pronunciation_node(state)
+    ctx = result["pron_context"]
+    assert "85" in ctx
+    assert "82" in ctx
+    assert "Azure Pronunciation scores" in ctx
 
 
 # ---------------------------------------------------------------------------

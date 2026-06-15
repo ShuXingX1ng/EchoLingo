@@ -36,7 +36,6 @@ export default function ReadAloudPage() {
     recordTime: RECORD_TIME,
     minRecSeconds: MIN_REC_SECONDS,
     withPronunciation: true,
-    randomEndpoint: "/api/read-aloud/stimulus",
   })
 
   return (

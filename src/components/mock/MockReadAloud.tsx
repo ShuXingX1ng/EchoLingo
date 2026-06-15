@@ -18,7 +18,6 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
     prepTime: PREP_TIME,
     recordTime: RECORD_TIME,
     withPronunciation: true,
-    randomEndpoint: "/api/read-aloud/stimulus",
   })
 
   useEffect(() => {

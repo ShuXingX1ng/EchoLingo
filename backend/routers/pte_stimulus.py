@@ -4,6 +4,9 @@ PTE Stimulus API Router
 POST /api/pte/stimulus — generate stimulus for any PTE task type.
 """
 
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from models.schemas import PteStimulusRequest, PteStimulusResponse
 from services.prompt_loader import prompts
@@ -11,12 +14,8 @@ from services.stimulus_service import generate_stimulus
 
 router = APIRouter()
 
-VALID_TASK_TYPES = {
-    "read_aloud", "repeat_sentence", "answer_short_question", "summarize_written_text",
-    "write_essay", "personal_intro", "write_from_dictation", "describe_image", "re_tell_lecture",
-    "fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading",
-    "summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary",
-}
+_registry_path = Path(__file__).parent.parent.parent / "src" / "data" / "task-types.json"
+VALID_TASK_TYPES: set[str] = set(json.loads(_registry_path.read_text())["taskTypes"])
 
 
 @router.post("/pte/stimulus", response_model=PteStimulusResponse)
