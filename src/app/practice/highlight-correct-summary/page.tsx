@@ -67,7 +67,10 @@ export default function HighlightCorrectSummaryPage() {
   const submitRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+  }, [])
 
   useEffect(() => {
     if (phase !== "selecting") return

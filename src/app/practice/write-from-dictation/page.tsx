@@ -25,6 +25,10 @@ export default function WriteFromDictationPage() {
   const startedAtRef = useRef("")
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  useEffect(() => () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+  }, [])
+
   const generate = useCallback(async () => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
