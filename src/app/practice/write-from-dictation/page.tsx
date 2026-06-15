@@ -56,10 +56,12 @@ export default function WriteFromDictationPage() {
       setPhase("typing")
     }
     setPhase("listening")
-    audio.play().catch(() => {
-      setHasPlayed(true)
-      setPhase("typing")
-      audioRef.current = null
+    requestAnimationFrame(() => {
+      audio.play().catch(() => {
+        setHasPlayed(true)
+        setPhase("typing")
+        audioRef.current = null
+      })
     })
   }, [audioUrl])
 

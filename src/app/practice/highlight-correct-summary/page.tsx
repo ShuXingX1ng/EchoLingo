@@ -116,9 +116,11 @@ export default function HighlightCorrectSummaryPage() {
       setSeconds(TIME_LIMIT)
     }
     setPhase("listening")
-    audio.play().catch(() => {
-      setPhase("ready")
-      audioRef.current = null
+    requestAnimationFrame(() => {
+      audio.play().catch(() => {
+        setPhase("ready")
+        audioRef.current = null
+      })
     })
   }, [audioUrl])
 
