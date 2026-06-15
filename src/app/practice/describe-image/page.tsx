@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import Image from "next/image"
+
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
@@ -47,7 +47,7 @@ export default function DescribeImagePage() {
 
     let fb: TaskFeedback
     try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx })
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx }, { timeoutMs: 90000 })
     } catch {
       fb = { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
     }
@@ -87,7 +87,7 @@ export default function DescribeImagePage() {
     setTranscript("")
     setImageError(false)
     setPrepSeconds(PREP_TIME)
-    setImage(getRandomImage())
+    setImage(prev => getRandomImage(prev?.url))
     setPhase("ready")
   }, [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,8 +168,8 @@ export default function DescribeImagePage() {
                 </div>
               ) : (
                 <div className="relative w-full" style={{ minHeight: 240 }}>
-                  <Image src={image.url} alt={image.topic} width={640} height={400}
-                    className="w-full h-auto object-contain" onError={() => setImageError(true)} unoptimized />
+                  <img src={image.url} alt={image.topic}
+                    className="w-full h-auto object-contain" onError={() => setImageError(true)} />
                 </div>
               )}
             </div>
@@ -202,8 +202,8 @@ export default function DescribeImagePage() {
                 </div>
               ) : (
                 <div className="relative w-full" style={{ minHeight: 240 }}>
-                  <Image src={image.url} alt={image.topic} width={640} height={400}
-                    className="w-full h-auto object-contain" onError={() => setImageError(true)} unoptimized />
+                  <img src={image.url} alt={image.topic}
+                    className="w-full h-auto object-contain" onError={() => setImageError(true)} />
                 </div>
               )}
             </div>
@@ -237,8 +237,9 @@ export default function DescribeImagePage() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{t('practiceTask.describe-image.image')}</p>
               <p className="text-sm text-[var(--text-secondary)] mb-2">{image.topic}</p>
               <div className="relative w-full">
-                <Image src={image.url} alt={image.topic} width={400} height={250}
-                  className="w-full h-auto object-contain max-h-48" unoptimized />
+                <img src={image.url} alt={image.topic}
+                  className="w-full h-auto object-contain max-h-48"
+                  onError={() => setImageError(true)} />
               </div>
             </div>
             <TaskFeedbackDisplay
