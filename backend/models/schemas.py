@@ -37,6 +37,7 @@ class PronunciationAssessmentResult(BaseModel):
     completenessScore: int
     words: List[WordAssessment]
     summary: str
+    recognizedText: Optional[str] = None
 
 
 # =============================================================================

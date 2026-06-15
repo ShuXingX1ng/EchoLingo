@@ -85,8 +85,8 @@ class AzureSpeechService:
         </speak>
         """
 
-        # Create synthesizer
-        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
+        # audio_config=None: synthesize to memory only, do not play through system speakers
+        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
 
         # Synthesize — run blocking SDK call off the event loop thread
         loop = asyncio.get_event_loop()
@@ -183,6 +183,7 @@ class AzureSpeechService:
             completenessScore=round(pronunciation_result.completeness_score),
             words=words,
             summary=summary,
+            recognizedText=result.text or None,
         )
 
     def _extract_words(

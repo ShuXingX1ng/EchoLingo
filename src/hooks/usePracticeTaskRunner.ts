@@ -113,37 +113,36 @@ export function usePracticeTaskRunner({
       try { wavBlob = await blobToWav(audioBlob) } catch {}
     }
 
-    const azurePromise: Promise<PronunciationAssessmentResult | null> = wavBlob
-      ? (async () => {
-          try {
-            const form = new FormData()
-            form.append("audio", wavBlob!, "recording.wav")
-            form.append("referenceText", stimulusRef.current)
-            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
-          } catch { return null }
-        })()
-      : Promise.resolve(null)
-
-    const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
+    // Step 1: Azure pronunciation first (fast ~5-10s) so its recognized text
+    // can be used as the LLM input instead of the less reliable Web Speech transcript.
+    let pronunciationResult: PronunciationAssessmentResult | null = null
+    if (wavBlob) {
       try {
-        return await apiPost<TaskFeedback>(feedbackEndpoint, {
-          taskType,
-          stimulus: stimulusRef.current,
-          response: tx,
-        })
-      } catch { return null }
-    })()
+        const form = new FormData()
+        form.append("audio", wavBlob, "recording.wav")
+        form.append("referenceText", stimulusRef.current)
+        pronunciationResult = await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
+      } catch {}
+    }
 
-    const [pronunciationResult, feedbackResult] = await Promise.all([azurePromise, feedbackPromise])
+    const effectiveTranscript = pronunciationResult?.recognizedText || tx
+    setTranscript(effectiveTranscript)
+
+    // Step 2: LLM feedback with the best available transcript
+    let feedbackResult: TaskFeedback | null = null
+    try {
+      feedbackResult = await apiPost<TaskFeedback>(feedbackEndpoint, {
+        taskType,
+        stimulus: stimulusRef.current,
+        response: effectiveTranscript,
+      }, { timeoutMs: 90000 })
+    } catch {}
 
     const fb: TaskFeedback = feedbackResult ?? {
       summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [],
     }
     if (pronunciationResult) {
       fb.pronunciationAssessment = pronunciationResult
-      if (tx === "[transcript not captured]" && pronunciationResult.words.length > 0) {
-        setTranscript(pronunciationResult.words.map(w => w.word).join(" "))
-      }
     }
 
     setFeedback(fb)
@@ -157,15 +156,13 @@ export function usePracticeTaskRunner({
       createdAt: startedAt,
       endedAt,
     }
-    let task: PracticeTask
-    try {
-      task = await saveTask(taskInput)
-    } catch (e) {
-      console.warn("saveTask failed:", e)
-      task = { id: `local_${Date.now()}`, ...taskInput }
-    }
-    setSavedTask(task)
+    const localTask: PracticeTask = { id: `local_${Date.now()}`, ...taskInput }
+    setSavedTask(localTask)
     setPhase("done")
+
+    saveTask(taskInput)
+      .then(task => setSavedTask(task))
+      .catch(e => console.warn("saveTask failed:", e))
   }, [taskType, feedbackEndpoint, stimulusKind, withPronunciation])
 
   // ── Unconditional hook call (React rules) ─────────────────────────────────
@@ -240,7 +237,7 @@ export function usePracticeTaskRunner({
         taskType,
         stimulus: effectiveStimulus,
         response: effectiveResponse,
-      })
+      }, { timeoutMs: 90000 })
     } catch {}
 
     const fb: TaskFeedback = result ?? {
@@ -257,15 +254,13 @@ export function usePracticeTaskRunner({
       createdAt: startedAtRef.current,
       endedAt,
     }
-    let task: PracticeTask
-    try {
-      task = await saveTask(taskInput)
-    } catch (e) {
-      console.warn("saveTask failed:", e)
-      task = { id: `local_${Date.now()}`, ...taskInput }
-    }
-    setSavedTask(task)
+    const localTask: PracticeTask = { id: `local_${Date.now()}`, ...taskInput }
+    setSavedTask(localTask)
     setPhase("done")
+
+    saveTask(taskInput)
+      .then(task => setSavedTask(task))
+      .catch(e => console.warn("saveTask failed:", e))
   }, [responseKind, userText, taskType, feedbackEndpoint, stimulusKind])
 
   useEffect(() => { submitRef.current = submit }, [submit])
