@@ -115,7 +115,7 @@ export default function RepeatSentencePage() {
       setSentence(text)
       sentenceRef.current = text
 
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 })
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 }, { timeoutMs: 30000 })
       setAudioUrl(URL.createObjectURL(blob))
       setPhase("ready")
     } catch (e) {
