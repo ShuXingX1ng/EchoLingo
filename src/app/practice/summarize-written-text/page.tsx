@@ -1,93 +1,23 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
 import { useTranslation } from "@/lib/i18n"
 
-// PTE: 10 minutes; we use 600s
 const TIME_LIMIT = 600
-
-type Phase = "idle" | "generating" | "writing" | "processing" | "done" | "error"
 
 export default function SummarizeWrittenTextPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [passage, setPassage] = useState("")
-  const [userText, setUserText] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
-
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
-
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
-
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setUserText(""); setSeconds(TIME_LIMIT)
-    try {
-      const text = await loadStimulusText({ taskType: "summarize_written_text" })
-      setPassage(text)
-      startedAtRef.current = new Date().toISOString()
-      setPhase("writing")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed")
-      setPhase("error")
-    }
-  }, [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const handleSubmit = async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    if (!userText.trim()) { setError(t('practiceTask.summarize-written-text.emptySummaryError')); return }
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "summarize_written_text", stimulus: passage, response: userText })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "summarize_written_text",
-        stimulus: { kind: "text", content: passage },
-        response: { kind: "text", content: userText },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }
-
-  useEffect(() => { submitRef.current = handleSubmit })
+  const {
+    phase, stimulus, seconds, error, feedback,
+    userText, setText, submit, generate,
+  } = usePracticeTaskRunner({
+    taskType: "summarize_written_text",
+    responseKind: "text",
+    timeLimit: TIME_LIMIT,
+  })
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -137,7 +67,7 @@ export default function SummarizeWrittenTextPage() {
               </span>
             </div>
             <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
-              <p className="text-sm leading-8 text-[var(--foreground)] font-serif">{passage}</p>
+              <p className="text-sm leading-8 text-[var(--foreground)] font-serif">{stimulus}</p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -148,7 +78,7 @@ export default function SummarizeWrittenTextPage() {
               </div>
               <textarea
                 value={userText}
-                onChange={e => setUserText(e.target.value)}
+                onChange={e => setText(e.target.value)}
                 placeholder={t('practiceTask.summarize-written-text.summaryPlaceholder')}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--foreground)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 rows={4}
@@ -156,7 +86,7 @@ export default function SummarizeWrittenTextPage() {
               <p className="mt-1 text-xs text-slate-400">{t('practiceTask.summarize-written-text.summaryHint')}</p>
             </div>
             <div className="flex justify-end">
-              <button onClick={handleSubmit} disabled={!userText.trim()}
+              <button onClick={() => submit()} disabled={!userText.trim()}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
                 {t('practiceTask.common.submit')}
               </button>
@@ -173,7 +103,7 @@ export default function SummarizeWrittenTextPage() {
 
         {phase === "done" && feedback && (
           <div className="space-y-6">
-            <TaskFeedbackDisplay feedback={feedback} stimulus={passage} stimulusLabel={t('practiceTask.common.passage')}
+            <TaskFeedbackDisplay feedback={feedback} stimulus={stimulus} stimulusLabel={t('practiceTask.common.passage')}
               responseText={userText} responseLabel={t('practiceTask.summarize-written-text.yourSummary')} />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">

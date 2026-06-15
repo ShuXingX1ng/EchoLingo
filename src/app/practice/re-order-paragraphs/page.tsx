@@ -4,17 +4,13 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
 import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 180 // 3 minutes
 
 type Paragraph = { label: string; text: string }
 type ParsedStimulus = { paragraphs: Paragraph[] }
-type Phase = "idle" | "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -55,97 +51,55 @@ function buildResponseForFeedback(userOrder: Paragraph[], correctOrder: Paragrap
 
 export default function ReOrderParagraphsPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
+  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
+    taskType: "re_order_paragraphs",
+    responseKind: "text",
+  })
+
   const [correctOrder, setCorrectOrder] = useState<Paragraph[]>([])
   const [displayOrder, setDisplayOrder] = useState<Paragraph[]>([])
-  const [rawStimulus, setRawStimulus] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
   const [seconds, setSeconds] = useState(TIME_LIMIT)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
-  const startedAtRef = useRef("")
+  const correctOrderRef = useRef<Paragraph[]>([])
+  const displayOrderRef = useRef<Paragraph[]>([])
+  const submittedResponseRef = useRef("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
 
+  useEffect(() => { correctOrderRef.current = correctOrder }, [correctOrder])
+  useEffect(() => { displayOrderRef.current = displayOrder }, [displayOrder])
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
+  // Parse JSON stimulus when hook loads it
   useEffect(() => {
-    if (phase !== "ready") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setSeconds(TIME_LIMIT)
-    try {
-      const raw = await loadStimulusText({ taskType: "re_order_paragraphs" })
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-      setRawStimulus(raw)
-      setCorrectOrder(p.paragraphs)
-      setDisplayOrder(shuffleArray(p.paragraphs))
-      startedAtRef.current = new Date().toISOString()
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setCorrectOrder(p.paragraphs)
+    setDisplayOrder(shuffleArray(p.paragraphs))
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
 
   const handleSubmit = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
+    const feedbackStimulus = buildStimulusForFeedback(correctOrderRef.current)
+    const feedbackResponse = buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current)
+    submittedResponseRef.current = feedbackResponse
+    await submit({ feedbackStimulus, feedbackResponse })
+  }, [submit])
 
-    const stimulusForFeedback = buildStimulusForFeedback(correctOrder)
-    const responseForFeedback = buildResponseForFeedback(displayOrder, correctOrder)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "re_order_paragraphs",
-        stimulus: stimulusForFeedback,
-        response: responseForFeedback,
+  // Timer while the user is reordering
+  useEffect(() => {
+    if (phase !== "writing") return
+    timerRef.current = setInterval(() => {
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
       })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "re_order_paragraphs",
-        stimulus: { kind: "text", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [correctOrder, displayOrder, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+    }, 1000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [phase, handleSubmit])
 
   const moveUp = (idx: number) => {
     if (idx === 0) return
@@ -193,28 +147,14 @@ export default function ReOrderParagraphsPage() {
           </p>
         </div>
 
-        {phase === "idle" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-[var(--text-secondary)] mb-8">
-              {t('practiceTask.re-order-paragraphs.idleDesc')}
-            </p>
-            <button
-              onClick={generate}
-              className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            >
-              {t('practiceTask.re-order-paragraphs.getParagraphs')}
-            </button>
-          </div>
-        )}
-
-        {phase === "generating" && (
+        {(phase === "idle" || phase === "generating") && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.re-order-paragraphs.generating')}</p>
           </div>
         )}
 
-        {phase === "ready" && (
+        {phase === "writing" && displayOrder.length > 0 && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -284,13 +224,13 @@ export default function ReOrderParagraphsPage() {
           </div>
         )}
 
-        {phase === "done" && feedback && (
+        {phase === "done" && feedback && correctOrder.length > 0 && (
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(correctOrder)}
               stimulusLabel={t('practiceTask.re-order-paragraphs.correctOrder')}
-              responseText={buildResponseForFeedback(displayOrder, correctOrder)}
+              responseText={submittedResponseRef.current}
               responseLabel={t('practiceTask.re-order-paragraphs.yourOrder')}
             />
             <div className="flex gap-3 justify-center">
