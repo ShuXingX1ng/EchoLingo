@@ -5,7 +5,6 @@
 --
 -- Run once on the Supabase dashboard SQL editor:
 --   \i supabase-migration-006.sql
-
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.practice_tasks (

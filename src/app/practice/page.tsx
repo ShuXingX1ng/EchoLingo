@@ -177,7 +177,7 @@ export default function PracticeHubPage() {
 
           {activeTheme && (
             <p className="mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              ✓ {t("practiceHub.theme.active", { topic: activeTheme })} — {t("practiceHub.start")}ing any task below will generate themed stimuli.
+              ✓ {t("practiceHub.theme.active", { topic: activeTheme })} — {t("practiceHub.theme.activeHint")}
             </p>
           )}
         </div>

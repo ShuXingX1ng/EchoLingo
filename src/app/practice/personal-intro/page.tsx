@@ -41,7 +41,7 @@ export default function PersonalIntroPage() {
 
     let result: TaskFeedback | null = null
     try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "personal_intro", stimulus: FIXED_PROMPT, response: tx })
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "personal_intro", stimulus: FIXED_PROMPT, response: tx }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {

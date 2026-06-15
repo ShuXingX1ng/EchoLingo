@@ -48,10 +48,9 @@ CREATE INDEX IF NOT EXISTS idx_user_error_patterns_frequency ON user_error_patte
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS user_weak_areas (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  weak_skills JSONB DEFAULT '[]', -- ['grammar', 'vocabulary', ...]
-  top_errors JSONB DEFAULT '{}', -- { grammar: "pattern text", ... }
+  weak_skills JSONB DEFAULT '[]',
+  top_errors JSONB DEFAULT '{}',
   last_updated TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
