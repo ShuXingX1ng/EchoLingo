@@ -30,6 +30,11 @@ export default function RepeatSentencePage() {
 
   const sentenceRef = useRef("")
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const isGeneratingRef = useRef(false)
+
+  useEffect(() => () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+  }, [])
 
   const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
@@ -44,37 +49,35 @@ export default function RepeatSentencePage() {
       try { wavBlob = await blobToWav(audioBlob) } catch { /* optional */ }
     }
 
-    const azurePromise: Promise<PronunciationAssessmentResult | null> = wavBlob
-      ? (async () => {
-          try {
-            const form = new FormData()
-            form.append("audio", wavBlob!, "recording.wav")
-            form.append("referenceText", sentenceRef.current)
-            return await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
-          } catch { return null }
-        })()
-      : Promise.resolve(null)
-
-    const feedbackPromise: Promise<TaskFeedback | null> = (async () => {
+    // Step 1: Azure pronunciation first so its recognized text feeds the LLM.
+    let pronunciationResult: PronunciationAssessmentResult | null = null
+    if (wavBlob) {
       try {
-        return await apiPost<TaskFeedback>("/api/pte/feedback", {
-          taskType: "repeat_sentence",
-          stimulus: sentenceRef.current,
-          response: tx,
-        })
-      } catch { return null }
-    })()
+        const form = new FormData()
+        form.append("audio", wavBlob, "recording.wav")
+        form.append("referenceText", sentenceRef.current)
+        pronunciationResult = await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
+      } catch { /* optional */ }
+    }
 
-    const [pronunciationResult, feedbackResult] = await Promise.all([azurePromise, feedbackPromise])
+    const effectiveTranscript = pronunciationResult?.recognizedText || tx
+    setTranscript(effectiveTranscript)
+
+    // Step 2: LLM feedback with the best available transcript
+    let feedbackResult: TaskFeedback | null = null
+    try {
+      feedbackResult = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "repeat_sentence",
+        stimulus: sentenceRef.current,
+        response: effectiveTranscript,
+      }, { timeoutMs: 90000 })
+    } catch { /* null */ }
 
     const fb: TaskFeedback = feedbackResult ?? {
       summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [],
     }
     if (pronunciationResult) {
       fb.pronunciationAssessment = pronunciationResult
-      if (tx === "[transcript not captured]" && pronunciationResult.words.length > 0) {
-        setTranscript(pronunciationResult.words.map(w => w.word).join(" "))
-      }
     }
 
     setFeedback(fb)
@@ -99,7 +102,11 @@ export default function RepeatSentencePage() {
   })
 
   const generate = useCallback(async () => {
+    if (isGeneratingRef.current) return
+    isGeneratingRef.current = true
+
     setError(""); setFeedback(null); setTranscript("")
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
     setPhase("generating")
 
@@ -114,6 +121,8 @@ export default function RepeatSentencePage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : t("practiceTask.repeat-sentence.errorGenerate"))
       setPhase("error")
+    } finally {
+      isGeneratingRef.current = false
     }
   }, [audioUrl, t])
 
@@ -181,7 +190,12 @@ export default function RepeatSentencePage() {
                 {t("practiceTask.repeat-sentence.playSentence")}
               </button>
               <p className="text-xs text-slate-400 mb-6">{t("practiceTask.repeat-sentence.playThenRecord")}</p>
-              <button onClick={recording.start}
+              <button
+                onClick={() => {
+                  if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+                  setPhase("recording")
+                  recording.start()
+                }}
                 className="rounded-xl border-2 border-emerald-500 px-8 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
                 {t("practiceTask.repeat-sentence.recordMyAnswer")}
               </button>

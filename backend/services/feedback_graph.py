@@ -25,6 +25,19 @@ SCORED_WRITING   = {"summarize_written_text", "write_essay"}
 SCORED_READING   = {"fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading"}
 SCORED_LISTENING = {"summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary"}
 
+# Official PTE point maximums for each task type (fixed-max tasks only)
+_TASK_SCORE_MAX: dict[str, int] = {
+    "read_aloud": 15,
+    "repeat_sentence": 13,
+    "answer_short_question": 1,
+    "describe_image": 15,
+    "re_tell_lecture": 15,
+    "summarize_written_text": 14,
+    "write_essay": 15,
+    "summarize_spoken_text": 14,
+    "highlight_correct_summary": 1,
+}
+
 
 class FeedbackState(TypedDict):
     task_type: str
@@ -52,11 +65,18 @@ def _section(task_type: str) -> str:
     return "unscored"
 
 
+_LANGUAGE_INSTRUCTION = (
+    "IMPORTANT: All feedback text values must be written in Simplified Chinese (简体中文). "
+    "JSON keys remain in English. Only string values — summary, strengths, weaknesses, "
+    "suggestions, coachSuggestions, and all fields inside details — must be in Chinese."
+)
+
+
 def _build_primary_system(task_type: str, retrieved_context: str) -> str:
     task = prompts.feedback_tasks[task_type]
     section = _section(task_type)
     schema = prompts.build_primary_schema(section, task["details_schema"])
-    parts = [task["system_prompt"].strip(), schema]
+    parts = [task["system_prompt"].strip(), _LANGUAGE_INSTRUCTION, schema]
     if section != "unscored":
         parts.append(prompts.schema_scoring_note)
     if retrieved_context:
@@ -220,11 +240,92 @@ async def retry_primary_node(state: FeedbackState) -> dict:
     return {"retry_count": state.get("retry_count", 0) + 1}
 
 
+_COVERAGE_TASKS = {"read_aloud", "repeat_sentence"}
+
+
+def _word_coverage_ratio(stimulus: str, response: str) -> float:
+    """Fraction of unique stimulus words found in the response (case-insensitive)."""
+    import re as _re
+    def _tokens(text: str) -> set:
+        return set(_re.sub(r"[^\w\s]", "", text.lower()).split())
+    s_words = _tokens(stimulus)
+    r_words = _tokens(response)
+    if not s_words:
+        return 1.0
+    return len(s_words & r_words) / len(s_words)
+
+
+def _apply_content_coverage(task_type: str, state: FeedbackState, result: dict) -> dict:
+    """Cap content score by actual word coverage for read-verbatim speaking tasks."""
+    if task_type not in _COVERAGE_TASKS:
+        return result
+    stimulus = state.get("stimulus", "")
+    response = state.get("response", "")
+    if not stimulus or not response:
+        return result
+
+    # Azure completenessScore is most accurate (word-level alignment)
+    pron = state.get("pron_assessment")
+    if pron and isinstance(pron.get("completenessScore"), (int, float)):
+        coverage = pron["completenessScore"] / 100
+    else:
+        coverage = _word_coverage_ratio(stimulus, response)
+
+    ds = result.get("dimensionScores")
+    if not isinstance(ds, dict) or ds.get("section") != "speaking":
+        return result
+
+    original_content = ds.get("content", 100)
+    capped_content = min(original_content, round(coverage * 100))
+    if capped_content >= original_content:
+        return result
+
+    result = dict(result)
+    result["dimensionScores"] = {**ds, "content": capped_content}
+    logger.info(
+        "[coverage-correction] task=%s coverage=%.2f content %d→%d",
+        task_type, coverage, original_content, capped_content,
+    )
+
+    # Recompute scoreCard with corrected content
+    max_score = _TASK_SCORE_MAX.get(task_type)
+    if max_score:
+        avg = (ds.get("fluency", 0) + ds.get("pronunciation", 0) + capped_content) / 3
+        result["scoreCard"] = {"earned": round(avg / 100 * max_score), "max": max_score}
+
+    return result
+
+
+def _compute_score_card_from_dims(task_type: str, result: dict) -> Optional[dict]:
+    max_score = _TASK_SCORE_MAX.get(task_type)
+    if max_score is None:
+        return None
+    ds = result.get("dimensionScores")
+    if not isinstance(ds, dict):
+        return None
+    section = ds.get("section")
+    dim_keys = {
+        "speaking":  ["fluency", "pronunciation", "content"],
+        "writing":   ["grammar", "vocabulary", "form", "content"],
+        "listening": ["comprehension", "accuracy"],
+    }.get(section, [])
+    values = [ds[k] for k in dim_keys if isinstance(ds.get(k), (int, float))]
+    if not values:
+        return None
+    avg = sum(values) / len(values)
+    return {"earned": round(avg / 100 * max_score), "max": max_score}
+
+
 async def finalize_node(state: FeedbackState) -> dict:
     result = dict(state.get("primary_result") or {})
     pron = state.get("pron_assessment")
     if pron:
         result["pronunciationAssessment"] = pron
+    score_card = _compute_score_card_from_dims(state["task_type"], result)
+    if score_card:
+        result["scoreCard"] = score_card
+    # Must run after initial scoreCard so coverage correction can overwrite it
+    result = _apply_content_coverage(state["task_type"], state, result)
     diverged = state.get("diverged", [])
     if diverged:
         judge_log = {
@@ -285,8 +386,80 @@ def _build_graph():
 _graph = _build_graph()
 
 
+def _compute_reading_feedback(task_type: str, response: str) -> dict:
+    """Deterministic feedback for reading tasks — no LLM call needed."""
+    import re as _re
+
+    if task_type == "fill_in_the_blanks_reading":
+        lines = [l.strip() for l in response.strip().splitlines() if l.strip()]
+        correct = sum(1 for l in lines if "✓" in l)
+        total = len(lines)
+        score = round(correct / total * 100) if total > 0 else 0
+
+        wrong_blanks = [_re.search(r"(Blank \d+)", l).group(1) for l in lines if "✗" in l and _re.search(r"Blank \d+", l)]
+        accuracy_text = f"共 {total} 个空白，答对 {correct} 个。"
+        if wrong_blanks:
+            accuracy_text += f"错误项：{', '.join(wrong_blanks)}。"
+
+        return {
+            "summary": f"本次作答答对 {correct}/{total} 个空白，得分约 {score} 分。",
+            "strengths": [f"正确填入 {correct} 个词汇"] if correct > 0 else [],
+            "weaknesses": [f"有 {total - correct} 个空白填写有误"] if correct < total else [],
+            "suggestions": ["复习题目中出错的词汇，注意结合上下文语义选词。"] if correct < total else ["词汇运用准确，继续保持关注上下文语境的好习惯。"],
+            "details": {
+                "taskType": "fill_in_the_blanks_reading",
+                "accuracy": accuracy_text,
+                "vocabulary": "请回顾错误选项，分析在上下文中哪个词语更符合句意。" if correct < total else "词汇运用准确，语境理解良好。",
+            },
+            "dimensionScores": {"section": "reading", "vocabulary": score, "comprehension": score},
+            "scoreCard": {"earned": correct, "max": total},
+        }
+
+    if task_type == "re_order_paragraphs":
+        m = _re.search(r"(\d+) of (\d+) paragraphs in the correct position", response)
+        correct, total = (int(m.group(1)), int(m.group(2))) if m else (0, 1)
+        score = round(correct / total * 100) if total > 0 else 0
+
+        return {
+            "summary": f"共 {total} 个段落，{correct} 个位置正确，得分约 {score} 分。",
+            "strengths": [f"正确排列了 {correct} 个段落"] if correct > 0 else [],
+            "weaknesses": [f"{total - correct} 个段落顺序有误"] if correct < total else [],
+            "suggestions": ["注意段落首句的衔接词和指代关系，判断段落之间的逻辑顺序。"] if correct < total else ["段落排列顺序正确，语篇结构理解良好。"],
+            "details": {
+                "taskType": "re_order_paragraphs",
+                "orderAccuracy": f"提交顺序中 {correct}/{total} 个段落位置正确。",
+                "logicFeedback": "建议重点关注衔接词（首先、其次、因此等）和指代词，帮助判断段落逻辑顺序。" if correct < total else "段落排列正确，说明对语篇逻辑结构理解良好。",
+            },
+            "dimensionScores": {"section": "reading", "vocabulary": min(score + 10, 100), "comprehension": score},
+            "scoreCard": {"earned": correct, "max": total},
+        }
+
+    if task_type == "multiple_choice_reading":
+        is_correct = "✓" in response
+        score = 100 if is_correct else 0
+
+        return {
+            "summary": "回答正确！阅读理解准确。" if is_correct else "回答有误，请仔细阅读原文后重试。",
+            "strengths": ["准确理解了文章主旨，选择了正确答案"] if is_correct else [],
+            "weaknesses": [] if is_correct else ["对文章主旨或细节理解存在偏差"],
+            "suggestions": ["继续保持，注意区分主旨与支撑细节。"] if is_correct else ["重新阅读原文，注意区分各选项与原文的对应关系，避免被干扰项误导。"],
+            "details": {
+                "taskType": "multiple_choice_reading",
+                "answerAccuracy": "答案正确。" if is_correct else "答案有误，请参考正确选项重新理解文章。",
+                "readingComprehension": "理解准确，抓住了文章的关键信息。" if is_correct else "建议仔细对比各选项与原文的对应关系，排除干扰项。",
+            },
+            "dimensionScores": {"section": "reading", "vocabulary": 75 if is_correct else 40, "comprehension": score},
+            "scoreCard": {"earned": 1 if is_correct else 0, "max": 1},
+        }
+
+    return {}
+
+
 async def run_feedback_graph(request) -> dict:
     """Run the feedback pipeline and return the merged final result dict."""
+    if request.taskType in SCORED_READING:
+        return _compute_reading_feedback(request.taskType, request.response.strip())
+
     initial_state: FeedbackState = {
         "task_type": request.taskType,
         "stimulus": request.stimulus or "",

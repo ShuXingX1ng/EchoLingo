@@ -65,6 +65,12 @@ export type DimensionWeakness = {
   score: number  // 0–100, lower is weaker
 }
 
+// Task score: how many points earned out of the task maximum
+export type TaskScoreCard = {
+  earned: number
+  max: number
+}
+
 // Generic Feedback Envelope — drives shared UI (history, stats, daily plan)
 export type TaskFeedback = {
   summary: string
@@ -74,6 +80,7 @@ export type TaskFeedback = {
   details?: TaskFeedbackDetails
   pronunciationAssessment?: PronunciationAssessmentResult
   dimensionScores?: DimensionScores
+  scoreCard?: TaskScoreCard
   coachSuggestions?: string[]
   judgeLog?: JudgeLog
 }
@@ -245,6 +252,7 @@ export type PronunciationAssessmentResult = {
   completenessScore: number;
   words: WordAssessment[];
   summary: string; // 简要反馈
+  recognizedText?: string; // Azure STT 识别出的原文，比浏览器 Web Speech 更准确
 };
 
 // ── Study Aids: Word Lookup & Vocabulary List ───────────────────────────────
