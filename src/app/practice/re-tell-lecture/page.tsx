@@ -133,9 +133,11 @@ export default function ReTellLecturePage() {
     audio.onerror = () => startPrepTimer()
 
     setPhase("listening")
-    audio.play().catch(() => {
-      setPhase("ready")
-      audioRef.current = null
+    requestAnimationFrame(() => {
+      audio.play().catch(() => {
+        setPhase("ready")
+        audioRef.current = null
+      })
     })
   }, [audioUrl, startPrepTimer])
 
