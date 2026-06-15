@@ -180,14 +180,14 @@ export default function MockFillInTheBlanksListening({ onComplete }: { onComplet
         if (cached) {
           raw = cached
         } else {
-          const resData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "fill_in_the_blanks_listening" })
+          const resData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "fill_in_the_blanks_listening" }, { timeoutMs: 45000 })
           raw = resData.text
           addStimulusToBank("fill_in_the_blanks_listening", raw)
         }
         const nextParsed = parseStimulus(raw)
         if (!nextParsed) throw new Error("Invalid stimulus format")
 
-        const blob = await apiPostBlob("/api/tts", { text: buildTtsText(nextParsed), voice: "en-US-AriaNeural", rate: 0.85 })
+        const blob = await apiPostBlob("/api/tts", { text: buildTtsText(nextParsed), voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
 
         parsedRef.current = nextParsed
         rawStimulusRef.current = raw

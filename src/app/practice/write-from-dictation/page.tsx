@@ -39,7 +39,7 @@ export default function WriteFromDictationPage() {
       const text = await loadStimulusText({ taskType: "write_from_dictation" })
       setSentence(text)
 
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       setAudioUrl(URL.createObjectURL(blob))
       setPhase("ready")
     } catch (e) {

@@ -114,7 +114,7 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
       .then(async text => {
         sentenceRef.current = text
         setSentence(text)
-        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 })
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 }, { timeoutMs: 30000 })
         setAudioUrl(URL.createObjectURL(blob))
         setPhase("ready")
       })

@@ -125,14 +125,14 @@ export default function MockSummarizeSpokenText({ onComplete }: { onComplete: (t
         if (cached) {
           text = cached
         } else {
-          const res = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text" })
+          const res = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text" }, { timeoutMs: 45000 })
           text = res.text
           addStimulusToBank("summarize_spoken_text", text)
         }
         passageRef.current = text
         setPassage(text)
 
-        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
         setAudioUrl(URL.createObjectURL(blob))
         setPhase("ready")
       } catch (e) {

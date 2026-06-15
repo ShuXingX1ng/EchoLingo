@@ -122,14 +122,14 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
         if (cached) {
           text = cached
         } else {
-          const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_from_dictation" })
+          const stimData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "write_from_dictation" }, { timeoutMs: 45000 })
           text = stimData.text
           addStimulusToBank("write_from_dictation", text)
         }
         sentenceRef.current = text
         setSentence(text)
 
-        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
         setAudioUrl(URL.createObjectURL(blob))
         setPhase("ready")
       } catch (e) {

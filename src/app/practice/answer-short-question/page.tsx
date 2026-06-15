@@ -117,7 +117,7 @@ export default function AnswerShortQuestionPage() {
       // Fetch TTS for the question
       let audioUrl: string | null = null
       try {
-        const blob = await apiPostBlob("/api/tts", { text: questionText, voice: "en-US-AriaNeural", rate: 0.9 })
+        const blob = await apiPostBlob("/api/tts", { text: questionText, voice: "en-US-AriaNeural", rate: 0.9 }, { timeoutMs: 30000 })
         if (id !== generateIdRef.current) return
         audioUrl = URL.createObjectURL(blob)
         audioUrlRef.current = audioUrl

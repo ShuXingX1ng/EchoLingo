@@ -173,14 +173,14 @@ export default function MockHighlightCorrectSummary({ onComplete }: { onComplete
         if (cached) {
           raw = cached
         } else {
-          const resData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "highlight_correct_summary" })
+          const resData = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "highlight_correct_summary" }, { timeoutMs: 45000 })
           raw = resData.text
           addStimulusToBank("highlight_correct_summary", raw)
         }
         const nextParsed = parseStimulus(raw)
         if (!nextParsed) throw new Error("Invalid stimulus format")
 
-        const blob = await apiPostBlob("/api/tts", { text: nextParsed.passage, voice: "en-US-AriaNeural", rate: 0.85 })
+        const blob = await apiPostBlob("/api/tts", { text: nextParsed.passage, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
 
         parsedRef.current = nextParsed
         rawStimulusRef.current = raw

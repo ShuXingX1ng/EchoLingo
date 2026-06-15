@@ -23,12 +23,12 @@ interface LoadStimulusOptions {
  *
  * Must be called in a browser context (reads window.location.search).
  */
-export async function loadStimulusText({ taskType, randomEndpoint, timeoutMs }: LoadStimulusOptions): Promise<string> {
+export async function loadStimulusText({ taskType, randomEndpoint, timeoutMs = 45000 }: LoadStimulusOptions): Promise<string> {
   const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
   const isSeeded = mode !== "random"
   const extras = buildStimulusExtras(mode, topic)
 
-  const opts = timeoutMs ? { timeoutMs } : undefined
+  const opts = { timeoutMs }
 
   if (isSeeded) {
     const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType, ...extras }, opts)
