@@ -502,6 +502,8 @@
   "practiceTask.answer-short-question.idleDesc": "An AI-generated factual question will appear. Answer as briefly and accurately as possible.",
   "practiceTask.answer-short-question.getQuestion": "Get Question",
   "practiceTask.answer-short-question.generatingQuestion": "Generating question…",
+  "practiceTask.answer-short-question.listeningToQuestion": "Listening",
+  "practiceTask.answer-short-question.listenCarefully": "Listen carefully, then answer in 1–3 words",
   "practiceTask.answer-short-question.recordingStartsAuto": "Recording starts automatically",
   "practiceTask.answer-short-question.checking": "Checking your answer…",
   "practiceTask.answer-short-question.modelAnswer": "Model Answer",
