@@ -75,7 +75,7 @@ _Avoid_: pronunciation score, Azure score
 ### Study Aids
 
 **Word Lookup**:
-A floating helper available on Task Practice pages (never in a Mock Exam) that translates a word or short phrase the learner selects from any on-page text. The learner selects text, then either drags the selection into the helper (desktop) or taps a "译" button beside the selection (all platforms); both routes hit the same translation path. Single English words resolve against the ECDICT dictionary database (instant, offline); phrases — and dictionary misses — fall through to the DeepSeek LLM. It is a learning aid only and does not produce Feedback.
+A helper available on Task Practice pages (never in a Mock Exam) that translates a word or short phrase the learner selects from any on-page text. The learner selects text and taps the "译" pill that appears beside the selection (all platforms); the result card opens with the translation. (Earlier versions also offered a persistent floating button with a desktop drag-and-drop route — both were removed because the selection pill alone is sufficient.) Single English words resolve against the ECDICT dictionary database (instant, offline); phrases — and dictionary misses — fall through to the DeepSeek LLM. It is a learning aid only and does not produce Feedback.
 _Avoid_: translator, dictionary, assistant, chat helper, glossary (reserved for CONTEXT.md term list)
 
 **Vocabulary List**:

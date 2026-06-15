@@ -15,9 +15,10 @@ interface LoadStimulusOptions {
 }
 
 /**
- * Loads a text Stimulus for the given Task Type, following the standard
- * cache-check → API call → cache-store flow:
- * - Random mode: check localStorage bank first; call API on miss; store result.
+ * Loads a text Stimulus for the given Task Type:
+ * - Random mode: always calls the API first to get a fresh Stimulus; on success
+ *   also writes it to the Task Bank (fallback pool). Falls back to the Task Bank
+ *   only when the API call fails; throws if the bank is also empty.
  * - Theme/Targeted (seeded) mode: skip cache; always call /api/pte/stimulus.
  *
  * Must be called in a browser context (reads window.location.search).
@@ -27,25 +28,29 @@ export async function loadStimulusText({ taskType, randomEndpoint, timeoutMs }: 
   const isSeeded = mode !== "random"
   const extras = buildStimulusExtras(mode, topic)
 
-  if (!isSeeded) {
-    const cached = getStimulusFromBank(taskType)
-    if (cached) return cached
-  }
-
-  let text: string
   const opts = timeoutMs ? { timeoutMs } : undefined
 
   if (isSeeded) {
     const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType, ...extras }, opts)
-    text = data.text
-  } else if (randomEndpoint) {
-    const data = await apiPost<{ text: string }>(randomEndpoint, {}, opts)
-    text = data.text
-  } else {
-    const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType }, opts)
-    text = data.text
+    return data.text
   }
 
-  if (!isSeeded) addStimulusToBank(taskType, text)
-  return text
+  // Random mode: always generate a fresh Stimulus via the API.
+  try {
+    let text: string
+    if (randomEndpoint) {
+      const data = await apiPost<{ text: string }>(randomEndpoint, {}, opts)
+      text = data.text
+    } else {
+      const data = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType }, opts)
+      text = data.text
+    }
+    addStimulusToBank(taskType, text)
+    return text
+  } catch {
+    // API failed — fall back to the Task Bank pool.
+    const cached = getStimulusFromBank(taskType)
+    if (cached) return cached
+    throw new Error(`Failed to load stimulus for ${taskType} and Task Bank is empty`)
+  }
 }

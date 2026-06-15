@@ -8,9 +8,8 @@ import { isSaved as isSavedLocally } from "@/lib/vocabulary"
 import type { WordLookupResult } from "@/types"
 
 // Floating Word Lookup helper for Task Practice pages (never Mock Exam).
-// Two capture routes hit the same translation path: a "译" button beside the
-// browser's native text selection (all platforms), and dragging the selection
-// onto the floating button (desktop). One-shot — no conversation history.
+// Capture route: a "译" pill beside the browser's native text selection.
+// One-shot — no conversation history.
 
 const MAX_SELECTION = 120 // chars; longer selections are ignored
 
@@ -35,7 +34,6 @@ export default function WordLookup() {
   const [result, setResult] = useState<WordLookupResult | null>(null)
   const [error, setError] = useState("")
   const [saved, setSaved] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   // ── Selection detection ─────────────────────────────────────────────────────
@@ -105,17 +103,6 @@ export default function WordLookup() {
     }
   }, [result, saved])
 
-  // ── Drag-and-drop onto the floating button ──────────────────────────────────
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      setDragOver(false)
-      const text = e.dataTransfer.getData("text/plain").trim()
-      if (text) runLookup(text)
-    },
-    [runLookup]
-  )
-
   return (
     <div ref={rootRef}>
       {/* Selection "译" button */}
@@ -135,7 +122,7 @@ export default function WordLookup() {
 
       {/* Result panel */}
       {open && (
-        <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-slide-up">
+        <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-slide-up">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[70vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
               <span className="text-sm font-semibold text-[var(--foreground)]">查词</span>
@@ -233,24 +220,6 @@ export default function WordLookup() {
         </div>
       )}
 
-      {/* Floating button + drop zone */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        aria-label="查词助手"
-        title="选中文字后点“译”，或将选中文字拖到这里"
-        className={`fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg ring-1 ring-emerald-700/20 transition-all active:scale-95 ${
-          dragOver ? "bg-emerald-500 scale-110 ring-4 ring-emerald-300" : "bg-emerald-600 hover:bg-emerald-700"
-        }`}
-      >
-        <TranslateIcon className="w-6 h-6" />
-      </button>
     </div>
   )
 }
