@@ -86,11 +86,11 @@ export default function HighlightCorrectSummaryPage() {
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
-      const raw = await loadStimulusText({ taskType: "highlight_correct_summary" })
+      const raw = await loadStimulusText({ taskType: "highlight_correct_summary", timeoutMs: 60000 })
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")
 
-      const blob = await apiPostBlob("/api/tts", { text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 })
+      const blob = await apiPostBlob("/api/tts", { text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       const url = URL.createObjectURL(blob)
 
       setRawStimulus(raw)
@@ -140,7 +140,7 @@ export default function HighlightCorrectSummaryPage() {
         taskType: "highlight_correct_summary",
         stimulus: stimulusForFeedback,
         response: responseForFeedback,
-      })
+      }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {
@@ -231,34 +231,35 @@ export default function HighlightCorrectSummaryPage() {
           </div>
         )}
 
-        {phase === "listening" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              {[0, 1, 2, 3, 4].map(i => (
-                <span
-                  key={i}
-                  className="inline-block w-1 rounded-full bg-emerald-500"
-                  style={{
-                    height: `${16 + (i % 3) * 8}px`,
-                    animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate`,
-                  }}
-                />
-              ))}
-            </div>
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.common.passagePlaying')}</p>
-            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.highlight-correct-summary.listenTimer')}</p>
-            <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
-          </div>
-        )}
-
-        {phase === "selecting" && parsed && (
+        {(phase === "listening" || phase === "selecting") && parsed && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.highlight-correct-summary.selectSummary')}</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
-                {timeStr}
-              </span>
-            </div>
+            {phase === "listening" && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <span
+                      key={i}
+                      className="inline-block w-1 rounded-full bg-emerald-500"
+                      style={{
+                        height: `${16 + (i % 3) * 8}px`,
+                        animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate`,
+                      }}
+                    />
+                  ))}
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 ml-2">{t('practiceTask.common.passagePlaying')}</p>
+                </div>
+                <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.highlight-correct-summary.listenTimer')}</p>
+                <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
+              </div>
+            )}
+            {phase === "selecting" && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.highlight-correct-summary.selectSummary')}</p>
+                <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
+                  {timeStr}
+                </span>
+              </div>
+            )}
 
             <div className="border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-3">
@@ -267,7 +268,7 @@ export default function HighlightCorrectSummaryPage() {
               {parsed.summaries.map((s, i) => (
                 <label
                   key={i}
-                  className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-all ${
+                  className={`flex items-start gap-3 ${phase === "listening" ? "cursor-default opacity-70" : "cursor-pointer"} rounded-lg border p-3 transition-all ${
                     selected === i
                       ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
                       : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--foreground)]"
@@ -278,7 +279,8 @@ export default function HighlightCorrectSummaryPage() {
                     name="hcs-option"
                     value={i}
                     checked={selected === i}
-                    onChange={() => setSelected(i)}
+                    onChange={() => phase === "selecting" && setSelected(i)}
+                    disabled={phase === "listening"}
                     className="mt-0.5 shrink-0 accent-emerald-600"
                   />
                   <span className="text-sm text-[var(--foreground)]">
@@ -297,13 +299,15 @@ export default function HighlightCorrectSummaryPage() {
                   {t('practiceTask.highlight-correct-summary.replayPassage')}
                 </button>
               )}
-              <button
-                onClick={handleSubmit}
-                disabled={selected === null}
-                className="ml-auto rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
-              >
-                {t('practiceTask.common.submitAnswer')}
-              </button>
+              {phase === "selecting" && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={selected === null}
+                  className="ml-auto rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                >
+                  {t('practiceTask.common.submitAnswer')}
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -52,7 +52,7 @@ export default function SummarizeSpokenTextPage() {
       const text = await loadStimulusText({ taskType: "summarize_spoken_text" })
       setPassageText(text)
 
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 })
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setPhase("ready")
@@ -99,7 +99,7 @@ export default function SummarizeSpokenTextPage() {
         taskType: "summarize_spoken_text",
         stimulus: passageText,
         response: summary.trim(),
-      })
+      }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {
