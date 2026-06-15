@@ -502,6 +502,8 @@
   "practiceTask.answer-short-question.idleDesc": "AI 生成的事实性问题将出现在屏幕上，请尽量简洁、准确地作答。",
   "practiceTask.answer-short-question.getQuestion": "获取问题",
   "practiceTask.answer-short-question.generatingQuestion": "正在生成问题…",
+  "practiceTask.answer-short-question.listeningToQuestion": "正在播放问题",
+  "practiceTask.answer-short-question.listenCarefully": "请仔细听，然后用 1–3 个词作答",
   "practiceTask.answer-short-question.recordingStartsAuto": "即将自动开始录音",
   "practiceTask.answer-short-question.checking": "正在核对你的答案…",
   "practiceTask.answer-short-question.modelAnswer": "参考答案",
