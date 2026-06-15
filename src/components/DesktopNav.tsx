@@ -6,7 +6,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import UserMenu from "@/components/UserMenu";
 import { useTranslation } from "@/lib/i18n";
 
-type NavItem = "home" | "practice" | "stats" | "history" | "settings";
+type NavItem = "home" | "practice" | "vocabulary" | "stats" | "history" | "settings";
 
 const maxWidthClasses = {
   "4xl": "max-w-4xl",
@@ -28,6 +28,7 @@ export default function DesktopNav({
   const links: { key: NavItem; href: string; label: string }[] = [
     { key: "home", href: "/", label: t("nav.home") },
     { key: "practice", href: "/practice", label: t("nav.practice") },
+    { key: "vocabulary", href: "/vocabulary", label: t("nav.vocabulary") },
     { key: "stats", href: "/stats", label: t("nav.stats") },
     { key: "history", href: "/history", label: t("nav.history") },
     { key: "settings", href: "/settings", label: t("nav.settings") },

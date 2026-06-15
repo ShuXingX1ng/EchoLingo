@@ -7,7 +7,7 @@ import { useTranslation } from "@/lib/i18n";
 type NavItem = {
   href: string;
   label: string;
-  icon: "home" | "practice" | "stats" | "history";
+  icon: "home" | "practice" | "vocabulary" | "stats" | "history";
 };
 
 const hiddenPrefixes = ["/practice", "/admin", "/debug", "/login", "/auth"];
@@ -28,6 +28,16 @@ function NavIcon({ icon, active }: { icon: NavItem["icon"]; active: boolean }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" className={cls} fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 20h9" />
         <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+    );
+  }
+  if (icon === "vocabulary") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={cls} fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+        <line x1="9" y1="7" x2="15" y2="7" />
+        <line x1="9" y1="11" x2="15" y2="11" />
       </svg>
     );
   }
@@ -60,6 +70,7 @@ export default function MobileNav() {
   const items: NavItem[] = [
     { href: "/", label: t("nav.home"), icon: "home" },
     { href: "/practice", label: t("nav.practice"), icon: "practice" },
+    { href: "/vocabulary", label: t("nav.vocabulary"), icon: "vocabulary" },
     { href: "/stats", label: t("nav.stats"), icon: "stats" },
     { href: "/history", label: t("nav.history"), icon: "history" },
   ];
@@ -71,7 +82,7 @@ export default function MobileNav() {
         aria-label="Mobile navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/98 px-2 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] pt-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-md md:hidden"
       >
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-0.5">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
           {items.map((item) => {
             const isActive =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
