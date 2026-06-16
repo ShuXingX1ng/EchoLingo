@@ -45,7 +45,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const ra = result.find((w) => w.taskType === "read_aloud")!
-    expect(ra.score).toBe(80) // (70+80+90)/3
+    // raw = (70+80+90)/3 = 80; with prior(35, weight=5): (80+175)/6 ≈ 43
+    expect(ra.score).toBe(43)
     expect(ra.recentCount).toBe(1)
     expect(ra.lastPracticed).toBe(task.createdAt)
   })
@@ -63,7 +64,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const we = result.find((w) => w.taskType === "write_essay")!
-    expect(we.score).toBe(75) // (60+70+80+90)/4
+    // raw = (60+70+80+90)/4 = 75; with prior(35, weight=5): (75+175)/6 ≈ 42
+    expect(we.score).toBe(42)
   })
 
   it("scores a reading task from dimension scores: vocabulary + comprehension average", () => {
@@ -79,7 +81,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const fib = result.find((w) => w.taskType === "fill_in_the_blanks_reading")!
-    expect(fib.score).toBe(70) // (60+80)/2
+    // raw = (60+80)/2 = 70; with prior(35, weight=5): (70+175)/6 ≈ 41
+    expect(fib.score).toBe(41)
   })
 
   it("scores a listening task from dimension scores: comprehension + accuracy average", () => {
@@ -95,7 +98,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const sst = result.find((w) => w.taskType === "summarize_spoken_text")!
-    expect(sst.score).toBe(70) // (50+90)/2
+    // raw = (50+90)/2 = 70; with prior(35, weight=5): (70+175)/6 ≈ 41
+    expect(sst.score).toBe(41)
   })
 
   it("falls back to strengths/weaknesses heuristic when no dimensionScores", () => {
@@ -110,8 +114,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const asq = result.find((w) => w.taskType === "answer_short_question")!
-    // 3 strengths / (3+1) total = 75
-    expect(asq.score).toBe(75)
+    // raw heuristic = 3/(3+1) = 75; with prior(35, weight=5): (75+175)/6 ≈ 42
+    expect(asq.score).toBe(42)
   })
 
   it("returns score 50 when feedback has no strengths or weaknesses", () => {
@@ -121,7 +125,8 @@ describe("deriveTaskTypeWeakness", () => {
     })
     const result = deriveTaskTypeWeakness([task])
     const pi = result.find((w) => w.taskType === "personal_intro")!
-    expect(pi.score).toBe(50)
+    // raw heuristic = 50 (no S/W); with prior(35, weight=5): (50+175)/6 ≈ 38
+    expect(pi.score).toBe(38)
   })
 
   it("populates dimensions when tasks have dimension scores", () => {
@@ -140,7 +145,8 @@ describe("deriveTaskTypeWeakness", () => {
     expect(ra.dimensions).toBeDefined()
     expect(ra.dimensions).toHaveLength(3)
     const fluencyDim = ra.dimensions!.find((d) => d.dimension === "fluency")!
-    expect(fluencyDim.score).toBe(60)
+    // raw = 60; with prior(35, weight=5): (60+175)/6 ≈ 39
+    expect(fluencyDim.score).toBe(39)
   })
 
   it("leaves dimensions undefined when no tasks have dimension scores", () => {
@@ -173,11 +179,15 @@ describe("deriveTaskTypeWeakness", () => {
         dimensionScores: { section: "writing", grammar: 10, vocabulary: 10, form: 10, content: 10 },
       },
     })
-    const result = deriveTaskTypeWeakness([recent, old])
-    const we = result.find((w) => w.taskType === "write_essay")!
-    // weighted: (90*1.0 + 10*0.25) / (1.0+0.25) = 92.5/1.25 = 74 (approx)
-    expect(we.score).toBeGreaterThan(60)
-    expect(we.score).toBeLessThan(90)
+    const resultHighRecent = deriveTaskTypeWeakness([recent, old])
+    const resultLowRecent = deriveTaskTypeWeakness([
+      { ...recent, feedback: { ...recent.feedback!, dimensionScores: { section: "writing", grammar: 10, vocabulary: 10, form: 10, content: 10 } } },
+      { ...old, feedback: { ...old.feedback!, dimensionScores: { section: "writing", grammar: 90, vocabulary: 90, form: 90, content: 90 } } },
+    ])
+    const highScore = resultHighRecent.find((w) => w.taskType === "write_essay")!.score
+    const lowScore = resultLowRecent.find((w) => w.taskType === "write_essay")!.score
+    // Recent tasks (weight=1.0) should pull the score more than old tasks (weight=0.25)
+    expect(highScore).toBeGreaterThan(lowScore)
   })
 })
 

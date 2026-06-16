@@ -31,6 +31,11 @@ function scoreFromTask(task: PracticeTask): number | null {
   return Math.round((strengths / total) * 100)
 }
 
+// Bayesian prior applied to all score aggregations.
+// Prevents a handful of early attempts from pushing scores to 100 immediately.
+const PRIOR_SCORE = 35
+const PRIOR_WEIGHT = 5
+
 // Recency decay — tasks older than 30 days contribute proportionally less
 function recencyWeight(createdAt: string): number {
   const ageDays = (Date.now() - new Date(createdAt).getTime()) / 86_400_000
@@ -88,7 +93,7 @@ function aggregateDimensions(tasks: PracticeTask[]): DimensionWeakness[] | undef
 
   return Array.from(dimMap.entries()).map(([dimension, { weightedSum, totalWeight }]) => ({
     dimension,
-    score: Math.round(weightedSum / totalWeight),
+    score: Math.round((weightedSum + PRIOR_SCORE * PRIOR_WEIGHT) / (totalWeight + PRIOR_WEIGHT)),
   }))
 }
 
@@ -106,8 +111,9 @@ export function deriveTaskTypeWeakness(tasks: PracticeTask[]): TaskTypeWeakness[
     let aggregateScore = 50
     if (scored.length > 0) {
       const totalWeight = scored.reduce((sum, s) => sum + s.weight, 0)
+      const weightedSum = scored.reduce((sum, s) => sum + s.score * s.weight, 0)
       aggregateScore = Math.round(
-        scored.reduce((sum, s) => sum + s.score * s.weight, 0) / totalWeight,
+        (weightedSum + PRIOR_SCORE * PRIOR_WEIGHT) / (totalWeight + PRIOR_WEIGHT),
       )
     }
 
