@@ -60,6 +60,7 @@
 | Architecture deepening (C2) — Read Aloud backend unification | Done | Deleted `backend/routers/read_aloud.py`; removed `read_aloud` from `backend/main.py`; removed `randomEndpoint` from read-aloud page + MockReadAloud (now use `/api/pte/stimulus`); added `process_pronunciation_node` to LangGraph graph; `pron_context` field in `FeedbackState`; 294/294 backend pytest, tsc 0 |
 | Architecture deepening (C3) — Task Type metadata registry | Done | Created `src/lib/task-type-registry.ts` (15-type registry with displayName/category/stimulusFormat/TimerConfig); `src/data/task-types.json` for Python backend; `task-weakness.ts` `ALL_TASK_TYPES` now imported from registry; `pte_feedback.py` + `pte_stimulus.py` load `VALID_TASK_TYPES` from JSON file; 294/294 backend pytest, tsc 0 |
 | Architecture deepening (C4) — `createSyncedStore` factory | Done | New `src/lib/synced-store.ts`; `unified-task-history.ts` + `unified-vocabulary.ts` delegate save/listAll/delete to factory; external signatures unchanged; tsc 0, 124/124 unit tests |
+| UI Visual Upgrade | Done | All 7 UI surfaces upgraded: globals.css tokens + body gradient; DesktopNav icon tiles; Home, Practice, Stats, History, Vocabulary, Settings pages unified to `rounded-[22px]`/`rounded-[28px]` card system + lucide icon tiles + section heading style; all `bg-[var(--background)]` outer-div overrides removed so body gradient shows through |
 
 ## Current Test Baseline
 
@@ -82,9 +83,12 @@ DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-
 
 ## Next Phase
 
-**Resume point (2026-06-15):** Architecture Candidates 1–4 are all complete.
+**Resume point (2026-06-16):** UI Visual Upgrade fully complete — all 7 surfaces (Home, Practice, DesktopNav, Stats, History, Vocabulary, Settings) now share the premium card system. Architecture Candidates 1–4 also complete.
 
 What's done:
+- UI Round 1 (Home + Practice + Nav): lucide-react installed; globals.css gradient body; DesktopNav icon tiles + inset-shadow active; Home glass metric card + Practice hero + color-coded task section cards
+- UI Round 2 (Stats + History): removed `bg-[var(--background)]` body overrides; Stats page hero (`BarChart2`), section icon tiles (`AlertTriangle`/`Target`/`TrendingUp`); History page lucide `Search` + explicit `border-violet-200` hero card tokens
+- UI Round 3 (Vocabulary + Settings): `vocabulary/page.tsx` outer-div bg override removed; hero card + `VocabularyCard` canonical tokens; `settings/page.tsx` outer-div bg override removed; new Settings hero card (`Settings2` indigo tile); Goals/Reminders/Voice/Account section cards canonical tokens + lucide icon tiles
 - C1: `usePracticeTaskRunner` hook covering 9 pages + 6 Mock components; `submit(overrides?)` for JSON-stimulus pages
 - C2: `backend/routers/read_aloud.py` deleted; `process_pronunciation_node` in `feedback_graph.py`; stimulus unified to `/api/pte/stimulus`
 - C3: `src/lib/task-type-registry.ts` (TASK_TYPE_REGISTRY + ALL_TASK_TYPES + helpers); `src/data/task-types.json`; both Python routers load VALID_TASK_TYPES from JSON
@@ -162,6 +166,17 @@ duplicates the task list.)
 **有意保留（不在本次范围）：** legacy 历史/备份孤岛 `src/lib/history.ts`、`unified-history.ts`、`supabase-history.ts`、`src/components/DataMigration.tsx` 及 `src/types/index.ts` 的 `SessionFeedback`/`ChatMessage` 类型 —— 支撑 IELTS-session 备份/迁移，未在 PTE UI 暴露（见 Known Technical Debt）。`recommendations.ts` 的 legacy `getRecommendations` 现已无调用方，但与 `getPteRecommendations` 同处一文件，保留待后续。
 
 ## Future / Backlog
+
+### Learning Experience
+
+- **Phase SRS-1: 词汇 SRS（间隔重复）** — 基于 SM-2 算法为词汇表中每个单词计算下次复习时间；`/vocabulary` 页增加"开始复习"入口；后端新增 `POST /api/vocabulary/review` 端点记录复习结果；Supabase 存储 `next_review_at` + `ease_factor` + `interval_days`。可由 SRS Scheduling Agent 驱动（根据用户历史表现动态调整难度权重）。
+- **Phase Streak-1: 每日目标 + 练习连击** — 用户可设定每日练习题数目标；主页/练习页显示当日进度环 + 连击天数；Supabase `daily_activity` 表记录每日完成数；连击断裂发送 PWA push notification 提醒。
+- **Phase Onboarding-1: 新用户引导** — 首次登录触发三步引导：(1) 快速水平自测（2 道 Read Aloud + 1 道 Write Essay）；(2) Diagnosis Agent 生成初始弱项画像；(3) 展示个性化"入门学习路径"并直接跳转第一道练习题。Agent 机会：Onboarding Orchestrator Agent 串联评估→诊断→计划生成三步。
+- **Phase Strategy-1: 题型解题策略内容** — 每个练习题页面增加可折叠"策略提示"面板，内容为静态 Markdown（15 种题型各一份）；后续可升级为 Strategy Coach Agent，根据用户当前弱项动态选取最相关的策略片段。
+- **Phase AWL-1: 学术词汇表（AWL）覆盖情况** — 将 Academic Word List（570 词族）内置为静态数据；在 `/vocabulary` 页展示用户已掌握的 AWL 覆盖率（已学 / 570）；单词查询时标注"AWL"徽章。
+- **Phase ModelAnswer-1: 对比示范答案** — 反馈页增加"查看示范"按钮：Read Aloud 用 Azure TTS 生成标准朗读音频供对比；Write Essay / SWT 用 DeepSeek 生成一份目标分数段的示范文本。可由 Model Answer Agent 驱动（按目标分数带生成不同难度的示范）。
+
+### Infrastructure / Ops
 
 - Phase Data-1: Scraped stimulus bank (see above)
 - Payment / subscriptions / commercial operations

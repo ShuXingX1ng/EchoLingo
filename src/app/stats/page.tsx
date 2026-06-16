@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { BarChart2, TrendingUp, AlertTriangle, Target } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import { BarChart, LineChart } from "@/components/Chart"
 import { getTasks } from "@/lib/unified-task-history"
@@ -448,7 +449,7 @@ export default function StatsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-[var(--background)]">
+      <div className="flex flex-col min-h-screen">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center">
           <div className="flex gap-2">
@@ -464,11 +465,13 @@ export default function StatsPage() {
 
   if (!stats || stats.totalTasks === 0) {
     return (
-      <div className="flex flex-col min-h-screen bg-[var(--background)]">
+      <div className="flex flex-col min-h-screen">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center px-6">
           <div className="text-center animate-fade-in">
-            <div className="text-6xl mb-6">📊</div>
+            <div className="h-16 w-16 rounded-[20px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center mx-auto mb-6">
+              <BarChart2 className="w-8 h-8" strokeWidth={2} />
+            </div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">No practice data yet</h1>
             <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md">
               Complete a PTE practice task to see your task-type weakness profile and progress trends.
@@ -502,16 +505,29 @@ export default function StatsPage() {
     : []
 
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--background)]">
+    <div className="flex flex-col min-h-screen">
       <DesktopNav active="stats" />
 
       <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto max-w-4xl space-y-6">
 
+          {/* Page hero */}
+          <div className="animate-enter rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-[15px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <BarChart2 className="w-6 h-6" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">Analytics</p>
+                <h1 className="text-xl font-bold text-[var(--foreground)]">Your Progress</h1>
+              </div>
+            </div>
+          </div>
+
           {/* Section 1: Overview */}
           <section className="animate-fade-in">
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-300">
                 Practice Overview
               </p>
               <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
@@ -530,15 +546,20 @@ export default function StatsPage() {
 
           {/* Section 2: Task-Type Weakness */}
           <section className="animate-card-in">
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6">
               <div className="flex items-start justify-between mb-5">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
-                    Task-Type Weakness
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    Score 0–100, lower means weaker. Tap a row to expand per-dimension breakdown.
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className="h-12 w-12 rounded-[15px] border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-300">
+                      Task-Type Weakness
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Score 0–100, lower means weaker. Tap a row to expand per-dimension breakdown.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4">
@@ -552,15 +573,20 @@ export default function StatsPage() {
           {/* Section 3: Dimension Profile + Gap Analysis (shown only when dimension data exists) */}
           {hasDimensionData && (
             <section className="animate-card-in">
-              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6 space-y-5">
+              <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6 space-y-5">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-400">
-                      Learner Profile
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      Aggregate dimension scores across all practiced task types.
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="h-12 w-12 rounded-[15px] border border-indigo-200 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                      <Target className="w-5 h-5" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">
+                        Learner Profile
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        Aggregate dimension scores across all practiced task types.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Section tab switcher — shown when 2+ sections have data */}
@@ -619,8 +645,13 @@ export default function StatsPage() {
 
           {/* Section 4: Focus areas + Recommended actions */}
           <div className="grid gap-4 sm:grid-cols-2 animate-card-in">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-500/30 dark:bg-amber-500/10">
-              <h3 className="text-sm font-semibold text-amber-950 dark:text-amber-100">Focus areas</h3>
+            <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-[10px] border border-amber-300 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+                </div>
+                <h3 className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-300">Focus areas</h3>
+              </div>
               {topWeaknesses.length > 0 ? (
                 <ul className="mt-3 space-y-2">
                   {topWeaknesses.map((w) => (
@@ -644,8 +675,13 @@ export default function StatsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-              <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Recommended next steps</h3>
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-[10px] border border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" strokeWidth={2} />
+                </div>
+                <h3 className="text-xs font-bold uppercase tracking-[0.19em] text-slate-700 dark:text-slate-300">Recommended next steps</h3>
+              </div>
               <div className="space-y-3">
                 <ActionLink href="/practice" label="Task Practice" desc="Pick any PTE task type and drill with AI feedback." color="emerald" />
                 <ActionLink href="/mock" label="Mock Exam" desc="Sequence all task types under exam conditions." color="cyan" />
@@ -656,7 +692,7 @@ export default function StatsPage() {
 
           {/* Section 5: Score Trajectory */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
               <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                 Score trajectory by task type
                 <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
@@ -701,7 +737,7 @@ export default function StatsPage() {
 
           {/* Section 6: Practice distribution */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
               <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                 Practice distribution
                 <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
@@ -731,7 +767,7 @@ export default function StatsPage() {
           {/* Section 7: Weekly activity */}
           {stats.weeklyActivity.some((w) => w.count > 0) && (
             <section className="animate-card-in">
-              <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
                 <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
                   Weekly activity
                   <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>

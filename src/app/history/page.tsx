@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
+import { Clock, Trash2, Search } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { getTasks, deleteTask, clearAllTasksLocal } from "@/lib/unified-task-history"
@@ -41,6 +42,22 @@ const TASK_SECTION: Record<PteTaskType, string> = {
   summarize_spoken_text: "Listening",
   fill_in_the_blanks_listening: "Listening",
   highlight_correct_summary: "Listening",
+}
+
+function parseFillInTheBlanksStimulus(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as { passage?: unknown; blanks?: unknown }
+    if (typeof parsed.passage !== "string" || !Array.isArray(parsed.blanks)) return null
+    let passage = parsed.passage
+    const blanks = parsed.blanks as Array<{ options: string[]; correct: number }>
+    blanks.forEach((b, i) => {
+      passage = passage.replace(`[BLANK_${i}]`, `[${b.options[b.correct]}]`)
+    })
+    const answers = blanks.map((b, i) => `Blank ${i + 1}: "${b.options[b.correct]}"`).join(", ")
+    return `Passage (correct answers shown):\n${passage}\n\nAnswers: ${answers}`
+  } catch {
+    return null
+  }
 }
 
 function formatDate(iso: string): string {
@@ -108,10 +125,10 @@ function TaskCard({
 
   return (
     <div
-      className={`w-full bg-[var(--surface)] rounded-xl p-4 sm:p-5 border transition-all text-left group ${
+      className={`w-full bg-[var(--surface)] rounded-[22px] p-4 sm:p-5 border transition-all text-left group ${
         isSelectMode && isSelected
-          ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/20"
-          : "border-[var(--border)] hover:border-[var(--brand)] hover:shadow-md"
+          ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/20 shadow-[0_10px_26px_rgba(15,23,42,.055)]"
+          : "border-[var(--border)] shadow-[0_10px_26px_rgba(15,23,42,.055)] hover:border-[var(--brand)]"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -172,10 +189,7 @@ function TaskCard({
             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
             title="Delete"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -195,7 +209,7 @@ function TaskDetail({
   onDelete: () => void
 }) {
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav active="history" />
 
       <div className="sticky top-0 z-10 bg-[var(--surface)]/90 backdrop-blur border-b border-[var(--border)] px-4 py-3">
@@ -221,10 +235,7 @@ function TaskDetail({
             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title="Delete"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -233,7 +244,11 @@ function TaskDetail({
         {task.feedback ? (
           <TaskFeedbackDisplay
             feedback={task.feedback}
-            stimulus={task.stimulus.kind === "text" ? task.stimulus.content : undefined}
+            stimulus={
+              task.stimulus.kind === "text"
+                ? (parseFillInTheBlanksStimulus(task.stimulus.content) ?? task.stimulus.content)
+                : undefined
+            }
             stimulusLabel={task.stimulus.kind === "text" ? "Stimulus" : "Audio Stimulus"}
             responseText={task.response.kind === "text" ? task.response.content : undefined}
             responseLabel={task.response.kind === "audio" ? "Spoken Response (transcript)" : "Your Response"}
@@ -375,10 +390,23 @@ export default function HistoryPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav active="history" />
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6">
+        {/* Page hero */}
+        <div className="mb-6 rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6 animate-enter">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-[15px] border border-violet-200 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 flex items-center justify-center shrink-0">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-violet-700 dark:text-violet-400">Practice History</p>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">Your Practice Journal</h1>
+            </div>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="flex gap-1.5 mb-4">
@@ -444,11 +472,7 @@ export default function HistoryPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
                 />
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={2} />
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">

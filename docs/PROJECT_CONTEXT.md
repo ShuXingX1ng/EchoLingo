@@ -21,7 +21,7 @@ Target users:
 | Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 294 backend tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality + 6 new graph tests) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
-| UI | Design token system complete — every page (practice tasks, settings, nav, history, stats, home) uses CSS variable tokens; `--border-strong` added for bold-card borders; DM Serif Display + DM Sans typography; Playwright visual verification passed (light + dark) |
+| UI | Visual upgrade complete — gradient page background (body, no per-page bg override); lucide-react icon set; premium card system (`rounded-[22px]/rounded-[28px]`, `border-[#dce4ee]`, `shadow-[0_10px_26px_rgba(15,23,42,.055)]`); Home hero + glass metric card; Practice hero + color-coded task sections; Stats hero (BarChart2 tile) + section icon tiles (AlertTriangle/Target/TrendingUp); History hero (Clock violet tile) + lucide Search in toolbar; Vocabulary hero (BookOpen emerald tile); Settings hero (Settings2 indigo tile) + section icon tiles (Target/Bell/Volume2/UserCircle2) per card; DesktopNav icon tiles + active inset-shadow |
 
 ## Architecture
 
