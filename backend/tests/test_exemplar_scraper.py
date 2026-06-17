@@ -6,7 +6,6 @@ JijingAdapter file reading (all HTTP calls are mocked — no real network reques
 """
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

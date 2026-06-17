@@ -7,7 +7,7 @@ Encapsulates Azure Speech SDK for TTS and Pronunciation Assessment.
 import asyncio
 import os
 import tempfile
-from typing import List, Optional
+from typing import List
 from dataclasses import dataclass
 import azure.cognitiveservices.speech as speechsdk
 from models.schemas import (

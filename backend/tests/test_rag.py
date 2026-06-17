@@ -22,7 +22,6 @@ def _stub_vecs():
 _stub_vecs()
 
 # Now it's safe to import the services
-import importlib
 import services.vector_store  # noqa: E402  — must come after stub
 import services.rag            # noqa: E402  — must come after vector_store
 

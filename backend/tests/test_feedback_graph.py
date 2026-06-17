@@ -24,9 +24,6 @@ def _stub_vecs():
 
 _stub_vecs()
 
-import importlib
-import services.vector_store   # noqa: E402
-import services.rag            # noqa: E402
 import services.feedback_graph as fg  # noqa: E402
 
 

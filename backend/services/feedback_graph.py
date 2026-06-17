@@ -65,10 +65,14 @@ class FeedbackState(TypedDict):
 # ---------------------------------------------------------------------------
 
 def _section(task_type: str) -> str:
-    if task_type in SCORED_SPEAKING:  return "speaking"
-    if task_type in SCORED_WRITING:   return "writing"
-    if task_type in SCORED_READING:   return "reading"
-    if task_type in SCORED_LISTENING: return "listening"
+    if task_type in SCORED_SPEAKING:
+        return "speaking"
+    if task_type in SCORED_WRITING:
+        return "writing"
+    if task_type in SCORED_READING:
+        return "reading"
+    if task_type in SCORED_LISTENING:
+        return "listening"
     return "unscored"
 
 
@@ -92,10 +96,14 @@ def _build_primary_system(task_type: str, retrieved_context: str) -> str:
 
 
 def _judge_system(task_type: str) -> Optional[str]:
-    if task_type in SCORED_SPEAKING:  return prompts.judge_speaking
-    if task_type in SCORED_WRITING:   return prompts.judge_writing
-    if task_type in SCORED_READING:   return prompts.judge_reading
-    if task_type in SCORED_LISTENING: return prompts.judge_listening
+    if task_type in SCORED_SPEAKING:
+        return prompts.judge_speaking
+    if task_type in SCORED_WRITING:
+        return prompts.judge_writing
+    if task_type in SCORED_READING:
+        return prompts.judge_reading
+    if task_type in SCORED_LISTENING:
+        return prompts.judge_listening
     return None
 
 
@@ -494,12 +502,12 @@ def _compute_reading_feedback(task_type: str, response: str) -> dict:
     import re as _re
 
     if task_type == "fill_in_the_blanks_reading":
-        lines = [l.strip() for l in response.strip().splitlines() if l.strip()]
-        correct = sum(1 for l in lines if "✓" in l)
+        lines = [ln.strip() for ln in response.strip().splitlines() if ln.strip()]
+        correct = sum(1 for ln in lines if "✓" in ln)
         total = len(lines)
         score = round(correct / total * 100) if total > 0 else 0
 
-        wrong_blanks = [_re.search(r"(Blank \d+)", l).group(1) for l in lines if "✗" in l and _re.search(r"Blank \d+", l)]
+        wrong_blanks = [_re.search(r"(Blank \d+)", ln).group(1) for ln in lines if "✗" in ln and _re.search(r"Blank \d+", ln)]
         accuracy_text = f"共 {total} 个空白，答对 {correct} 个。"
         if wrong_blanks:
             accuracy_text += f"错误项：{', '.join(wrong_blanks)}。"
