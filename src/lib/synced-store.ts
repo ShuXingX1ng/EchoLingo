@@ -23,6 +23,8 @@ export interface SyncedStore<T, TInput> {
   save(item: TInput): Promise<T>
   listAll(): Promise<T[]>
   delete(id: string): Promise<boolean>
+  /** Clears the login and list caches. Only call this in tests. */
+  _resetCache(): void
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -99,6 +101,11 @@ export function createSyncedStore<T, TInput>(
         // fall through to local-only delete
       }
       return local.delete(id)
+    },
+
+    _resetCache() {
+      loginCache = null
+      listCache = null
     },
   }
 }
