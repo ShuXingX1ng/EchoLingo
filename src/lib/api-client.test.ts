@@ -129,7 +129,7 @@ describe("api-client", () => {
       const audioContent = new Uint8Array([1, 2, 3, 4]);
       mockFetch.mockResolvedValueOnce(new Response(audioContent, { status: 200, headers: { "Content-Type": "audio/wav" } }));
       const blob = await apiPostBlob("/api/tts", { text: "hello" });
-      expect(blob).toBeInstanceOf(Blob);
+      expect(blob.constructor.name).toBe("Blob");
       expect(blob.size).toBeGreaterThan(0);
       expect(mockFetch).toHaveBeenCalledWith(`${BASE}/api/tts`, expect.objectContaining({
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "hello" }),
