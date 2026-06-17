@@ -1,22 +1,5 @@
 import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
-
-const ALL_TASK_TYPES: PteTaskType[] = [
-  "read_aloud",
-  "repeat_sentence",
-  "answer_short_question",
-  "summarize_written_text",
-  "write_essay",
-  "personal_intro",
-  "write_from_dictation",
-  "describe_image",
-  "re_tell_lecture",
-  "fill_in_the_blanks_reading",
-  "re_order_paragraphs",
-  "multiple_choice_reading",
-  "summarize_spoken_text",
-  "fill_in_the_blanks_listening",
-  "highlight_correct_summary",
-]
+import { ALL_TASK_TYPES } from "@/lib/task-type-registry"
 
 // Overall performance score from a single task (0–100).
 // Uses actual dimension scores when available (Phase 6); falls back to strengths/weaknesses heuristic.
@@ -47,6 +30,11 @@ function scoreFromTask(task: PracticeTask): number | null {
   if (total === 0) return 50
   return Math.round((strengths / total) * 100)
 }
+
+// Bayesian prior applied to all score aggregations.
+// Prevents a handful of early attempts from pushing scores to 100 immediately.
+const PRIOR_SCORE = 35
+const PRIOR_WEIGHT = 5
 
 // Recency decay — tasks older than 30 days contribute proportionally less
 function recencyWeight(createdAt: string): number {
@@ -105,7 +93,7 @@ function aggregateDimensions(tasks: PracticeTask[]): DimensionWeakness[] | undef
 
   return Array.from(dimMap.entries()).map(([dimension, { weightedSum, totalWeight }]) => ({
     dimension,
-    score: Math.round(weightedSum / totalWeight),
+    score: Math.round((weightedSum + PRIOR_SCORE * PRIOR_WEIGHT) / (totalWeight + PRIOR_WEIGHT)),
   }))
 }
 
@@ -123,8 +111,9 @@ export function deriveTaskTypeWeakness(tasks: PracticeTask[]): TaskTypeWeakness[
     let aggregateScore = 50
     if (scored.length > 0) {
       const totalWeight = scored.reduce((sum, s) => sum + s.weight, 0)
+      const weightedSum = scored.reduce((sum, s) => sum + s.score * s.weight, 0)
       aggregateScore = Math.round(
-        scored.reduce((sum, s) => sum + s.score * s.weight, 0) / totalWeight,
+        (weightedSum + PRIOR_SCORE * PRIOR_WEIGHT) / (totalWeight + PRIOR_WEIGHT),
       )
     }
 

@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import type { PracticeTask, TaskFeedback } from "@/types"
+import { useState, useRef, useCallback, useEffect } from "react"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import type { PracticeTask } from "@/types"
 
 const TIME_LIMIT = 240 // 4 min
 
@@ -13,7 +12,6 @@ type ParsedStimulus = {
   options: string[]
   correct: number
 }
-type Phase = "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -44,144 +42,66 @@ function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
 }
 
 export default function MockMultipleChoiceReading({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
-  const [phase, setPhase] = useState<Phase>("generating")
+  const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
+    taskType: "multiple_choice_reading",
+    responseKind: "text",
+  })
+
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
   const [selected, setSelected] = useState<number | null>(null)
   const [seconds, setSeconds] = useState(TIME_LIMIT)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
-  const [error, setError] = useState("")
 
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectedRef = useRef<number | null>(null)
-  const rawStimulusRef = useRef("")
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
+  useEffect(() => { selectedRef.current = selected }, [selected])
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
+  // Parse JSON stimulus when hook loads it
   useEffect(() => {
-    if (phase !== "ready") return
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelected(null)
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
+
+  const handleSubmit = useCallback(async () => {
+    const p = parsedRef.current
+    if (!p) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    const finalSelected = selectedRef.current ?? 0
+    await submit({
+      feedbackStimulus: buildStimulusForFeedback(p),
+      feedbackResponse: buildResponseForFeedback(p, finalSelected),
+    })
+  }, [submit])
+
+  // Timer while the user is answering
+  useEffect(() => {
+    if (phase !== "writing") return
     timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) {
-          clearInterval(timerRef.current!)
-          submitRef.current()
-          return 0
-        }
-        return s - 1
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
       })
     }, 1000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  useEffect(() => { selectedRef.current = selected }, [selected])
-
-  const handleSubmit = useCallback(async () => {
-    const currentParsed = parsedRef.current
-    if (!currentParsed) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const startedAt = startedAtRef.current || endedAt
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-
-    // If timer expired with no selection, default to first option
-    const finalSelected = selectedRef.current ?? 0
-    const stimulusForFeedback = buildStimulusForFeedback(currentParsed)
-    const responseForFeedback = buildResponseForFeedback(currentParsed, finalSelected)
-
-    let fb: TaskFeedback | null = null
-    try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "multiple_choice_reading",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
-      })
-      if (res.ok) fb = await res.json() as TaskFeedback
-    } catch { /* best-effort */ }
-
-    const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "multiple_choice_reading",
-        stimulus: { kind: "text", content: rawStimulusRef.current },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "multiple_choice_reading",
-        stimulus: { kind: "text", content: rawStimulusRef.current },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
-
-  useEffect(() => {
-    const generate = async () => {
-      try {
-        let raw: string
-        const cached = getStimulusFromBank("multiple_choice_reading")
-        if (cached) {
-          raw = cached
-        } else {
-          const res = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "multiple_choice_reading" }),
-          })
-          if (!res.ok) throw new Error("Failed to generate stimulus")
-          raw = ((await res.json()) as { text: string }).text
-          addStimulusToBank("multiple_choice_reading", raw)
-        }
-        const nextParsed = parseStimulus(raw)
-        if (!nextParsed) throw new Error("Invalid stimulus format")
-
-        parsedRef.current = nextParsed
-        rawStimulusRef.current = raw
-        startedAtRef.current = new Date().toISOString()
-        setParsed(nextParsed)
-        setRawStimulus(raw)
-        setPhase("ready")
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed")
-        setPhase("error")
-      }
-    }
-    generate()
-  }, [])
+  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 60
 
-  const skipTask = () => {
+  const skipTask = (): void => {
     onComplete({
       id: `mock_${Date.now()}`,
       taskType: "multiple_choice_reading",
-      stimulus: { kind: "text", content: rawStimulus },
+      stimulus: { kind: "text", content: stimulus },
       response: { kind: "text", content: "" },
       durationSeconds: 0,
       createdAt: new Date().toISOString(),
@@ -190,14 +110,14 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
 
   return (
     <div className="space-y-5">
-      {phase === "generating" && (
+      {(phase === "idle" || phase === "generating") && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Generating question...</p>
         </div>
       )}
 
-      {phase === "ready" && parsed && (
+      {phase === "writing" && parsed && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
@@ -250,14 +170,14 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
         </div>
       )}
 
-      {phase === "done" && doneTask && (
+      {phase === "done" && savedTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">AI Feedback</p>
-            <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{doneTask.feedback?.summary}</p>
+            <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{savedTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
-            <button onClick={() => onComplete(doneTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+            <button onClick={() => onComplete(savedTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
               Continue to Next Task
             </button>
           </div>

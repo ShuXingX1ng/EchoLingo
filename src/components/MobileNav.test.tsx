@@ -32,7 +32,7 @@ describe("MobileNav", () => {
     expect(screen.getByRole("navigation", { name: "Mobile navigation" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("link", { name: "Practice" }).getAttribute("href")).toBe(
-      "/practice/setup"
+      "/practice"
     );
     expect(screen.getByRole("link", { name: "Stats" }).getAttribute("aria-current")).toBe(
       "page"
@@ -42,7 +42,7 @@ describe("MobileNav", () => {
     );
   });
 
-  it.each(["/practice", "/practice/setup", "/practice/exam", "/admin", "/debug", "/login", "/auth/callback"])(
+  it.each(["/practice", "/practice/read-aloud", "/admin", "/debug", "/login", "/auth/callback"])(
     "hides the mobile nav on %s",
     (pathname) => {
       renderNav(pathname);

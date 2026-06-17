@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { saveTask } from "@/lib/unified-task-history"
+import { apiPost } from "@/lib/api-client"
 import { getRandomImage } from "@/lib/image-bank"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import type { ImageStimulus } from "@/lib/image-bank"
 import type { PracticeTask, TaskFeedback } from "@/types"
 import CountdownRing from "./CountdownRing"
@@ -18,45 +20,22 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
   const [image] = useState<ImageStimulus>(() => getRandomImage())
   const [imageError, setImageError] = useState(false)
   const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const imageRef = useRef(image)
-  const processAudioRef = useRef<(b: Blob) => void>(() => {})
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-  }, [])
-
-  const processAudio = useCallback(async (audioBlob: Blob) => {
+  const processAudio = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
     const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const tx = txRef.current.trim() || "[transcript not captured]"
-    const img = imageRef.current
-    const stimulusText = `Image type: ${img.topic}\n\nImage content: ${img.description}`
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
+    const stimulusText = `Image type: ${image.topic}\n\nImage content: ${image.description}`
 
     let fb: TaskFeedback
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "describe_image", stimulus: stimulusText, response: tx }),
-      })
-      fb = res.ok
-        ? (await res.json()) as TaskFeedback
-        : { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx })
     } catch {
       fb = { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
     }
@@ -65,100 +44,54 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
     try {
       task = await saveTask({
         taskType: "describe_image",
-        stimulus: { kind: "image", content: img.url },
+        stimulus: { kind: "image", content: image.url },
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch {
       task = {
         id: `mock_${Date.now()}`,
         taskType: "describe_image",
-        stimulus: { kind: "image", content: img.url },
+        stimulus: { kind: "image", content: image.url },
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       }
     }
 
     setDoneTask(task)
     setPhase("done")
+  }, [image])
+
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    onComplete: processAudio,
+    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  })
+
+  useEffect(() => () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
   }, [])
-
-  useEffect(() => { processAudioRef.current = processAudio }, [processAudio])
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") {
-      processAudioRef.current(new Blob([], { type: "audio/webm" }))
-      return
-    }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processAudioRef.current(blob)
-    }
-    mr.stop()
-  }, [])
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []; txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setErrorMsg("Microphone access denied.")
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => {}
-      srRef.current = rec
-      try { rec.start() } catch {}
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [stopRecording])
 
   // Auto-start prep timer on mount
   useEffect(() => {
-    timerRef.current = setInterval(() => {
+    prepTimerRef.current = setInterval(() => {
       setPrepSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
+        if (s <= 1) {
+          clearInterval(prepTimerRef.current!)
+          setPhase("recording")
+          recording.start()
+          return 0
+        }
         return s - 1
       })
     }, 1000)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const skipTask = () => {
@@ -206,7 +139,7 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Recording</p>
               </div>
-              <CountdownRing seconds={recSec} total={RECORD_TIME} size={64} />
+              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={64} />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{image.topic}</p>
             {imageError ? (

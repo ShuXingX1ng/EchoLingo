@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
+import { Clock, Trash2, Search } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { getTasks, deleteTask, clearAllTasksLocal } from "@/lib/unified-task-history"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask, PteTaskType } from "@/types"
 
 const TASK_LABELS: Record<PteTaskType, string> = {
@@ -25,7 +27,7 @@ const TASK_LABELS: Record<PteTaskType, string> = {
   highlight_correct_summary: "Highlight Correct Summary",
 }
 
-const TASK_SECTION: Record<PteTaskType, string> = {
+const TASK_SECTION_KEY: Record<PteTaskType, string> = {
   read_aloud: "Speaking",
   repeat_sentence: "Speaking",
   answer_short_question: "Speaking",
@@ -43,8 +45,24 @@ const TASK_SECTION: Record<PteTaskType, string> = {
   highlight_correct_summary: "Listening",
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+function parseFillInTheBlanksStimulus(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as { passage?: unknown; blanks?: unknown }
+    if (typeof parsed.passage !== "string" || !Array.isArray(parsed.blanks)) return null
+    let passage = parsed.passage
+    const blanks = parsed.blanks as Array<{ options: string[]; correct: number }>
+    blanks.forEach((b, i) => {
+      passage = passage.replace(`[BLANK_${i}]`, `[${b.options[b.correct]}]`)
+    })
+    const answers = blanks.map((b, i) => `Blank ${i + 1}: "${b.options[b.correct]}"`).join(", ")
+    return `Passage (correct answers shown):\n${passage}\n\nAnswers: ${answers}`
+  } catch {
+    return null
+  }
+}
+
+function formatDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -69,7 +87,7 @@ function exportToCSV(tasks: PracticeTask[]): string {
     t.id,
     new Date(t.createdAt).toLocaleDateString("en-US"),
     TASK_LABELS[t.taskType],
-    TASK_SECTION[t.taskType],
+    TASK_SECTION_KEY[t.taskType],
     t.durationSeconds,
     `"${(t.feedback?.summary ?? "").replace(/"/g, '""')}"`,
   ])
@@ -104,14 +122,15 @@ function TaskCard({
   onClick: () => void
   onDelete: () => void
 }) {
+  const { t, locale } = useTranslation()
   const firstWeakness = task.feedback?.weaknesses?.[0]
 
   return (
     <div
-      className={`w-full bg-[var(--surface)] rounded-xl p-4 sm:p-5 border transition-all text-left group ${
+      className={`w-full bg-[var(--surface)] rounded-[22px] p-4 sm:p-5 border transition-all text-left group ${
         isSelectMode && isSelected
-          ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/20"
-          : "border-[var(--border)] hover:border-[var(--brand)] hover:shadow-md"
+          ? "border-[var(--brand)] ring-2 ring-[var(--brand)]/20 shadow-[0_10px_26px_rgba(15,23,42,.055)]"
+          : "border-[var(--border)] shadow-[0_10px_26px_rgba(15,23,42,.055)] hover:border-[var(--brand)]"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -135,11 +154,11 @@ function TaskCard({
                   {TASK_LABELS[task.taskType]}
                 </span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  {TASK_SECTION[task.taskType]}
+                  {t(`practiceHub.section.${TASK_SECTION_KEY[task.taskType]}`)}
                 </span>
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                {formatDate(task.createdAt)} · {task.durationSeconds}s
+                {formatDate(task.createdAt, locale)} · {task.durationSeconds}s
               </p>
             </div>
             {!isSelectMode && (
@@ -158,7 +177,7 @@ function TaskCard({
               )}
               {firstWeakness && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-900/20 dark:text-amber-100 line-clamp-2">
-                  <span className="font-medium">Focus: </span>
+                  <span className="font-medium">{t("history.focus")} </span>
                   {firstWeakness}
                 </p>
               )}
@@ -170,12 +189,9 @@ function TaskCard({
           <button
             onClick={(e) => { e.stopPropagation(); onDelete() }}
             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
-            title="Delete"
+            title={t("admin.delete")}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -194,8 +210,10 @@ function TaskDetail({
   onBack: () => void
   onDelete: () => void
 }) {
+  const { t, locale } = useTranslation()
+
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav active="history" />
 
       <div className="sticky top-0 z-10 bg-[var(--surface)]/90 backdrop-blur border-b border-[var(--border)] px-4 py-3">
@@ -205,26 +223,23 @@ function TaskDetail({
               onClick={onBack}
               className="text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
             >
-              ← Back
+              ← {t("history.back")}
             </button>
             <div>
               <h1 className="font-semibold text-[var(--foreground)]">
                 {TASK_LABELS[task.taskType]}
               </h1>
               <p className="text-xs text-[var(--text-secondary)]">
-                {formatDate(task.createdAt)}
+                {formatDate(task.createdAt, locale)}
               </p>
             </div>
           </div>
           <button
             onClick={onDelete}
             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Delete"
+            title={t("admin.delete")}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -233,14 +248,18 @@ function TaskDetail({
         {task.feedback ? (
           <TaskFeedbackDisplay
             feedback={task.feedback}
-            stimulus={task.stimulus.kind === "text" ? task.stimulus.content : undefined}
-            stimulusLabel={task.stimulus.kind === "text" ? "Stimulus" : "Audio Stimulus"}
+            stimulus={
+              task.stimulus.kind === "text"
+                ? (parseFillInTheBlanksStimulus(task.stimulus.content) ?? task.stimulus.content)
+                : undefined
+            }
+            stimulusLabel={task.stimulus.kind === "text" ? t("practiceTask.common.passage") : t("history.details")}
             responseText={task.response.kind === "text" ? task.response.content : undefined}
-            responseLabel={task.response.kind === "audio" ? "Spoken Response (transcript)" : "Your Response"}
+            responseLabel={task.response.kind === "audio" ? t("history.transcript") : t("practiceTask.common.passage")}
           />
         ) : (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
-            <p className="text-sm text-[var(--text-secondary)]">No feedback available for this task.</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t("history.noFeedback")}</p>
           </div>
         )}
 
@@ -249,13 +268,13 @@ function TaskDetail({
             href="/practice"
             className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-[var(--brand)] rounded-xl hover:bg-[var(--brand-hover)] transition-colors"
           >
-            Practice Again
+            {t("history.startNew")}
           </Link>
           <button
             onClick={onBack}
             className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background)] transition-colors"
           >
-            Back to History
+            {t("history.backToHistory")}
           </button>
         </div>
       </main>
@@ -266,6 +285,7 @@ function TaskDetail({
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
+  const { t } = useTranslation()
   const [tasks, setTasks] = useState<PracticeTask[]>([])
   const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -297,7 +317,7 @@ export default function HistoryPage() {
   }, [tasks, filterType, searchQuery])
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this practice task?")) return false
+    if (!confirm(t("history.confirmDelete"))) return false
     await deleteTask(id)
     setTasks((prev) => prev.filter((t) => t.id !== id))
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n })
@@ -305,7 +325,7 @@ export default function HistoryPage() {
   }
 
   const handleBatchDelete = async () => {
-    if (!confirm(`Delete ${selectedIds.size} selected task(s)?`)) return
+    if (!confirm(t("history.confirmDeleteMultiple", { count: selectedIds.size }))) return
     await Promise.all(Array.from(selectedIds).map((id) => deleteTask(id)))
     setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)))
     setSelectedIds(new Set())
@@ -313,7 +333,7 @@ export default function HistoryPage() {
   }
 
   const handleClearAll = async () => {
-    if (!confirm("Delete ALL practice history? This cannot be undone.")) return
+    if (!confirm(t("history.confirmDeleteAll"))) return
     clearAllTasksLocal()
     setTasks([])
     setSelectedIds(new Set())
@@ -375,10 +395,23 @@ export default function HistoryPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav active="history" />
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6">
+        {/* Page hero */}
+        <div className="mb-6 rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6 animate-enter">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-[15px] border border-violet-200 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 flex items-center justify-center shrink-0">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-violet-700 dark:text-violet-400">{t("history.title")}</p>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">{t("home.practiceHistory")}</h1>
+            </div>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="flex gap-1.5 mb-4">
@@ -390,22 +423,22 @@ export default function HistoryPage() {
                 />
               ))}
             </div>
-            <p className="text-sm text-[var(--text-secondary)]">Loading history…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t("history.loading")}</p>
           </div>
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
             <div className="text-6xl mb-6">📝</div>
             <h2 className="text-lg font-medium text-[var(--foreground)] mb-2">
-              No Practice History Yet
+              {t("history.emptyTitle")}
             </h2>
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-md">
-              Complete a PTE practice task to see your history and track progress here.
+              {t("history.emptyDesc")}
             </p>
             <Link
               href="/practice"
               className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-[var(--brand)] rounded-xl hover:bg-[var(--brand-hover)] transition-all hover:shadow-lg"
             >
-              Start Practicing
+              {t("history.emptyCta")}
             </Link>
           </div>
         ) : (
@@ -413,7 +446,7 @@ export default function HistoryPage() {
             {/* Task type filter */}
             <div className="mb-5 flex gap-2 overflow-x-auto pb-1 animate-fade-in">
               {typeOptions.map((type) => {
-                const label = type === "all" ? "All" : TASK_LABELS[type]
+                const label = type === "all" ? t("history.filterAll") : TASK_LABELS[type]
                 const count = type === "all"
                   ? tasks.length
                   : tasks.filter((t) => t.taskType === type).length
@@ -439,16 +472,12 @@ export default function HistoryPage() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search by task type, feedback, or stimulus text…"
+                  placeholder={t("history.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 text-sm border border-[var(--border)] rounded-xl bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
                 />
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={2} />
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -460,7 +489,7 @@ export default function HistoryPage() {
                       : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--background)]"
                   }`}
                 >
-                  {isSelectMode ? "Cancel" : "Select"}
+                  {isSelectMode ? t("history.cancel") : t("history.select")}
                 </button>
 
                 <div className="flex items-center gap-2 flex-wrap">
@@ -469,17 +498,17 @@ export default function HistoryPage() {
                       onClick={() => setIsExportOpen(!isExportOpen)}
                       className="px-3 py-2 text-xs border border-[var(--border)] rounded-lg text-[var(--text-secondary)] hover:bg-[var(--background)] transition-colors"
                     >
-                      Export
+                      {t("history.export")}
                     </button>
                     {isExportOpen && (
                       <div className="absolute right-0 mt-1 w-32 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg z-10">
                         <button onClick={() => handleExport("json")}
                           className="w-full px-4 py-2 text-xs text-left text-[var(--text-secondary)] hover:bg-[var(--background)] rounded-t-lg">
-                          Export JSON
+                          {t("history.exportJson")}
                         </button>
                         <button onClick={() => handleExport("csv")}
                           className="w-full px-4 py-2 text-xs text-left text-[var(--text-secondary)] hover:bg-[var(--background)] rounded-b-lg">
-                          Export CSV
+                          {t("history.exportCsv")}
                         </button>
                       </div>
                     )}
@@ -488,7 +517,7 @@ export default function HistoryPage() {
                     onClick={handleClearAll}
                     className="px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                   >
-                    Clear All
+                    {t("history.clearAll")}
                   </button>
                 </div>
               </div>
@@ -498,10 +527,10 @@ export default function HistoryPage() {
                   <div className="flex items-center gap-3">
                     <button onClick={toggleSelectAll}
                       className="text-xs text-[var(--foreground)] hover:underline">
-                      {selectedIds.size === filteredTasks.length ? "Deselect All" : "Select All"}
+                      {selectedIds.size === filteredTasks.length ? t("history.deselectAll") : t("history.selectAll")}
                     </button>
                     <span className="text-xs text-[var(--text-secondary)]">
-                      {selectedIds.size} selected
+                      {t("history.selected", { count: selectedIds.size })}
                     </span>
                   </div>
                   <button
@@ -509,7 +538,7 @@ export default function HistoryPage() {
                     disabled={selectedIds.size === 0}
                     className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 bg-[var(--surface)] rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Delete Selected
+                    {t("history.deleteSelected")}
                   </button>
                 </div>
               )}
@@ -519,13 +548,13 @@ export default function HistoryPage() {
             <div className="space-y-3">
               <p className="text-sm text-[var(--text-secondary)]">
                 {searchQuery
-                  ? `${filteredTasks.length} result(s) for "${searchQuery}"`
-                  : `${filteredTasks.length} practice task(s)`}
+                  ? t("history.sessionsFound", { count: filteredTasks.length, query: searchQuery })
+                  : t("history.sessions", { count: filteredTasks.length })}
               </p>
 
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-[var(--text-secondary)]">No tasks match your search.</p>
+                  <p className="text-[var(--text-secondary)]">{t("history.noMatch")}</p>
                 </div>
               ) : (
                 filteredTasks.map((task, index) => (

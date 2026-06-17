@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost } from "@/lib/api-client"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import type { PracticeTask, TaskFeedback } from "@/types"
 import CountdownRing from "./CountdownRing"
 
@@ -16,42 +18,22 @@ export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (t
   const [question, setQuestion] = useState("")
   const [correctAnswer, setCorrectAnswer] = useState("")
   const [countSec, setCountSec] = useState(PAUSE_TIME)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const questionRef = useRef("")
-  const correctAnswerRef = useRef("")
-  const processResponseRef = useRef<(tx: string) => void>(() => {})
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-  }, [])
-
-  const processResponse = useCallback(async (tx: string) => {
+  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
     const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const stimulusWithAnswer = `Question: ${questionRef.current}\nCorrect answer: ${correctAnswerRef.current}`
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
+    const stimulusWithAnswer = `Question: ${question}\nCorrect answer: ${correctAnswer}`
 
     let fb: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx }),
-      })
-      if (res.ok) fb = await res.json() as TaskFeedback
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx })
     } catch { /* best-effort */ }
 
     const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
@@ -60,122 +42,61 @@ export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (t
     try {
       task = await saveTask({
         taskType: "answer_short_question",
-        stimulus: { kind: "text", content: questionRef.current },
+        stimulus: { kind: "text", content: question },
         response: { kind: "audio", content: tx },
         feedback: finalFb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch {
       task = {
         id: `mock_${Date.now()}`,
         taskType: "answer_short_question",
-        stimulus: { kind: "text", content: questionRef.current },
+        stimulus: { kind: "text", content: question },
         response: { kind: "audio", content: tx },
         feedback: finalFb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       }
     }
 
     setDoneTask(task)
     setPhase("done")
-  }, [])  
+  }, [question, correctAnswer])
 
-  useEffect(() => { processResponseRef.current = processResponse }, [processResponse])
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    onComplete: processResponse,
+    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  })
 
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") {
-      processResponseRef.current(txRef.current || "[no answer detected]")
-      return
-    }
-    mr.onstop = () => {
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processResponseRef.current(txRef.current || "[no answer detected]")
-    }
-    mr.stop()
-  }, [])  
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []; txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setErrorMsg("Microphone access denied.")
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => {}
-      srRef.current = rec
-      try { rec.start() } catch {}
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [stopRecording])
+  useEffect(() => () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+  }, [])
 
   // Auto-generate on mount
   useEffect(() => {
     const generate = async () => {
       try {
-        let text: string
-        const cached = getStimulusFromBank("answer_short_question")
-        if (cached) {
-          text = cached
-        } else {
-          const res = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "answer_short_question" }),
-          })
-          if (!res.ok) throw new Error("Failed to generate question")
-          text = ((await res.json()) as { text: string }).text
-          addStimulusToBank("answer_short_question", text)
-        }
-
+        const text = await loadStimulusText({ taskType: "answer_short_question" })
         const [q, a] = text.split("\n")
         const qText = q?.trim() ?? text
         const aText = a?.trim() ?? ""
-        questionRef.current = qText
-        correctAnswerRef.current = aText
         setQuestion(qText)
         setCorrectAnswer(aText)
         setCountSec(PAUSE_TIME)
         setPhase("countdown")
 
-        timerRef.current = setInterval(() => {
+        prepTimerRef.current = setInterval(() => {
           setCountSec(s => {
-            if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
+            if (s <= 1) {
+              clearInterval(prepTimerRef.current!)
+              setPhase("recording")
+              recording.start()
+              return 0
+            }
             return s - 1
           })
         }, 1000)
@@ -230,7 +151,7 @@ export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (t
                 Recording — Answer the question now
               </p>
             </div>
-            <CountdownRing seconds={recSec} total={RECORD_TIME} size={72} />
+            <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={72} />
             <p className="mt-4 text-xs text-slate-400">Recording stops automatically when time is up</p>
           </div>
         </div>

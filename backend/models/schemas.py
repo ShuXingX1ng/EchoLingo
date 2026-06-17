@@ -13,22 +13,6 @@ from pydantic import BaseModel, Field
 # Core Types
 # =============================================================================
 
-class ChatMessage(BaseModel):
-    """Chat message in a speaking session."""
-    id: str
-    role: Literal["examiner", "user"]
-    content: str
-    createdAt: str
-
-
-class ErrorAnnotation(BaseModel):
-    """Error annotation in feedback."""
-    original: str
-    corrected: str
-    type: Literal["grammar", "vocabulary", "fluency", "pronunciation"]
-    explanation: str
-
-
 class PhonemeAssessment(BaseModel):
     """Phoneme-level pronunciation assessment."""
     phoneme: str
@@ -53,47 +37,12 @@ class PronunciationAssessmentResult(BaseModel):
     completenessScore: int
     words: List[WordAssessment]
     summary: str
-
-
-class SessionFeedback(BaseModel):
-    """Structured IELTS speaking feedback."""
-    estimatedBand: float
-    fluencyAndCoherence: str
-    lexicalResource: str
-    grammarRangeAndAccuracy: str
-    pronunciation: str
-    pronunciationAssessment: Optional[PronunciationAssessmentResult] = None
-    strengths: List[str]
-    weaknesses: List[str]
-    improvementSuggestions: List[str]
-    improvedSampleAnswer: str
-    errorAnnotations: Optional[List[ErrorAnnotation]] = None
+    recognizedText: Optional[str] = None
 
 
 # =============================================================================
 # API Request/Response Models
 # =============================================================================
-
-# Examiner API
-class ExaminerRequest(BaseModel):
-    """Request for POST /api/examiner."""
-    mode: Literal["ielts_part_1", "ielts_part_2", "ielts_part_3"]
-    messages: List[ChatMessage]
-
-
-class ExaminerResponse(BaseModel):
-    """Response from POST /api/examiner."""
-    message: str
-
-
-# Feedback API
-class FeedbackRequest(BaseModel):
-    """Request for POST /api/feedback."""
-    mode: Literal["ielts_part_1", "ielts_part_2", "ielts_part_3"]
-    messages: List[ChatMessage]
-
-
-# FeedbackResponse is SessionFeedback
 
 # TTS API
 class TTSRequest(BaseModel):
@@ -136,6 +85,12 @@ PteTaskType = Literal[
 class PteStimulusRequest(BaseModel):
     """Request for POST /api/pte/stimulus."""
     taskType: str  # validated against PteTaskType in the router
+    # Retrieval strategy (ADR 0009). Mock and plain Task Practice both send "random".
+    mode: Literal["random", "targeted", "theme"] = "random"
+    topic: Optional[str] = None              # theme query (theme mode only)
+    targeting: Optional[Dict[str, Any]] = None  # {difficulty?, features?} for targeted mode
+    verbatim: bool = False                   # private path: serve an Exemplar verbatim
+    source: Literal["exemplars", "news"] = "exemplars"  # generation anchor source
 
 
 class PteStimulusResponse(BaseModel):
@@ -149,3 +104,4 @@ class PteFeedbackRequest(BaseModel):
     stimulus: str = ""
     response: str
     pronunciationAssessment: Optional[Dict[str, Any]] = None
+    historicalWeaknesses: Optional[Dict[str, float]] = None

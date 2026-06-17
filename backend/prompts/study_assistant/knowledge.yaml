@@ -1,0 +1,239 @@
+# Study Assistant — hand-authored grounding knowledge
+# Sections: feature_map, route_allowlist, pte_faq
+# This file is NOT RAG — it is curated and injected verbatim into the system prompt.
+
+# ─── (a) Feature map ──────────────────────────────────────────────────────────
+feature_map:
+  home: >
+    The Home page ( / ) shows the Daily Plan — a set of recommended Practice
+    Tasks derived from the learner's Task-Type Weaknesses. Logged-in learners
+    see weakness-targeted suggestions; guests see a general welcome with quick
+    start links.
+  practice: >
+    The Practice page ( /practice ) lets the learner choose a Task Type and
+    start a Task Practice session. Each Task Type card links to its own
+    dedicated practice page (e.g. /practice/write-essay). Every practice page
+    supports Theme Practice: type a topic/theme in the theme box and the system
+    generates a Stimulus about that theme.
+  mock: >
+    The Mock Exam page ( /mock ) runs a full simulated PTE Academic exam
+    following the official task sequence and strict timing. Stimuli are selected
+    randomly (no topic conditioning). The learner cannot change topics; the Word
+    Lookup and Study Assistant are disabled during a Mock Exam to preserve
+    authenticity.
+  history: >
+    The History page ( /history ) lists all completed Practice Tasks with their
+    Feedback summaries, sortable by date and Task Type.
+  stats: >
+    The Stats page ( /stats ) displays progress charts: score trends over time,
+    per-Task-Type breakdown, and Task-Type Weakness signals derived from the
+    learner's Feedback history.
+  vocabulary: >
+    The Vocabulary page ( /vocabulary ) shows the learner's Vocabulary List —
+    words they have explicitly saved from the Word Lookup card. Supports view
+    and delete; no spaced-repetition review in v1.
+  settings: >
+    The Settings page ( /settings ) lets the learner change the UI language
+    (English / Simplified Chinese), audio playback speed, and other preferences.
+  word_lookup: >
+    Word Lookup is available on Task Practice pages. Select any word or phrase
+    on-screen; a "译" pill appears — tap it to get a translation card. Single
+    English words resolve against the offline ECDICT dictionary; phrases and
+    misses fall through to the DeepSeek LLM. Tap the star icon in the card to
+    save the word to the Vocabulary List.
+  study_assistant: >
+    The Study Assistant (this chat) is reachable from a global floating button
+    on every page except during a Mock Exam. It can answer navigation questions,
+    generate a Practice Task on any topic you name, and answer questions about
+    the PTE Academic exam format.
+  task_types:
+    read_aloud: "Read Aloud — read a short passage aloud; scored on fluency, pronunciation, and content coverage."
+    repeat_sentence: "Repeat Sentence — listen once and repeat the sentence verbatim."
+    answer_short_question: "Answer Short Question — answer a spoken question with a single word or short phrase."
+    summarize_written_text: "Summarize Written Text (SWT) — read a passage and write ONE summarising sentence (5–75 words)."
+    write_essay: "Write Essay — write a 200–300 word academic essay on the given topic."
+    describe_image: "Describe Image — describe a chart, graph, or picture in 40 seconds."
+    re_tell_lecture: "Re-tell Lecture — summarise a spoken lecture in 40 seconds."
+    fill_in_the_blanks_reading: "Reading Fill in the Blanks — drag words from a box into blanks in a passage."
+    re_order_paragraphs: "Re-order Paragraphs — drag scrambled paragraphs into the correct order."
+    multiple_choice_reading: "Multiple Choice Reading — choose the best answer from options about a reading passage."
+    summarize_spoken_text: "Summarize Spoken Text — after listening, write a 50–70 word summary."
+    fill_in_the_blanks_listening: "Listening Fill in the Blanks — listen and type the missing words."
+    highlight_correct_summary: "Highlight Correct Summary — choose the paragraph that best matches a spoken text."
+    write_from_dictation: "Write from Dictation — listen and type the spoken sentence exactly."
+    personal_intro: "Personal Introduction — a non-scored warm-up: introduce yourself in 25 seconds."
+
+# ─── (b) Route allow-list ──────────────────────────────────────────────────────
+# These are the ONLY routes the Study Assistant may suggest. Any model-invented
+# route outside this list must be dropped before sending to the frontend.
+route_allowlist:
+  - label: "Home"
+    route: "/"
+  - label: "Practice"
+    route: "/practice"
+  - label: "Mock Exam"
+    route: "/mock"
+  - label: "History"
+    route: "/history"
+  - label: "Stats"
+    route: "/stats"
+  - label: "Vocabulary"
+    route: "/vocabulary"
+  - label: "Settings"
+    route: "/settings"
+  # Task-type deep links
+  - label: "Read Aloud"
+    route: "/practice/read-aloud"
+  - label: "Repeat Sentence"
+    route: "/practice/repeat-sentence"
+  - label: "Answer Short Question"
+    route: "/practice/answer-short-question"
+  - label: "Summarize Written Text"
+    route: "/practice/summarize-written-text"
+  - label: "Write Essay"
+    route: "/practice/write-essay"
+  - label: "Describe Image"
+    route: "/practice/describe-image"
+  - label: "Re-tell Lecture"
+    route: "/practice/re-tell-lecture"
+  - label: "Fill in the Blanks (Reading)"
+    route: "/practice/fill-in-the-blanks"
+  - label: "Re-order Paragraphs"
+    route: "/practice/re-order-paragraphs"
+  - label: "Multiple Choice (Reading)"
+    route: "/practice/multiple-choice"
+  - label: "Summarize Spoken Text"
+    route: "/practice/summarize-spoken-text"
+  - label: "Fill in the Blanks (Listening)"
+    route: "/practice/fill-in-the-blanks-listening"
+  - label: "Highlight Correct Summary"
+    route: "/practice/highlight-correct-summary"
+  - label: "Write from Dictation"
+    route: "/practice/write-from-dictation"
+  - label: "Personal Introduction"
+    route: "/practice/personal-intro"
+
+# ─── (c) PTE FAQ ──────────────────────────────────────────────────────────────
+pte_faq:
+  - q: "What is PTE Academic?"
+    a: >
+      PTE Academic (Pearson Test of English Academic) is a computer-based English
+      proficiency test accepted by thousands of universities and governments
+      worldwide. It tests Speaking & Writing, Reading, and Listening through
+      20 different task types in a single 2-hour session.
+
+  - q: "What sections does PTE Academic have?"
+    a: >
+      Three sections: (1) Speaking & Writing — tasks include Personal Introduction,
+      Read Aloud, Repeat Sentence, Describe Image, Re-tell Lecture, Answer Short
+      Question, Summarize Written Text, and Write Essay. (2) Reading — includes
+      Multiple Choice, Re-order Paragraphs, and Fill in the Blanks. (3) Listening
+      — includes Summarize Spoken Text, MCQ, Fill in the Blanks, Highlight Correct
+      Summary, Select Missing Word, Highlight Incorrect Words, and Write from
+      Dictation.
+
+  - q: "How is PTE Academic scored?"
+    a: >
+      PTE Academic uses an overall score from 10 to 90, plus individual
+      communicative skills scores for Speaking, Writing, Reading, and Listening.
+      Most tasks are scored by AI — no human examiners. Scores are typically
+      available within hours of completing the test.
+
+  - q: "What are the scoring dimensions for Read Aloud?"
+    a: >
+      Read Aloud is scored on three dimensions: Oral Fluency (rhythm, phrasing,
+      appropriate speed), Pronunciation (clarity and intelligibility of sounds),
+      and Content (how completely you read the words in the passage). Missing
+      words reduces your Content score.
+
+  - q: "What are the scoring dimensions for Write Essay?"
+    a: >
+      Write Essay is scored on: Content (whether the essay addresses the topic),
+      Form (200–300 words, single essay structure), Grammar (range and accuracy),
+      Vocabulary (range and precision), Spelling (British or American consistency),
+      and Development/Structure/Coherence (logical argument flow). Aim for
+      200–300 words; going below 200 or above 300 penalises the Form dimension.
+
+  - q: "What are the scoring dimensions for Summarize Written Text?"
+    a: >
+      Summarize Written Text is scored on Content (key ideas captured), Form
+      (exactly one sentence, 5–75 words), Grammar (sentence structure accuracy),
+      and Vocabulary (word choice). Write exactly ONE sentence ending with a full
+      stop; multiple sentences earn zero Form marks.
+
+  - q: "How is Repeat Sentence scored?"
+    a: >
+      Repeat Sentence is scored on Oral Fluency, Pronunciation, and Content
+      (proportion of the original sentence words reproduced in the correct order).
+      You hear the sentence only once, so listening carefully for the exact wording
+      is critical.
+
+  - q: "How long is the PTE Academic exam?"
+    a: >
+      The total exam time is approximately 2 hours (around 77–93 minutes of
+      timed test items, plus brief introductions and optional breaks). The exact
+      duration varies slightly depending on the mix of task types assigned.
+
+  - q: "What score do I need for university admission?"
+    a: >
+      Requirements vary by institution and programme. Most Australian and UK
+      universities accept PTE Academic scores of 50–65 for undergraduate entry
+      and 58–65 for postgraduate. High-stakes programmes (medicine, law,
+      engineering) often require 65–79. Check your target institution's official
+      requirements.
+
+  - q: "What is the best strategy for Write Essay?"
+    a: >
+      (1) Spend 2–3 minutes planning your argument and 2–3 paragraphs
+      (introduction, body×2, conclusion). (2) Aim for 240–280 words — safely
+      within the 200–300 range. (3) Use discourse markers (Firstly, Furthermore,
+      In conclusion) for coherence. (4) Vary your vocabulary; avoid repeating the
+      same words from the prompt. (5) Allow 1–2 minutes to proofread for grammar
+      and spelling.
+
+  - q: "What is the best strategy for Describe Image?"
+    a: >
+      (1) Use the 25-second preparation time to identify the chart type
+      (bar/line/pie), the main trend, and one notable detail. (2) Open with a
+      general overview: "The [chart type] illustrates...". (3) Describe the
+      highest/lowest values and the overall trend. (4) Close with a brief
+      conclusion. Fluency matters more than exhaustive detail — keep talking
+      for the full 40 seconds.
+
+  - q: "How does Theme Practice work?"
+    a: >
+      On any Task Practice page, type a theme or topic (e.g. "climate change",
+      "technology") in the theme box and press Go. EchoLingo generates a brand-new
+      Stimulus on that topic. This uses the same AI pipeline as regular practice
+      but conditions generation on your chosen theme.
+
+  - q: "What is a Stimulus?"
+    a: >
+      A Stimulus is the content presented before you respond in a Practice Task.
+      For text Task Types (Read Aloud, Write Essay, Summarize Written Text) the
+      Stimulus is AI-generated. For audio Task Types (Repeat Sentence, Write from
+      Dictation) it is a TTS audio recording. EchoLingo never serves real scraped
+      exam questions verbatim — every Stimulus is original.
+
+  - q: "Can I save words I look up?"
+    a: >
+      Yes — tap the star icon on the Word Lookup translation card. The word is
+      added to your Vocabulary List at /vocabulary. You can view and delete saved
+      words there.
+
+  - q: "Is PTE easier than IELTS?"
+    a: >
+      PTE Academic and IELTS test similar skills but in very different formats.
+      PTE is fully computer-based and AI-marked (no human examiner bias) and
+      results are faster. Many test-takers find the speaking tasks — especially
+      Read Aloud and Describe Image — very manageable with practise. IELTS has a
+      face-to-face speaking component. Neither is inherently "easier" — the best
+      choice depends on which format suits your study style.
+
+  - q: "How should I practise listening?"
+    a: >
+      (1) Use Write from Dictation daily — it trains both listening accuracy and
+      spelling. (2) Practise Summarize Spoken Text to improve note-taking and
+      summarisation. (3) Listen to English podcasts or lectures at normal speed.
+      (4) In EchoLingo, use the Highlight Correct Summary and Fill in the Blanks
+      (Listening) tasks to build detail listening skills.

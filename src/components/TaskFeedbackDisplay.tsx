@@ -1,7 +1,7 @@
 "use client"
 
 import PronunciationFeedback from "@/components/PronunciationFeedback"
-import type { TaskFeedback, DimensionScores } from "@/types"
+import type { TaskFeedback, DimensionScores, TaskScoreCard } from "@/types"
 
 interface Props {
   feedback: TaskFeedback
@@ -20,6 +20,10 @@ export default function TaskFeedbackDisplay({
 }: Props) {
   return (
     <div className="space-y-5">
+      {feedback.scoreCard && (
+        <ScoreCardBlock card={feedback.scoreCard} />
+      )}
+
       {stimulus && (
         <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/50">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{stimulusLabel}</p>
@@ -122,6 +126,37 @@ export default function TaskFeedbackDisplay({
             </ul>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function ScoreCardBlock({ card }: { card: TaskScoreCard }) {
+  const pct = card.max > 0 ? card.earned / card.max : 0
+  const color = pct >= 0.8
+    ? "text-emerald-700 dark:text-emerald-300"
+    : pct >= 0.5
+    ? "text-yellow-700 dark:text-yellow-300"
+    : "text-red-700 dark:text-red-300"
+  const barColor = pct >= 0.8
+    ? "bg-emerald-500"
+    : pct >= 0.5
+    ? "bg-yellow-400"
+    : "bg-red-500"
+
+  return (
+    <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-3">Score</p>
+      <div className="flex items-end gap-2 mb-3">
+        <span className={`text-4xl font-bold tabular-nums ${color}`}>{card.earned}</span>
+        <span className="text-xl text-slate-400 mb-0.5">/ {card.max}</span>
+        <span className="text-sm text-slate-400 mb-1 ml-1">pts</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
+        <div
+          className={`h-1.5 rounded-full transition-all ${barColor}`}
+          style={{ width: `${Math.round(pct * 100)}%` }}
+        />
       </div>
     </div>
   )

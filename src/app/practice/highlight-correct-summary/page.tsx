@@ -5,8 +5,10 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 300 // 5 minutes
 
@@ -50,6 +52,7 @@ function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
 }
 
 export default function HighlightCorrectSummaryPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [rawStimulus, setRawStimulus] = useState("")
@@ -64,7 +67,10 @@ export default function HighlightCorrectSummaryPage() {
   const submitRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+  }, [])
 
   useEffect(() => {
     if (phase !== "selecting") return
@@ -78,35 +84,17 @@ export default function HighlightCorrectSummaryPage() {
   }, [phase])
 
   const generate = useCallback(async () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
     setError(""); setFeedback(null); setSelected(null); setSeconds(TIME_LIMIT)
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
-      let raw: string
-      const cached = getStimulusFromBank("highlight_correct_summary")
-      if (cached) {
-        raw = cached
-      } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "highlight_correct_summary" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate stimulus")
-        raw = ((await res.json()) as { text: string }).text
-        addStimulusToBank("highlight_correct_summary", raw)
-      }
+      const raw = await loadStimulusText({ taskType: "highlight_correct_summary", timeoutMs: 60000 })
       const p = parseStimulus(raw)
       if (!p) throw new Error("Invalid stimulus format from server")
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       const url = URL.createObjectURL(blob)
 
       setRawStimulus(raw)
@@ -118,6 +106,8 @@ export default function HighlightCorrectSummaryPage() {
       setPhase("error")
     }
   }, [audioUrl])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const playPassage = useCallback(() => {
     if (!audioUrl) return
@@ -130,9 +120,11 @@ export default function HighlightCorrectSummaryPage() {
       setSeconds(TIME_LIMIT)
     }
     setPhase("listening")
-    audio.play().catch(() => {
-      setPhase("ready")
-      audioRef.current = null
+    requestAnimationFrame(() => {
+      audio.play().catch(() => {
+        setPhase("ready")
+        audioRef.current = null
+      })
     })
   }, [audioUrl])
 
@@ -150,16 +142,11 @@ export default function HighlightCorrectSummaryPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "highlight_correct_summary",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
-      })
-      if (res.ok) result = (await res.json()) as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "highlight_correct_summary",
+        stimulus: stimulusForFeedback,
+        response: responseForFeedback,
+      }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {
@@ -197,28 +184,28 @@ export default function HighlightCorrectSummaryPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Highlight Correct Summary</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Listening</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteListening')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Highlight Correct Summary</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Listen to a passage, then select the summary that best matches what you heard. 5 minutes.
+            {t('practiceTask.highlight-correct-summary.desc')}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated passage will be read aloud. After listening, select the one summary that accurately captures the main idea and key points.
+              {t('practiceTask.highlight-correct-summary.idleDesc')}
             </p>
             <button
               onClick={generate}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
-              Get Question
+              {t('practiceTask.highlight-correct-summary.getQuestion')}
             </button>
           </div>
         )}
@@ -226,14 +213,14 @@ export default function HighlightCorrectSummaryPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating passage and audio…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.highlight-correct-summary.generating')}</p>
           </div>
         )}
 
         {phase === "ready" && audioUrl && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-              Passage ready — listen carefully
+              {t('practiceTask.common.passageReady')}
             </p>
             <button
               onClick={playPassage}
@@ -242,51 +229,52 @@ export default function HighlightCorrectSummaryPage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5.14v14l11-7-11-7z" />
               </svg>
-              Play Passage
+              {t('practiceTask.common.playPassage')}
             </button>
             <p className="text-xs text-[var(--text-muted)]">
-              After the passage ends, you will choose the correct summary from 5 options.
+              {t('practiceTask.highlight-correct-summary.afterPassage')}
             </p>
           </div>
         )}
 
-        {phase === "listening" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              {[0, 1, 2, 3, 4].map(i => (
-                <span
-                  key={i}
-                  className="inline-block w-1 rounded-full bg-emerald-500"
-                  style={{
-                    height: `${16 + (i % 3) * 8}px`,
-                    animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate`,
-                  }}
-                />
-              ))}
-            </div>
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Passage playing…</p>
-            <p className="text-xs text-[var(--text-muted)]">Focus on the main idea and key points.</p>
-            <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
-          </div>
-        )}
-
-        {phase === "selecting" && parsed && (
+        {(phase === "listening" || phase === "selecting") && parsed && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select the correct summary</p>
-              <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
-                {timeStr}
-              </span>
-            </div>
+            {phase === "listening" && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <span
+                      key={i}
+                      className="inline-block w-1 rounded-full bg-emerald-500"
+                      style={{
+                        height: `${16 + (i % 3) * 8}px`,
+                        animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate`,
+                      }}
+                    />
+                  ))}
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 ml-2">{t('practiceTask.common.passagePlaying')}</p>
+                </div>
+                <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.highlight-correct-summary.listenTimer')}</p>
+                <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
+              </div>
+            )}
+            {phase === "selecting" && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.highlight-correct-summary.selectSummary')}</p>
+                <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
+                  {timeStr}
+                </span>
+              </div>
+            )}
 
             <div className="border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-3">
-                Which summary best captures what the passage was about?
+                {t('practiceTask.highlight-correct-summary.whichSummary')}
               </p>
               {parsed.summaries.map((s, i) => (
                 <label
                   key={i}
-                  className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-all ${
+                  className={`flex items-start gap-3 ${phase === "listening" ? "cursor-default opacity-70" : "cursor-pointer"} rounded-lg border p-3 transition-all ${
                     selected === i
                       ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
                       : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--foreground)]"
@@ -297,7 +285,8 @@ export default function HighlightCorrectSummaryPage() {
                     name="hcs-option"
                     value={i}
                     checked={selected === i}
-                    onChange={() => setSelected(i)}
+                    onChange={() => phase === "selecting" && setSelected(i)}
+                    disabled={phase === "listening"}
                     className="mt-0.5 shrink-0 accent-emerald-600"
                   />
                   <span className="text-sm text-[var(--foreground)]">
@@ -313,16 +302,18 @@ export default function HighlightCorrectSummaryPage() {
                   onClick={playPassage}
                   className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 underline"
                 >
-                  Replay passage
+                  {t('practiceTask.highlight-correct-summary.replayPassage')}
                 </button>
               )}
-              <button
-                onClick={handleSubmit}
-                disabled={selected === null}
-                className="ml-auto rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
-              >
-                Submit Answer
-              </button>
+              {phase === "selecting" && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={selected === null}
+                  className="ml-auto rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                >
+                  {t('practiceTask.common.submitAnswer')}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -330,7 +321,7 @@ export default function HighlightCorrectSummaryPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answer…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.highlight-correct-summary.evaluating')}</p>
           </div>
         )}
 
@@ -339,16 +330,16 @@ export default function HighlightCorrectSummaryPage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
-              stimulusLabel="Passage & Summaries"
+              stimulusLabel={t('practiceTask.highlight-correct-summary.passageSummaries')}
               responseText={buildResponseForFeedback(parsed, selected)}
-              responseLabel="Your Answer"
+              responseLabel={t('practiceTask.highlight-correct-summary.yourAnswer')}
             />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -358,7 +349,7 @@ export default function HighlightCorrectSummaryPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

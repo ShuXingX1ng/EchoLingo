@@ -1,0 +1,38 @@
+task_type: re_order_paragraphs
+description: PTE Academic Re-order Paragraphs scoring rubric
+dimensions:
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Scoring is based on adjacent pairs: each pair of paragraphs placed in the
+      correct order relative to each other earns 1 point. For a 5-paragraph item
+      the maximum is 4 points (4 adjacent pairs). Comprehension reflects the
+      candidate's ability to identify the topic sentence (an independent sentence
+      that introduces the subject) and follow the logical flow of ideas.
+    criteria:
+      1: Adjacent pair in correct relative order.
+      0: Adjacent pair in wrong relative order.
+
+  - name: vocabulary
+    weight: 1
+    max_score: 1
+    description: >
+      Vocabulary here reflects sensitivity to cohesive devices that signal order:
+      pronouns referring back to earlier nouns (he, this, such), connectives
+      (however, therefore, in addition), definite articles marking previously
+      introduced entities, and time markers (first, later, finally). Strong
+      candidates use these signals to chain paragraphs; weak candidates order
+      by topic guesswork alone.
+    criteria:
+      high: Cohesion signals (pronouns, connectives, articles) correctly chained.
+      medium: Some signals followed; partial chains correct.
+      low: Ordering ignores cohesive devices; mostly incorrect pairs.
+
+scoring_notes: >
+  Re-order Paragraphs is a reading task. The candidate drags shuffled paragraphs
+  into their original order. Credit is given per correctly ordered adjacent pair,
+  so partial credit applies — getting a chain of two or three paragraphs right
+  earns points even if the whole sequence is not perfect. The first step is
+  finding the topic sentence: the only paragraph that makes sense with no prior
+  context.

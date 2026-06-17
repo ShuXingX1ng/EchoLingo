@@ -3,7 +3,7 @@ Tests for TTS API.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
 from main import app
 

@@ -1,0 +1,35 @@
+task_type: fill_in_the_blanks_reading
+description: PTE Academic Fill in the Blanks (Reading) scoring rubric
+dimensions:
+  - name: vocabulary
+    weight: 1
+    max_score: 1
+    description: >
+      Each blank is scored individually. Vocabulary assesses whether the candidate
+      selects the correct word from the drag-and-drop options that fits both the
+      meaning and grammatical context of the blank. Score 1 per blank: the correct
+      word is selected and fits meaning and grammar. Score 0 per blank: wrong word
+      selected or blank left empty.
+    criteria:
+      1: Correct word chosen; fits meaning and grammatical context.
+      0: Incorrect word or blank not filled.
+
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Comprehension (aggregate, reported at task level) reflects how many blanks
+      the candidate correctly fills relative to the total number of blanks. Higher
+      scores indicate better understanding of context and word relationships.
+      Partial credit is awarded; each correct blank contributes equally.
+    criteria:
+      high: Majority of blanks correctly filled, demonstrating strong contextual reading.
+      medium: About half of blanks correct; some contextual understanding shown.
+      low: Few blanks correct; limited contextual comprehension.
+
+scoring_notes: >
+  Fill in the Blanks (Reading & Writing) is a reading task presented as a passage
+  with drag-and-drop word options. Each blank is worth 1 point. There is no
+  penalty for incorrect answers. Scores depend entirely on number of correct
+  word placements. The task type tests both vocabulary knowledge and the ability
+  to infer meaning from context. Partial credit applies — every correct blank counts.

@@ -48,7 +48,7 @@ async def text_to_speech(request: TTSRequest):
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
         print(f"TTS error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,

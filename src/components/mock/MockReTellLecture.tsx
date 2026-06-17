@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { useRecordingSession } from "@/hooks/useRecordingSession"
 import type { PracticeTask, TaskFeedback } from "@/types"
 import CountdownRing from "./CountdownRing"
 
@@ -16,46 +18,22 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
   const [lectureText, setLectureText] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [recSec, setRecSec] = useState(RECORD_TIME)
   const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
 
-  const startedAtRef = useRef("")
-  const mrRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null)
-  const txRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const lectureTextRef = useRef("")
-  const processAudioRef = useRef<(b: Blob) => void>(() => {})
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    srRef.current?.stop()
-    audioRef.current?.pause()
-  }, [])
-
-  const processAudio = useCallback(async (audioBlob: Blob) => {
+  const processAudio = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
     setPhase("processing")
     const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000)
-    const tx = txRef.current.trim() || "[transcript not captured]"
-    const stim = lectureTextRef.current
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
+    )
 
     let fb: TaskFeedback
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: "re_tell_lecture", stimulus: stim, response: tx }),
-      })
-      fb = res.ok
-        ? (await res.json()) as TaskFeedback
-        : { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
+      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: lectureText, response: tx })
     } catch {
       fb = { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
     }
@@ -64,101 +42,56 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
     try {
       task = await saveTask({
         taskType: "re_tell_lecture",
-        stimulus: { kind: "audio", content: stim },
+        stimulus: { kind: "audio", content: lectureText },
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       })
     } catch {
       task = {
         id: `mock_${Date.now()}`,
         taskType: "re_tell_lecture",
-        stimulus: { kind: "audio", content: stim },
+        stimulus: { kind: "audio", content: lectureText },
         response: { kind: "audio", content: tx },
         feedback: fb,
         durationSeconds,
-        createdAt: startedAtRef.current,
+        createdAt: startedAt,
         endedAt,
       }
     }
 
     setDoneTask(task)
     setPhase("done")
+  }, [lectureText])
+
+  const recording = useRecordingSession({
+    totalSeconds: RECORD_TIME,
+    onComplete: processAudio,
+    onError: msg => { setErrorMsg(msg); setPhase("error") },
+  })
+
+  useEffect(() => () => {
+    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
+    audioRef.current?.pause()
   }, [])
-
-  useEffect(() => { processAudioRef.current = processAudio }, [processAudio])
-
-  const stopRecording = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    srRef.current?.stop(); srRef.current = null
-    const mr = mrRef.current
-    if (!mr || mr.state === "inactive") {
-      processAudioRef.current(new Blob([], { type: "audio/webm" }))
-      return
-    }
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      processAudioRef.current(blob)
-    }
-    mr.stop()
-  }, [])
-
-  const startRecording = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("recording")
-    startedAtRef.current = new Date().toISOString()
-    chunksRef.current = []; txRef.current = ""
-    setRecSec(RECORD_TIME)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mr = new MediaRecorder(stream)
-      mrRef.current = mr
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-    } catch {
-      setErrorMsg("Microphone access denied.")
-      setPhase("error")
-      return
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) : null
-    if (SR) {
-      const rec = new SR()
-      rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-      rec.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) txRef.current += (txRef.current ? " " : "") + e.results[i][0].transcript
-        }
-      }
-      rec.onerror = () => {}
-      srRef.current = rec
-      try { rec.start() } catch {}
-    }
-
-    timerRef.current = setInterval(() => {
-      setRecSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); stopRecording(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-  }, [stopRecording])
 
   const startPrepTimer = useCallback(() => {
     setPrepSec(PREP_TIME)
     setPhase("prep")
-    timerRef.current = setInterval(() => {
+    prepTimerRef.current = setInterval(() => {
       setPrepSec(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); startRecording(); return 0 }
+        if (s <= 1) {
+          clearInterval(prepTimerRef.current!)
+          setPhase("recording")
+          recording.start()
+          return 0
+        }
         return s - 1
       })
     }, 1000)
-  }, [startRecording])
+  }, [recording.start]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const playLecture = useCallback((url: string) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
@@ -174,30 +107,10 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
   useEffect(() => {
     const generate = async () => {
       try {
-        let text: string
-        const cached = getStimulusFromBank("re_tell_lecture")
-        if (cached) {
-          text = cached
-        } else {
-          const stimRes = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "re_tell_lecture" }),
-          })
-          if (!stimRes.ok) throw new Error("Failed to generate lecture")
-          text = ((await stimRes.json()) as { text: string }).text
-          addStimulusToBank("re_tell_lecture", text)
-        }
-        lectureTextRef.current = text
+        const text = await loadStimulusText({ taskType: "re_tell_lecture" })
         setLectureText(text)
 
-        const ttsRes = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-        })
-        if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-        const blob = await ttsRes.blob()
+        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
         const url = URL.createObjectURL(blob)
         setAudioUrl(url)
         setPhase("ready")
@@ -284,7 +197,7 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
               Recording — Re-tell the lecture now
             </p>
           </div>
-          <CountdownRing seconds={recSec} total={RECORD_TIME} size={80} />
+          <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
           <p className="mt-4 text-xs text-slate-400">Recording stops automatically when time is up</p>
         </div>
       )}
