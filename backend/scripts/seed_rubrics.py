@@ -9,7 +9,6 @@ Run from the backend/ directory:
 Requires env vars: DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL (optional), SUPABASE_DB_URL
 """
 
-import os
 import sys
 import pathlib
 import uuid
