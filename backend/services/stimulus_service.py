@@ -21,6 +21,7 @@ import logging
 from typing import Optional
 
 from services.exemplar_store import get_verbatim, retrieve
+from services.gnews import fetch_news_anchors
 from services.llm_chain import llm_chain
 from services.originality import is_too_similar
 from services.prompt_loader import prompts
@@ -82,10 +83,16 @@ async def generate_stimulus(
     topic: Optional[str] = None,
     targeting: Optional[dict] = None,
     verbatim: bool = False,
+    source: str = "exemplars",
 ) -> str:
     """
     Produce the Stimulus text for a Task Type. Caller (router) has already
     validated `task_type` and short-circuited personal_intro.
+
+    source="exemplars" (default): existing Exemplar-grounded path.
+    source="news": fetch news anchors via GNews (title+summary only) and use
+        them in place of Exemplars. Falls back silently to the Exemplar path
+        on any GNews failure or empty result (per ADR-0007, never a bare error).
     """
     is_json = task_type in JSON_TASK_TYPES
     base_user = prompts.stimulus_tasks[task_type]
@@ -96,6 +103,25 @@ async def generate_stimulus(
         if exemplar:
             return exemplar.text
         # No Exemplar available — fall through to generation (silent degrade).
+
+    # ── News-anchor path: fetch GNews, degrade to Exemplar path on failure. ──
+    if source == "news" and topic:
+        news_anchors = await fetch_news_anchors(topic, n=FEWSHOT_N)
+        if news_anchors:
+            user = _build_fewshot_user(base_user, news_anchors, topic, "theme")
+            text = await _generate(user, is_json)
+            if is_too_similar(text, news_anchors):
+                logger.info(
+                    "Originality guard tripped (news path, task_type=%s) — regenerating once.",
+                    task_type,
+                )
+                text = await _generate(user, is_json)
+            return text
+        # GNews returned nothing — fall through to Exemplar path silently.
+        logger.info(
+            "News anchors unavailable for topic=%r — falling back to Exemplar path.",
+            topic,
+        )
 
     # ── Retrieve few-shot anchors. Empty on JSON tasks, empty bank, or failure. ──
     exemplars = await retrieve(

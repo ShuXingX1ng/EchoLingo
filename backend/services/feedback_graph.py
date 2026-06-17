@@ -8,15 +8,20 @@ Nodes: retrieve_context → (call_primary ‖ call_judge) → check_divergence
 
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from typing import Optional, TypedDict
 
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 
 from services.llm_chain import llm_chain
 from services.prompt_loader import prompts
 from services.rag import retrieve_context as rag_retrieve
+from tools.rubric import get_rubric
+from tools.weakness import make_weakness_tool
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +55,9 @@ class FeedbackState(TypedDict):
     judge_result: Optional[dict]
     diverged: list
     retry_count: int
+    coach_suggestions: list
     final_result: dict
+    historical_weaknesses: Optional[dict]
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +247,101 @@ async def retry_primary_node(state: FeedbackState) -> dict:
     return {"retry_count": state.get("retry_count", 0) + 1}
 
 
+_DIM_KEYS: dict[str, list[str]] = {
+    "speaking":  ["fluency", "pronunciation", "content"],
+    "writing":   ["grammar", "vocabulary", "form", "content"],
+    "reading":   ["vocabulary", "comprehension"],
+    "listening": ["comprehension", "accuracy"],
+}
+
+_COACH_SYSTEM = (
+    "You are a PTE Academic coach. "
+    "You have two tools: call get_user_weaknesses first to see the learner's historical performance, "
+    "then call get_rubric to retrieve the scoring rubric for the task type. "
+    "Use both to write 2 specific coaching tips in Simplified Chinese targeting the weakest dimensions. "
+    "Return ONLY valid JSON: {\"coachSuggestions\": [\"tip1\", \"tip2\"]}"
+)
+
+
+async def call_coach_node(state: FeedbackState) -> dict:
+    primary = state.get("primary_result") or {}
+    ds = primary.get("dimensionScores") or {}
+    section = ds.get("section", "")
+    dim_keys = _DIM_KEYS.get(section, [])
+
+    if not dim_keys:
+        return {"coach_suggestions": []}
+
+    weak = sorted(
+        [(k, ds.get(k, 100)) for k in dim_keys],
+        key=lambda x: x[1],
+    )[:2]
+    weak_summary = ", ".join(f"{k}={v}" for k, v in weak)
+
+    historical_weaknesses = state.get("historical_weaknesses")
+    weakness_tool = make_weakness_tool(historical_weaknesses)
+    tools = [weakness_tool, get_rubric]
+
+    llm_with_tools = ChatOpenAI(
+        model=os.getenv("LLM_MODEL", "deepseek-chat"),
+        api_key=os.getenv("LLM_API_KEY"),
+        base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+        temperature=0.3,
+        max_tokens=600,
+        timeout=45.0,
+    ).bind_tools(tools)
+
+    messages = [
+        SystemMessage(content=_COACH_SYSTEM),
+        HumanMessage(content=(
+            f"task_type: {state['task_type']}\n"
+            f"current session weakest dimensions: {weak_summary}\n"
+            "Call get_user_weaknesses then get_rubric, then give 2 coaching tips."
+        )),
+    ]
+
+    tool_map = {t.name: t for t in tools}
+
+    try:
+        # Agentic loop: process tool calls until the model returns a final answer
+        for _ in range(4):
+            response = await llm_with_tools.ainvoke(messages)
+            messages = messages + [response]
+
+            if not response.tool_calls:
+                parsed = _try_parse(response.content or "")
+                if parsed and isinstance(parsed.get("coachSuggestions"), list):
+                    return {"coach_suggestions": parsed["coachSuggestions"]}
+                break
+
+            for tc in response.tool_calls:
+                t = tool_map.get(tc["name"])
+                if t is None:
+                    continue
+                result = t.invoke(tc["args"])
+                messages = messages + [ToolMessage(content=result, tool_call_id=tc["id"])]
+
+        # Final forced-JSON call if the loop ended without a clean answer
+        final_llm = ChatOpenAI(
+            model=os.getenv("LLM_MODEL", "deepseek-chat"),
+            api_key=os.getenv("LLM_API_KEY"),
+            base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+            temperature=0.3,
+            max_tokens=400,
+            timeout=30.0,
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
+        final = await final_llm.ainvoke(messages)
+        parsed = _try_parse(final.content or "")
+        if parsed and isinstance(parsed.get("coachSuggestions"), list):
+            return {"coach_suggestions": parsed["coachSuggestions"]}
+
+    except Exception as exc:
+        logger.warning("[coach-agent] failed: %s", exc)
+
+    return {"coach_suggestions": []}
+
+
 _COVERAGE_TASKS = {"read_aloud", "repeat_sentence"}
 
 
@@ -326,6 +428,9 @@ async def finalize_node(state: FeedbackState) -> dict:
         result["scoreCard"] = score_card
     # Must run after initial scoreCard so coverage correction can overwrite it
     result = _apply_content_coverage(state["task_type"], state, result)
+    coach = state.get("coach_suggestions")
+    if coach:
+        result["coachSuggestions"] = coach
     diverged = state.get("diverged", [])
     if diverged:
         judge_log = {
@@ -360,24 +465,22 @@ def _build_graph():
     builder.add_node("call_judge", call_judge_node)
     builder.add_node("check_divergence", check_divergence_node)
     builder.add_node("retry_primary", retry_primary_node)
+    builder.add_node("call_coach", call_coach_node)
     builder.add_node("finalize", finalize_node)
 
     builder.set_entry_point("retrieve_context")
-    # retrieve_context → process_pronunciation (format pron data before LLM calls)
     builder.add_edge("retrieve_context", "process_pronunciation")
-    # Fan-out: process_pronunciation → call_primary ‖ call_judge (parallel)
     builder.add_edge("process_pronunciation", "call_primary")
     builder.add_edge("process_pronunciation", "call_judge")
-    # Fan-in: both complete → check_divergence
     builder.add_edge("call_primary", "check_divergence")
     builder.add_edge("call_judge", "check_divergence")
-    # Conditional edge: diverged → retry, else → finalize
     builder.add_conditional_edges(
         "check_divergence",
         _route_after_divergence,
-        {"retry_primary": "retry_primary", "finalize": "finalize"},
+        {"retry_primary": "retry_primary", "finalize": "call_coach"},
     )
-    builder.add_edge("retry_primary", "finalize")
+    builder.add_edge("retry_primary", "call_coach")
+    builder.add_edge("call_coach", "finalize")
     builder.add_edge("finalize", END)
 
     return builder.compile()
@@ -472,6 +575,7 @@ async def run_feedback_graph(request) -> dict:
         "diverged": [],
         "retry_count": 0,
         "final_result": {},
+        "historical_weaknesses": request.historicalWeaknesses,
     }
     result = await _graph.ainvoke(initial_state)
     return result.get("final_result") or {}

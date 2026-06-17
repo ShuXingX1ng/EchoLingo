@@ -25,6 +25,7 @@ class Prompts:
         _pte_retry          = _load("pte/retry_note.yaml")
         _read_aloud         = _load("read_aloud/prompts.yaml")
         _word_lookup        = _load("word_lookup/prompts.yaml")
+        _study_assistant_knowledge = _load("study_assistant/knowledge.yaml")
 
         # PTE stimulus
         self.stimulus_system: str           = _pte_stimulus["system"]
@@ -60,6 +61,9 @@ class Prompts:
         # Word Lookup — DeepSeek fallback for phrases and dictionary misses
         self.word_lookup_fallback_system: str = _word_lookup["fallback"]["system"]
         self.word_lookup_fallback_user:   str = _word_lookup["fallback"]["user"]
+
+        # Study Assistant — hand-authored navigation knowledge + PTE FAQ
+        self.study_assistant_knowledge: dict = _study_assistant_knowledge
 
     def build_primary_schema(self, section: str, details_schema: str) -> str:
         """Assemble the full output schema string for the primary LLM call."""

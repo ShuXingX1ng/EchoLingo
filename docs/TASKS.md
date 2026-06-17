@@ -61,6 +61,8 @@
 | Architecture deepening (C3) — Task Type metadata registry | Done | Created `src/lib/task-type-registry.ts` (15-type registry with displayName/category/stimulusFormat/TimerConfig); `src/data/task-types.json` for Python backend; `task-weakness.ts` `ALL_TASK_TYPES` now imported from registry; `pte_feedback.py` + `pte_stimulus.py` load `VALID_TASK_TYPES` from JSON file; 294/294 backend pytest, tsc 0 |
 | Architecture deepening (C4) — `createSyncedStore` factory | Done | New `src/lib/synced-store.ts`; `unified-task-history.ts` + `unified-vocabulary.ts` delegate save/listAll/delete to factory; external signatures unchanged; tsc 0, 124/124 unit tests |
 | UI Visual Upgrade | Done | All 7 UI surfaces upgraded: globals.css tokens + body gradient; DesktopNav icon tiles; Home, Practice, Stats, History, Vocabulary, Settings pages unified to `rounded-[22px]`/`rounded-[28px]` card system + lucide icon tiles + section heading style; all `bg-[var(--background)]` outer-div overrides removed so body gradient shows through |
+| Phase Study-Assistant-1: Study Assistant | Done | Global floating tool-using assistant (`POST /api/study-assistant/chat`, LangGraph tool loop, recency gate in node); 3 tools (navigate/generate-practice/PTE-Q&A) + route allow-list; hand-authored knowledge file (no RAG); GNews `source=news` plumbed through `stimulus_service` reusing originality guard; deep-link handoff, hidden on `/mock`, session-only, no new table/login; backend 343 pass, FE tsc/eslint/build green (ADR-0010) |
+| Portfolio README refresh | Done | `README.md` rewritten for GitHub: PTE scope, Agent workflows, RAG/retrieval, setup, tests, and Claude Code-assisted workflow |
 
 ## Current Test Baseline
 
@@ -68,10 +70,10 @@
 |-------|----------------|
 | Frontend unit | 12 files / 124 tests |
 | E2E | 55 tests (14 smoke + 12 listening + 14 reading + 9 mock exam + 6 other) |
-| Backend | 294 tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality + 6 new graph tests) |
+| Backend | 343 tests (full suite incl. 41 Study Assistant graph/tools/gnews tests) |
 | Quality gate | lint 0, typecheck pass, build pass |
 
-## Current Status (as of 2026-06-15)
+## Current Status (as of 2026-06-17)
 
 Architecture Candidates 1, 2, and 3 are **fully complete**.
 
@@ -81,28 +83,27 @@ Architecture Candidates 1, 2, and 3 are **fully complete**.
 
 DB: 14,005 Stimulus Exemplar rows across all 14 task types; embed pipeline BLAS-accelerated.
 
+Portfolio README is refreshed for GitHub upload and recruiting review.
+
 ## Next Phase
 
-**Resume point (2026-06-16):** UI Visual Upgrade fully complete — all 7 surfaces (Home, Practice, DesktopNav, Stats, History, Vocabulary, Settings) now share the premium card system. Architecture Candidates 1–4 also complete.
+**Resume point (2026-06-17):** Portfolio README refresh is complete — the repo is ready for GitHub presentation, with no runtime code changed in this pass.
 
 What's done:
-- UI Round 1 (Home + Practice + Nav): lucide-react installed; globals.css gradient body; DesktopNav icon tiles + inset-shadow active; Home glass metric card + Practice hero + color-coded task section cards
-- UI Round 2 (Stats + History): removed `bg-[var(--background)]` body overrides; Stats page hero (`BarChart2`), section icon tiles (`AlertTriangle`/`Target`/`TrendingUp`); History page lucide `Search` + explicit `border-violet-200` hero card tokens
-- UI Round 3 (Vocabulary + Settings): `vocabulary/page.tsx` outer-div bg override removed; hero card + `VocabularyCard` canonical tokens; `settings/page.tsx` outer-div bg override removed; new Settings hero card (`Settings2` indigo tile); Goals/Reminders/Voice/Account section cards canonical tokens + lucide icon tiles
-- C1: `usePracticeTaskRunner` hook covering 9 pages + 6 Mock components; `submit(overrides?)` for JSON-stimulus pages
-- C2: `backend/routers/read_aloud.py` deleted; `process_pronunciation_node` in `feedback_graph.py`; stimulus unified to `/api/pte/stimulus`
-- C3: `src/lib/task-type-registry.ts` (TASK_TYPE_REGISTRY + ALL_TASK_TYPES + helpers); `src/data/task-types.json`; both Python routers load VALID_TASK_TYPES from JSON
-- C4: `src/lib/synced-store.ts` factory; `unified-task-history.ts` + `unified-vocabulary.ts` delegate to factory; external APIs unchanged
+- Rewrote `README.md` from stale IELTS-era content into a GitHub/portfolio README for the PTE platform.
+- Documented product scope, architecture, three Agent workflows, RAG/retrieval design, setup steps, useful commands, limitations, and Claude Code-assisted development workflow.
+- Updated project docs for this documentation-only change.
 
 What's next:
-- [ ] **Populate JijingAdapter data** — place PTE recall data at `backend/data/jijing_raw/jijing.jsonl`, run full pipeline (`scrape → clean → embed`) — key file: `backend/scripts/scrape_exemplars/sources/jijing.py`
-- [ ] **supabase-migration-006.sql** — `practice_tasks` table migration (file already created, needs applying to live DB)
+- [ ] Add screenshots or a short demo GIF to the README — key files: `README.md`, `public/`
+- [ ] Add a small Agent evaluation note for scoring stability/divergence metrics — key files: `docs/agent-architecture.md`, `backend/services/feedback_graph.py`
+- [ ] Pick the next product task: apply `supabase-migration-006.sql`, complete Onboarding-1, or populate JijingAdapter data.
 
 Key files to open first:
-- `src/lib/synced-store.ts` — new generic synced-store factory (C4)
-- `src/lib/unified-task-history.ts` — delegates save/listAll/delete to factory
-- `src/lib/unified-vocabulary.ts` — delegates save/listAll/delete to factory
-- `backend/scripts/scrape_exemplars/sources/jijing.py` — JijingAdapter (public code, gitignored data)
+- `README.md`
+- `docs/agent-architecture.md`
+- `backend/services/feedback_graph.py`
+- `backend/services/onboarding_graph.py`
 
 Key resolved decisions (so we don't re-litigate):
 - **Exemplars are retrieval-only**; default path generates an original Stimulus
@@ -166,6 +167,10 @@ duplicates the task list.)
 **有意保留（不在本次范围）：** legacy 历史/备份孤岛 `src/lib/history.ts`、`unified-history.ts`、`supabase-history.ts`、`src/components/DataMigration.tsx` 及 `src/types/index.ts` 的 `SessionFeedback`/`ChatMessage` 类型 —— 支撑 IELTS-session 备份/迁移，未在 PTE UI 暴露（见 Known Technical Debt）。`recommendations.ts` 的 legacy `getRecommendations` 现已无调用方，但与 `getPteRecommendations` 同处一文件，保留待后续。
 
 ## Future / Backlog
+
+> **Phase Study-Assistant-1 has shipped (2026-06-17).** The items below were deferred behind it and are now eligible to be picked up — see "Next Phase" for the recommended order. Kept here, not deleted, so the plan is recoverable.
+>
+> Note: **Phase Onboarding-1** below already has partial scaffolding in-tree (`backend/services/onboarding_graph.py`, `backend/routers/onboarding.py`, `src/app/onboarding/`); it is a separate concern from the Study Assistant.
 
 ### Learning Experience
 

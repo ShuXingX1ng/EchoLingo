@@ -82,6 +82,17 @@ _Avoid_: translator, dictionary, assistant, chat helper, glossary (reserved for 
 The learner's saved collection of looked-up words. A word enters the Vocabulary List only by explicit action (a save/star control on the Word Lookup card) — looking a word up does not add it. Stored per learner in Supabase when logged in, with localStorage fallback when not. Viewed on the `/vocabulary` page (view and delete only; no spaced-repetition review in v1).
 _Avoid_: word book, saved words, flashcards, SRS deck
 
+**Study Assistant**:
+The learner-facing, tool-using conversational agent. It holds a multi-turn conversation (single session, not persisted) and decides which of its tools to call to help the learner. Reachable from a global floating entry point on every page **except during an in-progress Mock Exam** (same exclusion rule as **Word Lookup**). Answers follow the current UI language; preset "common question" buttons lower the barrier to entry. It is a tool-using agent in the technical sense, but it is **not** an **Agent** in this project's vocabulary — that term is reserved for the internal feedback/scoring pipeline stages (see `docs/agent-architecture.md`, ADR-0004), which the Study Assistant never invokes.
+
+Its MVP tools are:
+1. **Navigation / app help** — answers "how / where / what is" questions and returns clickable jump links drawn from a fixed route allow-list, grounded by a hand-authored knowledge file (app feature map + PTE FAQ), not RAG over dev docs.
+2. **Generate practice on a topic** — produces an original **Stimulus** (text Task Types only at MVP) for a learner-named topic. Grounding defaults to the **Stimulus Exemplar** corpus (the existing **Theme Practice** path); it switches to live-news grounding only on explicit learner recency intent. Either way the source text is never served verbatim — the **originality guard** applies — so it stays consistent with ADR-0008.
+3. **PTE knowledge Q&A** — answers exam-format, scoring-dimension, and study-tip questions.
+
+**Action boundary**: the Study Assistant may generate practice content and navigate the learner into a **Practice Task**, but it never submits a **Response**, never scores, and never alters saved learner data on the learner's behalf. It produces no **Feedback** of its own.
+_Avoid_: Agent (reserved for the feedback/scoring pipeline), assistant (bare — reserved by Word Lookup's avoid-list), chatbot, support bot, tutor, Coach (reserved for the Coach Agent)
+
 ### Progress
 
 **Task-Type Weakness**:

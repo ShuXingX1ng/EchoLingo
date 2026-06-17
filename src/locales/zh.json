@@ -6,7 +6,6 @@
   "nav.stats": "统计",
   "nav.settings": "设置",
   "nav.admin": "管理",
-
   "home.title": "EchoLingo",
   "home.subtitle": "随时随地，用 AI 练习 PTE Academic。",
   "home.description": "获取真实练习体验，获得流利度、词汇、语法的详细反馈，并追踪预估分数。",
@@ -21,7 +20,6 @@
   "home.feature3.title": "详细反馈",
   "home.feature3.desc": "获得流利度、词汇、语法的反馈，以及具体的改进建议。",
   "home.footer": "EchoLingo - AI 驱动的 PTE Academic 练习平台",
-
   "practice.title": "PTE 练习",
   "practice.part1": "Part 1 - AI 考官",
   "practice.examiner": "考官",
@@ -36,7 +34,6 @@
   "practice.tryAgain": "重试",
   "practice.startingSession": "正在开始练习...",
   "practice.feedbackError": "生成反馈失败。",
-
   "exam.title": "PTE 模拟考试",
   "exam.endExam": "结束考试",
   "exam.newExam": "开始新考试",
@@ -50,7 +47,6 @@
   "exam.prepEndingSoon": "时间快到了！准备开始发言。",
   "exam.speakTimeWarning": "还剩 30 秒 - 总结你的回答。",
   "exam.speakEndingSoon": "时间快到了！请结束发言。",
-
   "setup.title": "练习设置",
   "setup.chooseMode": "选择练习模式",
   "setup.chooseTopic": "选择话题",
@@ -84,7 +80,6 @@
   "setup.trainingType": "训练类型",
   "setup.selectedTopic": "已选话题：{name}",
   "setup.noTopicSelected": "未选话题。考官可以为你随机选择。",
-
   "practice.input": "输入",
   "practice.voiceConversation": "语音对话",
   "practice.textOrDictated": "文字或口述答案",
@@ -92,14 +87,12 @@
   "practice.sessionGoalHint": "给出清晰、有展开的回答",
   "practice.evidenceCollected": "已收集",
   "practice.candidateAnswers": "{count} 条回答",
-
   "exam.phase.introduction": "自我介绍",
   "exam.phase.preparation": "准备",
   "exam.phase.speaking": "发言",
   "exam.phase.discussion": "讨论",
   "exam.phase.ended": "已结束",
   "exam.phase.testComplete": "考试结束",
-
   "feedback.title": "会话反馈",
   "feedback.studyReview": "学习复盘",
   "feedback.reviewSubtitle": "把本次结果转成下一步学习任务：先看分数，再处理最影响分数的问题，然后用更聚焦的练习巩固。",
@@ -133,7 +126,6 @@
   "feedback.errorType.vocabulary": "词汇",
   "feedback.errorType.fluency": "流利度",
   "feedback.errorType.pronunciation": "发音",
-
   "pronunciation.title": "发音评估",
   "pronunciation.overall": "整体发音分数",
   "pronunciation.accuracy": "准确度",
@@ -146,7 +138,6 @@
   "pronunciation.good": "良好",
   "pronunciation.fair": "一般",
   "pronunciation.needsWork": "需要改进",
-
   "auth.login": "登录",
   "auth.signUp": "注册",
   "auth.createAccount": "创建账号",
@@ -160,7 +151,6 @@
   "auth.noAccount": "没有账号？注册",
   "auth.hasAccount": "已有账号？登录",
   "auth.logout": "退出登录",
-
   "admin.title": "管理后台",
   "admin.topics": "话题管理",
   "admin.users": "用户管理",
@@ -181,17 +171,14 @@
   "admin.inactive": "停用",
   "admin.loading": "加载中...",
   "admin.noAccess": "你没有权限访问此页面。",
-
   "recommendations.title": "为你推荐",
   "recommendations.basedOn": "基于你的练习历史",
   "recommendations.weakArea": "重点提升",
   "recommendations.startPractice": "开始练习",
   "recommendations.noData": "完成一些练习后，即可获得个性化推荐。",
-
   "language.switch": "语言",
   "language.en": "English",
   "language.zh": "中文",
-
   "shadowing.title": "跟读练习",
   "shadowing.setup.title": "跟读练习",
   "shadowing.setup.description": "听标准发音后模仿跟读，即时获得发音评估反馈。",
@@ -249,7 +236,6 @@
   "home.reviewProgress": "复习进度",
   "home.reviewProgressDesc": "查看你的练习记录和分数趋势。",
   "home.practiceHistory": "练习历史",
-
   "reminder.title": "学习提醒",
   "reminder.examDate": "考试日期",
   "reminder.examDateDesc": "设置你的 PTE 目标考试日期",
@@ -271,7 +257,6 @@
   "reminder.encouragement.soon": "快到考试了！保持专注，坚持练习。",
   "reminder.encouragement.today": "就是今天！你一定可以的！",
   "reminder.practiceNow": "去练习",
-
   "stats.learningProgress": "学习进度",
   "stats.avgBand": "平均分",
   "stats.trend.up": "上升趋势",
@@ -307,9 +292,38 @@
   "stats.recentSessions": "最近练习",
   "stats.viewAll": "查看全部",
   "stats.emptyTitle": "暂无练习数据",
-  "stats.emptyDesc": "完成第一次练习后，即可查看进度、趋势和个性化推荐。",
+  "stats.emptyDesc": "完成一次 PTE 练习任务，即可查看题型薄弱分析和进度走势。",
   "stats.emptyCta": "去练习",
-
+  "stats.analytics": "数据分析",
+  "stats.yourProgress": "我的进度",
+  "stats.practiceOverview": "练习概览",
+  "stats.totalPracticeTasks": "练习任务总数",
+  "stats.taskTypeWeakness": "题型薄弱分析",
+  "stats.weaknessDesc": "分数 0–100，越低越弱。点击任意行可展开各维度详情。",
+  "stats.learnerProfile": "学习者画像",
+  "stats.profileDesc": "汇总所有已练题型的维度得分。",
+  "stats.radarLegend": "绿色 = 你的得分 · 虚线 = 目标（{target}）",
+  "stats.targetScore": "目标分数：{score}",
+  "stats.noProfileData": "暂无{section}维度数据，完成相关题型练习后即可查看画像。",
+  "stats.actionTaskPractice": "题型练习",
+  "stats.actionTaskPracticeDesc": "选择任意 PTE 题型，获取 AI 反馈。",
+  "stats.actionMockExam": "模拟考试",
+  "stats.actionMockExamDesc": "按考试顺序完成所有题型。",
+  "stats.actionBrowseHistory": "查看过往练习任务，回顾 AI 反馈。",
+  "stats.scoreTrajectory": "各题型得分走势",
+  "stats.show": "展开",
+  "stats.hide": "收起",
+  "stats.trajectoryDesc": "每周平均综合得分（0–100），选择题型查看走势。",
+  "stats.notEnoughData": "{taskType} 暂无足够的每周数据。",
+  "stats.noData": "无数据",
+  "stats.gapToTarget": "距目标差 {gap} 分",
+  "stats.aboveTarget": "超出目标 {n} 分",
+  "stats.gapLegend": "黄线 = 目标（{target}）。分数为 0–100 内部参考值，非官方 PTE 分数。",
+  "stats.section.speaking": "口语",
+  "stats.section.writing": "写作",
+  "stats.section.listening": "听力",
+  "stats.taskCount": "{count} 次练习 · 上次：{date}",
+  "stats.taskCountSingle": "1 次练习 · 上次：{date}",
   "history.title": "练习历史",
   "history.back": "返回",
   "history.newSession": "新建练习",
@@ -347,7 +361,7 @@
   "history.confirmDeleteMultiple": "确定要删除 {count} 条练习记录吗？",
   "history.confirmDeleteAll": "确定要删除所有练习记录吗？此操作不可撤销。",
   "history.noFeedback": "查看本次练习并选择一个专项训练。",
-
+  "history.filterAll": "全部",
   "settings.practiceGoals": "练习目标",
   "settings.weeklyPractice": "每周练习",
   "settings.bandScore": "目标分数",
@@ -381,11 +395,9 @@
   "settings.aboutVoices": "语音由 Azure Neural TTS 提供，音色自然",
   "settings.aboutSpeed": "学习时建议使用较慢语速（0.8-0.9x）",
   "settings.aboutStorage": "所有设置保存在浏览器本地",
-
   "loading": "加载中...",
   "error.generic": "出错了，请重试。",
   "error.network": "网络错误，请检查连接。",
-
   "dailyTasks.title": "今日学习计划",
   "dailyTasks.completed": "已完成",
   "dailyTasks.noTasks": "开始练习以获取个性化每日任务。",
@@ -442,7 +454,6 @@
   "home.practiceCardTitle": "练习",
   "home.practiceCardDesc": "Read Aloud、Repeat Sentence、Write Essay 等全部 15 种 PTE 任务类型，均配 AI 反馈。",
   "home.practiceCardCta": "选择任务类型",
-
   "practiceTask.common.pteSpeaking": "PTE 口语",
   "practiceTask.common.pteWriting": "PTE 写作",
   "practiceTask.common.pteReading": "PTE 阅读",
@@ -474,7 +485,6 @@
   "practiceTask.common.submit": "提交",
   "practiceTask.common.playPassage": "播放文章",
   "practiceTask.common.holdOn": "稍等… {sec} 秒",
-
   "practiceTask.read-aloud.desc": "尽量清晰、自然地朗读文章。你有 {prepTime} 秒准备，然后有 {recordTime} 秒朗读。",
   "practiceTask.read-aloud.idleDesc": "AI 生成的文章将出现在屏幕上，在准备阶段仔细阅读，计时开始后大声朗读。",
   "practiceTask.read-aloud.generatePassage": "生成文章",
@@ -484,7 +494,6 @@
   "practiceTask.read-aloud.azurePronunciation": "Azure 发音评估",
   "practiceTask.read-aloud.oralFluency": "口语流利度",
   "practiceTask.read-aloud.errorGenerate": "生成文章失败",
-
   "practiceTask.repeat-sentence.desc": "听一遍句子，然后逐字复述。你有 {recordTime} 秒作答。",
   "practiceTask.repeat-sentence.idleDesc": "一个句子将由 Azure TTS 朗读，仔细聆听后原话重复一遍。",
   "practiceTask.repeat-sentence.generateSentence": "生成句子",
@@ -498,7 +507,6 @@
   "practiceTask.repeat-sentence.originalSentence": "原句",
   "practiceTask.repeat-sentence.yourRepetition": "你的复述",
   "practiceTask.repeat-sentence.errorGenerate": "生成题目失败",
-
   "practiceTask.answer-short-question.desc": "听完问题后，用简短口语作答（1–3 个词）。作答时间 {recordTime} 秒。",
   "practiceTask.answer-short-question.idleDesc": "AI 生成的事实性问题将出现在屏幕上，请尽量简洁、准确地作答。",
   "practiceTask.answer-short-question.getQuestion": "获取问题",
@@ -512,7 +520,6 @@
   "practiceTask.answer-short-question.yourAnswer": "你的回答",
   "practiceTask.answer-short-question.nextQuestion": "下一题",
   "practiceTask.answer-short-question.errorGenerate": "生成问题失败",
-
   "practiceTask.personal-intro.desc": "PTE 中不计分，但非常适合热身。{prepTime} 秒准备，{recordTime} 秒发言。",
   "practiceTask.personal-intro.fixedPrompt": "请做自我介绍，包括你的背景、学业或工作、英语学习经历和目标。请自然、清晰地表达。",
   "practiceTask.personal-intro.imReady": "我准备好了",
@@ -521,7 +528,6 @@
   "practiceTask.personal-intro.generatingFeedback": "正在生成反馈…",
   "practiceTask.personal-intro.prompt": "题目",
   "practiceTask.personal-intro.yourIntroduction": "你的自我介绍",
-
   "practiceTask.describe-image.desc": "观察图像 {prepTime} 秒，然后详细口头描述。你有 {recordTime} 秒发言。",
   "practiceTask.describe-image.idleDesc": "图表、地图或示意图将出现在屏幕上，在准备阶段仔细研究，录音开始后描述你看到的内容。",
   "practiceTask.describe-image.loadImage": "加载图像",
@@ -531,7 +537,6 @@
   "practiceTask.describe-image.imageDescription": "图像描述",
   "practiceTask.describe-image.yourDescription": "你的描述",
   "practiceTask.describe-image.newImage": "换一张图",
-
   "practiceTask.re-tell-lecture.desc": "听一段简短讲座，然后用自己的话复述。你有 {prepTime} 秒准备，{recordTime} 秒作答。",
   "practiceTask.re-tell-lecture.idleDesc": "AI 生成的讲座将合成为音频，仔细聆听后准备 10 秒，再复述要点。",
   "practiceTask.re-tell-lecture.generateLecture": "生成讲座",
@@ -550,7 +555,6 @@
   "practiceTask.re-tell-lecture.newLecture": "换一段讲座",
   "practiceTask.re-tell-lecture.errorGenerate": "生成讲座失败",
   "practiceTask.re-tell-lecture.recordingStartsIn": "{sec} 秒后自动开始录音",
-
   "practiceTask.summarize-written-text.desc": "阅读文章后用一句话进行总结（5–75 词）。限时 10 分钟。",
   "practiceTask.summarize-written-text.idleDesc": "AI 生成的文章将出现在屏幕上，请写一句话总结文章要点。",
   "practiceTask.summarize-written-text.generatePassage": "生成文章",
@@ -559,7 +563,6 @@
   "practiceTask.summarize-written-text.evaluating": "正在评估你的总结…",
   "practiceTask.summarize-written-text.summaryPlaceholder": "在此输入一句话总结…",
   "practiceTask.summarize-written-text.emptySummaryError": "请先写好总结再提交。",
-
   "practiceTask.write-essay.desc": "根据题目写一篇 {minWords}–{maxWords} 词的文章。限时 20 分钟。",
   "practiceTask.write-essay.idleDesc": "AI 生成的写作题目将出现在屏幕上，请写一篇结构清晰的 {minWords}–{maxWords} 词文章。",
   "practiceTask.write-essay.getEssayQuestion": "获取写作题目",
@@ -572,7 +575,6 @@
   "practiceTask.write-essay.essayPlaceholder": "在此输入文章，目标 {minWords}–{maxWords} 词，结构清晰：引言、正文段落、结论。",
   "practiceTask.write-essay.wordStatusBelow": "（目标 {min} 词以上）",
   "practiceTask.write-essay.wordStatusOver": "（最多 {max} 词）",
-
   "practiceTask.write-from-dictation.desc": "听完句子后，逐字输入你听到的内容。每个词都很重要。",
   "practiceTask.write-from-dictation.idleDesc": "AI 生成的句子将被朗读，请逐字输入你听到的内容。",
   "practiceTask.write-from-dictation.getSentence": "获取句子",
@@ -588,7 +590,6 @@
   "practiceTask.write-from-dictation.replayOnce": "重播一次",
   "practiceTask.write-from-dictation.checking": "正在核对你的听写…",
   "practiceTask.write-from-dictation.dictatedSentence": "朗读的句子",
-
   "practiceTask.summarize-spoken-text.desc": "听一段简短的学术录音，然后写一段 50–70 词的总结。限时 10 分钟。",
   "practiceTask.summarize-spoken-text.idleDesc": "AI 生成的学术文章将合成为音频，仔细聆听后写一段 50–70 词的简洁总结。",
   "practiceTask.summarize-spoken-text.generatePassage": "生成文章",
@@ -603,7 +604,6 @@
   "practiceTask.summarize-spoken-text.afterPassage": "文章结束后，你将有 10 分钟写总结。",
   "practiceTask.summarize-spoken-text.listenTimer": "请仔细聆听，文章结束后写作计时开始。",
   "practiceTask.summarize-spoken-text.yourSummary": "你的总结",
-
   "practiceTask.fill-in-the-blanks-listening.desc": "听一段文章，然后从下拉菜单中为每个空选择正确的词。限时 7 分钟。",
   "practiceTask.fill-in-the-blanks-listening.idleDesc": "AI 生成的学术文章将被朗读，听完后用下拉选项填写空白。",
   "practiceTask.fill-in-the-blanks-listening.getPassage": "获取文章",
@@ -614,7 +614,6 @@
   "practiceTask.fill-in-the-blanks-listening.evaluating": "正在评估你的答案…",
   "practiceTask.fill-in-the-blanks-listening.passageWithAnswers": "文章（含答案）",
   "practiceTask.fill-in-the-blanks-listening.yourAnswers": "你的答案",
-
   "practiceTask.highlight-correct-summary.desc": "听一段文章，然后选出最符合内容的总结。限时 5 分钟。",
   "practiceTask.highlight-correct-summary.idleDesc": "AI 生成的文章将被朗读，听完后选出准确概括要点的总结。",
   "practiceTask.highlight-correct-summary.getQuestion": "获取题目",
@@ -627,14 +626,12 @@
   "practiceTask.highlight-correct-summary.evaluating": "正在评估你的答案…",
   "practiceTask.highlight-correct-summary.passageSummaries": "文章与总结选项",
   "practiceTask.highlight-correct-summary.yourAnswer": "你的答案",
-
   "practiceTask.fill-in-the-blanks.desc": "阅读文章，从下拉菜单中为每个空选择正确的词。限时 7 分钟。",
   "practiceTask.fill-in-the-blanks.idleDesc": "AI 生成的学术文章将出现并含有空白，从下拉选项中为每个空选择最合适的词。",
   "practiceTask.fill-in-the-blanks.getPassage": "获取文章",
   "practiceTask.fill-in-the-blanks.generating": "正在生成文章…",
   "practiceTask.fill-in-the-blanks.evaluating": "正在评估你的答案…",
   "practiceTask.fill-in-the-blanks.yourAnswers": "你的答案",
-
   "practiceTask.re-order-paragraphs.desc": "将段落拖拽成正确的逻辑顺序。限时 3 分钟。",
   "practiceTask.re-order-paragraphs.idleDesc": "打乱顺序的段落将出现在屏幕上，请通过拖拽或箭头将其排列成正确顺序。",
   "practiceTask.re-order-paragraphs.getParagraphs": "获取段落",
@@ -644,12 +641,23 @@
   "practiceTask.re-order-paragraphs.evaluating": "正在评估你的排序…",
   "practiceTask.re-order-paragraphs.correctOrder": "正确顺序",
   "practiceTask.re-order-paragraphs.yourOrder": "你的排序",
-
   "practiceTask.multiple-choice.desc": "阅读文章，从五个选项中选出唯一正确答案。限时 4 分钟。",
   "practiceTask.multiple-choice.idleDesc": "AI 生成的阅读理解题目将出现在屏幕上，请仔细阅读并选出最佳答案。",
   "practiceTask.multiple-choice.getQuestion": "获取题目",
   "practiceTask.multiple-choice.generating": "正在生成题目…",
   "practiceTask.multiple-choice.evaluating": "正在评估你的答案…",
   "practiceTask.multiple-choice.passageQuestion": "文章与问题",
-  "practiceTask.multiple-choice.yourAnswer": "你的答案"
+  "practiceTask.multiple-choice.yourAnswer": "你的答案",
+  "studyAssistant.title": "学习助手",
+  "studyAssistant.launcher": "打开学习助手",
+  "studyAssistant.placeholder": "有关 PTE 的任何问题都可以问我…",
+  "studyAssistant.send": "发送",
+  "studyAssistant.thinking": "思考中…",
+  "studyAssistant.error": "出错了，请重试。",
+  "studyAssistant.startPractice": "开始练习",
+  "studyAssistant.close": "关闭学习助手",
+  "studyAssistant.preset1": "如何开始模拟考试？",
+  "studyAssistant.preset2": "生成一篇关于科技的写作题",
+  "studyAssistant.preset3": "写作总结题考察哪些能力？",
+  "studyAssistant.preset4": "给我一道时事新闻相关练习"
 }

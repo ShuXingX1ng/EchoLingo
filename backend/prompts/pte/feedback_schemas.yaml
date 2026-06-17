@@ -14,8 +14,7 @@ speaking: |
   {
     FIELDS_PLACEHOLDER,
     DETAILS_PLACEHOLDER,
-    "dimensionScores": { "section": "speaking", "fluency": <0-100>, "pronunciation": <0-100>, "content": <0-100> },
-    "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+    "dimensionScores": { "section": "speaking", "fluency": <0-100>, "pronunciation": <0-100>, "content": <0-100> }
   }
 
 writing: |
@@ -24,8 +23,7 @@ writing: |
   {
     FIELDS_PLACEHOLDER,
     DETAILS_PLACEHOLDER,
-    "dimensionScores": { "section": "writing", "grammar": <0-100>, "vocabulary": <0-100>, "form": <0-100>, "content": <0-100> },
-    "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+    "dimensionScores": { "section": "writing", "grammar": <0-100>, "vocabulary": <0-100>, "form": <0-100>, "content": <0-100> }
   }
 
 reading: |
@@ -34,8 +32,7 @@ reading: |
   {
     FIELDS_PLACEHOLDER,
     DETAILS_PLACEHOLDER,
-    "dimensionScores": { "section": "reading", "vocabulary": <0-100>, "comprehension": <0-100> },
-    "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+    "dimensionScores": { "section": "reading", "vocabulary": <0-100>, "comprehension": <0-100> }
   }
 
 listening: |
@@ -44,8 +41,7 @@ listening: |
   {
     FIELDS_PLACEHOLDER,
     DETAILS_PLACEHOLDER,
-    "dimensionScores": { "section": "listening", "comprehension": <0-100>, "accuracy": <0-100> },
-    "coachSuggestions": ["<targeted coaching tip for the weakest dimension>", "<targeted tip for 2nd weakest dimension>"]
+    "dimensionScores": { "section": "listening", "comprehension": <0-100>, "accuracy": <0-100> }
   }
 
 unscored: |

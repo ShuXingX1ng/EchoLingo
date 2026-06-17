@@ -146,11 +146,11 @@ function ScoreCardBlock({ card }: { card: TaskScoreCard }) {
 
   return (
     <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-3">本题得分</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-3">Score</p>
       <div className="flex items-end gap-2 mb-3">
         <span className={`text-4xl font-bold tabular-nums ${color}`}>{card.earned}</span>
         <span className="text-xl text-slate-400 mb-0.5">/ {card.max}</span>
-        <span className="text-sm text-slate-400 mb-1 ml-1">分</span>
+        <span className="text-sm text-slate-400 mb-1 ml-1">pts</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
         <div

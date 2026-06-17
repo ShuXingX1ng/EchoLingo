@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
+import { BookOpen, Trash2 } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import { getVocabulary, deleteVocabulary } from "@/lib/unified-vocabulary"
 import type { VocabularyEntry } from "@/types"
@@ -22,7 +23,7 @@ function VocabularyCard({
   onDelete: () => void
 }) {
   return (
-    <div className="bg-[var(--surface)] rounded-xl p-4 sm:p-5 border border-[var(--border)]">
+    <div className="bg-white dark:bg-slate-900 rounded-[22px] p-4 sm:p-5 border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
@@ -65,14 +66,7 @@ function VocabularyCard({
           title="Delete"
           aria-label={`删除 ${entry.text}`}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -95,23 +89,32 @@ export default function VocabularyPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav />
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-[var(--foreground)]">生词本</h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              {loading ? "加载中…" : `${entries.length} 个生词`}
-            </p>
+        {/* Page hero */}
+        <div className="mb-6 rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6 animate-enter">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-12 w-12 rounded-[15px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <BookOpen className="w-6 h-6" strokeWidth={2} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">Vocabulary</p>
+                <h1 className="text-xl font-bold text-[var(--foreground)]">生词本</h1>
+                <p className="text-sm text-[var(--text-muted)]">
+                  {loading ? "加载中…" : `${entries.length} 个生词`}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/practice"
+              className="shrink-0 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              去练习 →
+            </Link>
           </div>
-          <Link
-            href="/practice"
-            className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline"
-          >
-            去练习 →
-          </Link>
         </div>
 
         {!loading && entries.length === 0 ? (

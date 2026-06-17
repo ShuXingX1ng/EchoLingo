@@ -18,10 +18,11 @@ Target users:
 | Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
 | Data | Supabase + localStorage + IndexedDB recordings |
 | Auth | Supabase email + Google OAuth |
-| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 294 backend tests (123 core + 101 scraper/cleaner + 28 embed_exemplars + 36 serving/originality + 6 new graph tests) |
+| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 343 backend tests (full suite incl. 41 Study Assistant graph/tools/gnews tests) |
 | Quality gate | lint 0 errors; typecheck pass; build pass |
 | Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
 | UI | Visual upgrade complete — gradient page background (body, no per-page bg override); lucide-react icon set; premium card system (`rounded-[22px]/rounded-[28px]`, `border-[#dce4ee]`, `shadow-[0_10px_26px_rgba(15,23,42,.055)]`); Home hero + glass metric card; Practice hero + color-coded task sections; Stats hero (BarChart2 tile) + section icon tiles (AlertTriangle/Target/TrendingUp); History hero (Clock violet tile) + lucide Search in toolbar; Vocabulary hero (BookOpen emerald tile); Settings hero (Settings2 indigo tile) + section icon tiles (Target/Bell/Volume2/UserCircle2) per card; DesktopNav icon tiles + active inset-shadow |
+| Documentation | GitHub/portfolio README refreshed to present the PTE product scope, Agent workflows, RAG/retrieval architecture, setup, tests, and Claude Code-assisted development workflow |
 
 ## Architecture
 
@@ -100,6 +101,7 @@ Deferred / planned task types (not yet implemented):
 - **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
 - **Word Lookup** (Study Aid) — floating helper on Task Practice pages only (never Mock Exam): select text → "译" button or desktop drag-drop → one-shot translation card. Single English words resolve against the bundled ECDICT SQLite dictionary (instant, offline); phrases and dictionary misses fall through to DeepSeek. See ADR 0006.
 - **Vocabulary List** (Study Aid) — explicit save on the Word Lookup card adds a word; `/vocabulary` page (view + delete only, no SRS in v1); Supabase cloud sync from v1 with localStorage fallback; included in `backup.ts`. See ADR 0006.
+- **Study Assistant** (Study Aid) — global floating, multi-turn, session-only conversational tool-using helper on every page **except an in-progress Mock Exam** (`/mock*`); LangGraph tool loop (`POST /api/study-assistant/chat`) with three tools: navigation/app-help (clickable links from a fixed route allow-list, hand-authored knowledge file — no RAG), generate-practice (text Task Types only; default `source=exemplars`, `source=news` only on explicit recency cue → GNews title+summary anchor; deep-link handoff into a Practice Task, never serves verbatim), and PTE knowledge Q&A. Action boundary: generates content + navigates only — never submits a Response, scores, or saves data. Answers follow UI language. See ADR-0010 and CONTEXT.md.
 - **Min recording guard** — Stop/Done button disabled for first 5s on all 4 spoken task pages (Read Aloud, Repeat Sentence, Answer Short Question, Personal Intro)
 - PTE task-type practice with timed exercises
 - Full mock exam flow covering the original 7-task sequence plus 3 extended Listening tasks
@@ -131,7 +133,7 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `src/lib/supabase-error-patterns.ts` | Legacy error-pattern storage | Supabase |
 | `src/lib/wav-encoder.ts` | Convert browser audio Blob → WAV for Azure pronunciation API | computed (Web Audio API) |
 | `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
-| `src/lib/practice-mode.ts` | Parse `mode` + `topic` from URL search params; build extras object for `apiPost` body; consumed exclusively by `src/lib/stimulus-loader.ts` (all practice pages delegate through `loadStimulusText`) | computed |
+| `src/lib/practice-mode.ts` | Parse `mode` + `topic` + `source` (`news` when `?source=news`, else `exemplars`) from URL search params; build extras object for `apiPost` body (includes `source:"news"` only when set); consumed exclusively by `src/lib/stimulus-loader.ts` (all practice pages delegate through `loadStimulusText`) | computed |
 | `src/lib/stimulus-loader.ts` | `loadStimulusText({taskType,randomEndpoint?})` — cache-check → API call → cache-store; mode-aware (seeded path always calls `/api/pte/stimulus`; random path respects `randomEndpoint` override for legacy routes) | computed |
 | `src/hooks/useRecordingSession.ts` | `useRecordingSession({totalSeconds,minSeconds?,onComplete,onError?})` — encapsulates MediaRecorder, SpeechRecognition, countdown timer, cleanup; calls `onComplete(blob,transcript,startedAt)` on countdown expiry or manual stop | computed |
 | `src/hooks/usePracticeTaskRunner.ts` | `usePracticeTaskRunner(config)` — full Practice Task lifecycle: phase SM, countdown timer, `loadStimulusText`, feedback API call, `saveTask`, optional `useRecordingSession` + Azure pronunciation; `submit(overrides?)` allows JSON-stimulus pages to inject human-readable `feedbackStimulus`/`feedbackResponse` for the API call while storing raw JSON in task history; returns `savedTask: PracticeTask\|null` for Mock `onComplete` wiring. Covers 9 practice pages: text-response (write-essay, summarize-written-text), audio-response (read-aloud), and JSON-stimulus (multiple-choice, re-order-paragraphs, fill-in-the-blanks) + their 6 Mock components. TTS-audio-stimulus and fixed-prompt pages remain self-managed. | computed |
@@ -164,7 +166,13 @@ Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `Pronunciat
 | `supabase-migration-004.sql` | `stimulus_exemplars` table — shared retrieval corpus for Stimulus Exemplar-grounded generation; `hnsw vector_cosine_ops` + GIN tsvector + task_type btree indexes; RLS enabled with no policies (PostgREST-deny; backend direct Postgres connection bypasses RLS, ADR 0009 §2) | Supabase pgvector |
 | `backend/services/exemplar_store.py` | Read path over `stimulus_exemplars`: `retrieve(task_type,mode,topic?,targeting?,n)` (`random`=`ORDER BY random()`; `targeted`=task_type+difficulty/`features @> jsonb`; `theme`=single-SQL hybrid dense `embedding <=>` + sparse `plainto_tsquery`, RRF-fused `FULL OUTER JOIN`) + `get_verbatim`; direct `psycopg2` via `asyncio.to_thread`, silent `[]` on any failure (ADR 0008 §4) | Supabase (service-role direct) |
 | `backend/services/originality.py` | Local word-shingle Jaccard guard (4-gram, threshold 0.5): `shingles`/`jaccard`/`max_overlap`/`is_too_similar`; no API calls (ADR 0008 §3) | computed |
-| `backend/services/stimulus_service.py` | Stimulus serving logic behind `POST /api/pte/stimulus`: three-tier fallback (verbatim → exemplar-grounded few-shot generation → empty-bank pure-AI → silent pure-AI) + originality guard (regenerate once if a generation overlaps an injected exemplar above threshold) | computed |
+| `backend/services/stimulus_service.py` | Stimulus serving logic behind `POST /api/pte/stimulus`: three-tier fallback (verbatim → exemplar-grounded few-shot generation → empty-bank pure-AI → silent pure-AI) + originality guard (regenerate once if a generation overlaps an injected exemplar above threshold); `source=news` branch injects a GNews title+summary anchor through the same few-shot + originality path, silently degrading to the exemplar path on any GNews failure (ADR-0007/0008/0010) | computed |
+| `backend/services/study_assistant_graph.py` | LangGraph tool-calling loop for the Study Assistant (mirrors `call_coach_node`); recency gate (`recent/latest/current/news/real-time/最近新闻/实时新闻/最新事件`) lives in the node and sets `source`; assembles `{reply, links, practice}`; `run_study_assistant_graph(messages, locale)` (ADR-0010) | computed |
+| `backend/tools/study_assistant_tools.py` | Three `@lc_tool`s — `navigate_app` (allow-listed links), `generate_practice` (text Task Types only → deep-link payload), `pte_knowledge` (FAQ) — plus `filter_links` route allow-list enforcement | computed |
+| `backend/services/gnews.py` | GNews adapter `fetch_news_anchors(topic, n)` → `["title — summary", …]` (title+summary only, never full text); `[]` on missing `GNEWS_API_KEY`/timeout/error (never raises) | network |
+| `backend/prompts/study_assistant/knowledge.yaml` | Hand-authored Study Assistant grounding: `feature_map` + `route_allowlist` (22 routes) + `pte_faq`; loaded once via `prompt_loader` (no RAG) | static YAML |
+| `src/lib/study-assistant.ts` | Study Assistant client → `POST /api/study-assistant/chat`; exports request/response types | — |
+| `src/components/StudyAssistant.tsx` | Global floating Study Assistant panel; session-only multi-turn chat; preset question chips; renders allow-listed links + a practice deep-link `<Link>`; mounted in `ClientLayout`, hidden when `usePathname()` starts with `/mock` | — |
 | `backend/scripts/eval_originality.py` | Offline originality eval: samples generations vs injected exemplars, prints overlap distribution + over-threshold rate; real LLM/embedding/DB calls, NOT wired into CI | — |
 
 Personalization policy:
@@ -186,9 +194,10 @@ browser via `NEXT_PUBLIC_API_BASE_URL`.
 |----------|---------|---------|----------|
 | `POST /api/tts` | Azure TTS | `{ text, voice, rate }` | WAV audio stream |
 | `POST /api/pronunciation` | Azure pronunciation assessment | FormData audio + reference text | `PronunciationAssessmentResult` JSON |
-| `POST /api/pte/stimulus` | Generate stimulus for any PTE task type (Exemplar-grounded when a bank exists, else pure-AI; ADR 0008) | `{ taskType, mode?: random\|targeted\|theme, topic?, targeting?, verbatim? }` | `{ text: string }` |
+| `POST /api/pte/stimulus` | Generate stimulus for any PTE task type (Exemplar-grounded when a bank exists, else pure-AI; ADR 0008). `source=news` uses a GNews title+summary anchor (silent fallback to exemplars on failure) | `{ taskType, mode?: random\|targeted\|theme, topic?, targeting?, verbatim?, source?: exemplars\|news }` | `{ text: string }` |
 | `POST /api/pte/feedback` | AI feedback for any PTE task type | `{ taskType, stimulus, response, pronunciationAssessment? }` | `TaskFeedback` JSON |
 | `POST /api/word-lookup` | Translate a selected word/phrase (dictionary-first, LLM fallback) | `{ query: string }` | `WordLookupResult` JSON (`{ source, text, phonetic, entries, tags }`) |
+| `POST /api/study-assistant/chat` | Multi-turn Study Assistant (LangGraph tool loop; ADR-0010). Reply in request locale; links from a fixed route allow-list; optional practice deep-link | `{ messages: {role,content}[], locale: en\|zh }` | `{ reply, links: {label,route}[], practice: {taskType,taskSlug,topic,source,route}\|null }` |
 
 ## Quality Gates
 

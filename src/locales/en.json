@@ -6,7 +6,6 @@
   "nav.stats": "Stats",
   "nav.settings": "Settings",
   "nav.admin": "Admin",
-
   "home.title": "EchoLingo",
   "home.subtitle": "Practice IELTS Speaking with an AI examiner anytime.",
   "home.description": "Get realistic practice, receive detailed feedback on fluency, vocabulary, grammar, and track your estimated band score.",
@@ -21,7 +20,6 @@
   "home.feature3.title": "Detailed Feedback",
   "home.feature3.desc": "Receive feedback on fluency, vocabulary, grammar, and specific suggestions for improvement.",
   "home.footer": "EchoLingo - AI-powered IELTS Speaking practice",
-
   "practice.title": "IELTS Speaking Practice",
   "practice.part1": "Part 1 - AI Examiner",
   "practice.examiner": "Examiner",
@@ -36,7 +34,6 @@
   "practice.tryAgain": "Try Again",
   "practice.startingSession": "Starting your practice session...",
   "practice.feedbackError": "Failed to generate feedback.",
-
   "exam.title": "IELTS Mock Exam",
   "exam.endExam": "End Exam",
   "exam.newExam": "Start New Exam",
@@ -50,7 +47,6 @@
   "exam.prepEndingSoon": "Almost time! Get ready to speak.",
   "exam.speakTimeWarning": "30 seconds left - wrap up your answer.",
   "exam.speakEndingSoon": "Time's almost up! Conclude now.",
-
   "setup.title": "Practice Setup",
   "setup.chooseMode": "Choose Practice Mode",
   "setup.chooseTopic": "Choose a Topic",
@@ -84,7 +80,6 @@
   "setup.trainingType": "Training type",
   "setup.selectedTopic": "Selected topic: {name}",
   "setup.noTopicSelected": "No topic selected. The examiner can choose one for you.",
-
   "practice.input": "Input",
   "practice.voiceConversation": "Voice conversation",
   "practice.textOrDictated": "Text or dictated answer",
@@ -92,14 +87,12 @@
   "practice.sessionGoalHint": "Give clear, extended answers",
   "practice.evidenceCollected": "Evidence collected",
   "practice.candidateAnswers": "{count} candidate answers",
-
   "exam.phase.introduction": "Introduction",
   "exam.phase.preparation": "Preparation",
   "exam.phase.speaking": "Speaking",
   "exam.phase.discussion": "Discussion",
   "exam.phase.ended": "Ended",
   "exam.phase.testComplete": "Test complete",
-
   "feedback.title": "Session Feedback",
   "feedback.studyReview": "Learning review",
   "feedback.reviewSubtitle": "Turn this result into your next study step: review the score, fix the highest-impact problems, then practise again with a narrower focus.",
@@ -133,7 +126,6 @@
   "feedback.errorType.vocabulary": "Vocabulary",
   "feedback.errorType.fluency": "Fluency",
   "feedback.errorType.pronunciation": "Pronunciation",
-
   "pronunciation.title": "Pronunciation Assessment",
   "pronunciation.overall": "Overall Pronunciation Score",
   "pronunciation.accuracy": "Accuracy",
@@ -146,7 +138,6 @@
   "pronunciation.good": "Good",
   "pronunciation.fair": "Fair",
   "pronunciation.needsWork": "Needs work",
-
   "auth.login": "Login",
   "auth.signUp": "Sign Up",
   "auth.createAccount": "Create Account",
@@ -160,7 +151,6 @@
   "auth.noAccount": "Don't have an account? Sign up",
   "auth.hasAccount": "Already have an account? Login",
   "auth.logout": "Logout",
-
   "admin.title": "Admin Dashboard",
   "admin.topics": "Topic Management",
   "admin.users": "User Management",
@@ -181,17 +171,14 @@
   "admin.inactive": "Inactive",
   "admin.loading": "Loading...",
   "admin.noAccess": "You do not have access to this page.",
-
   "recommendations.title": "Recommended for You",
   "recommendations.basedOn": "Based on your practice history",
   "recommendations.weakArea": "Focus area",
   "recommendations.startPractice": "Start Practice",
   "recommendations.noData": "Complete some practice sessions to get personalized recommendations.",
-
   "language.switch": "Language",
   "language.en": "English",
   "language.zh": "中文",
-
   "shadowing.title": "Shadowing Practice",
   "shadowing.setup.title": "Shadowing Practice",
   "shadowing.setup.description": "Listen to standard pronunciation and practice repeating. Get instant feedback on your pronunciation.",
@@ -249,7 +236,6 @@
   "home.reviewProgress": "Review Progress",
   "home.reviewProgressDesc": "See your practice records and score trends.",
   "home.practiceHistory": "Practice History",
-
   "reminder.title": "Learning Reminders",
   "reminder.examDate": "Exam Date",
   "reminder.examDateDesc": "Set your target IELTS exam date",
@@ -271,7 +257,6 @@
   "reminder.encouragement.soon": "Almost there! Stay focused and keep practicing.",
   "reminder.encouragement.today": "Today is the day! You've got this!",
   "reminder.practiceNow": "Practice Now",
-
   "stats.learningProgress": "Learning progress",
   "stats.avgBand": "avg band",
   "stats.trend.up": "Trending up",
@@ -307,9 +292,38 @@
   "stats.recentSessions": "Recent sessions",
   "stats.viewAll": "View all",
   "stats.emptyTitle": "No practice data yet",
-  "stats.emptyDesc": "Complete your first practice session to see your progress, trends, and personalized recommendations.",
+  "stats.emptyDesc": "Complete a PTE practice task to see your task-type weakness profile and progress trends.",
   "stats.emptyCta": "Start practicing",
-
+  "stats.analytics": "Analytics",
+  "stats.yourProgress": "Your Progress",
+  "stats.practiceOverview": "Practice Overview",
+  "stats.totalPracticeTasks": "total practice tasks",
+  "stats.taskTypeWeakness": "Task-Type Weakness",
+  "stats.weaknessDesc": "Score 0–100, lower means weaker. Tap a row to expand per-dimension breakdown.",
+  "stats.learnerProfile": "Learner Profile",
+  "stats.profileDesc": "Aggregate dimension scores across all practiced task types.",
+  "stats.radarLegend": "Green = your scores · Dashed = target ({target})",
+  "stats.targetScore": "Target score: {score}",
+  "stats.noProfileData": "No {section} dimension data yet. Complete some {section} tasks to see your profile.",
+  "stats.actionTaskPractice": "Task Practice",
+  "stats.actionTaskPracticeDesc": "Pick any PTE task type and drill with AI feedback.",
+  "stats.actionMockExam": "Mock Exam",
+  "stats.actionMockExamDesc": "Sequence all task types under exam conditions.",
+  "stats.actionBrowseHistory": "Browse past practice tasks and revisit feedback.",
+  "stats.scoreTrajectory": "Score trajectory by task type",
+  "stats.show": "Show",
+  "stats.hide": "Hide",
+  "stats.trajectoryDesc": "Weekly average overall score (0–100). Select a task type to view its trend.",
+  "stats.notEnoughData": "Not enough weekly data for {taskType} yet.",
+  "stats.noData": "no data",
+  "stats.gapToTarget": "−{gap} to target",
+  "stats.aboveTarget": "+{n} above",
+  "stats.gapLegend": "Yellow line = target ({target}). Scores are 0–100 internal reference values, not official PTE scores.",
+  "stats.section.speaking": "Speaking",
+  "stats.section.writing": "Writing",
+  "stats.section.listening": "Listening",
+  "stats.taskCount": "{count} tasks · last: {date}",
+  "stats.taskCountSingle": "1 task · last: {date}",
   "history.title": "Practice History",
   "history.back": "Back",
   "history.newSession": "New Session",
@@ -347,7 +361,7 @@
   "history.confirmDeleteMultiple": "Are you sure you want to delete {count} sessions?",
   "history.confirmDeleteAll": "Are you sure you want to delete ALL sessions? This cannot be undone.",
   "history.noFeedback": "Review the session and choose one focused drill.",
-
+  "history.filterAll": "All",
   "settings.practiceGoals": "Practice Goals",
   "settings.weeklyPractice": "Weekly Practice",
   "settings.bandScore": "Band Score",
@@ -381,11 +395,9 @@
   "settings.aboutVoices": "Voices are powered by Azure Neural TTS for natural sound",
   "settings.aboutSpeed": "A slower speed (0.8-0.9x) is recommended for learning",
   "settings.aboutStorage": "All settings are saved locally in your browser",
-
   "loading": "Loading...",
   "error.generic": "Something went wrong. Please try again.",
   "error.network": "Network error. Please check your connection.",
-
   "dailyTasks.title": "Today's Learning Plan",
   "dailyTasks.completed": "completed",
   "dailyTasks.noTasks": "Start practicing to get personalized daily tasks.",
@@ -442,7 +454,6 @@
   "home.practiceCardTitle": "Practice",
   "home.practiceCardDesc": "Read Aloud, Repeat Sentence, Write Essay and all 15 PTE task types — each with AI feedback.",
   "home.practiceCardCta": "Choose task type",
-
   "practiceTask.common.pteSpeaking": "PTE Speaking",
   "practiceTask.common.pteWriting": "PTE Writing",
   "practiceTask.common.pteReading": "PTE Reading",
@@ -474,7 +485,6 @@
   "practiceTask.common.submit": "Submit",
   "practiceTask.common.playPassage": "Play Passage",
   "practiceTask.common.holdOn": "Hold on… {sec}s",
-
   "practiceTask.read-aloud.desc": "Read the passage aloud as clearly and naturally as possible. You will have {prepTime}s to prepare, then {recordTime}s to read.",
   "practiceTask.read-aloud.idleDesc": "An AI-generated passage will appear. Study it during the preparation phase, then read it aloud when recording starts.",
   "practiceTask.read-aloud.generatePassage": "Generate Passage",
@@ -484,7 +494,6 @@
   "practiceTask.read-aloud.azurePronunciation": "Azure Pronunciation Assessment",
   "practiceTask.read-aloud.oralFluency": "Oral Fluency",
   "practiceTask.read-aloud.errorGenerate": "Failed to generate passage",
-
   "practiceTask.repeat-sentence.desc": "Listen to the sentence, then repeat it verbatim. You have {recordTime}s to respond.",
   "practiceTask.repeat-sentence.idleDesc": "A sentence will be read aloud by Azure TTS. Listen carefully, then repeat it exactly.",
   "practiceTask.repeat-sentence.generateSentence": "Generate Sentence",
@@ -498,7 +507,6 @@
   "practiceTask.repeat-sentence.originalSentence": "Original Sentence",
   "practiceTask.repeat-sentence.yourRepetition": "Your Repetition",
   "practiceTask.repeat-sentence.errorGenerate": "Failed to generate stimulus",
-
   "practiceTask.answer-short-question.desc": "Listen to the question, then give a short spoken answer (1–3 words). {recordTime}s to respond.",
   "practiceTask.answer-short-question.idleDesc": "An AI-generated factual question will appear. Answer as briefly and accurately as possible.",
   "practiceTask.answer-short-question.getQuestion": "Get Question",
@@ -512,7 +520,6 @@
   "practiceTask.answer-short-question.yourAnswer": "Your Answer",
   "practiceTask.answer-short-question.nextQuestion": "Next Question",
   "practiceTask.answer-short-question.errorGenerate": "Failed to generate question",
-
   "practiceTask.personal-intro.desc": "Unscored in PTE, but great for warming up. {prepTime}s prep, {recordTime}s to speak.",
   "practiceTask.personal-intro.fixedPrompt": "Please introduce yourself. Tell us about your background, studies or work, your English learning experience, and your goals. Speak naturally and clearly.",
   "practiceTask.personal-intro.imReady": "I'm Ready",
@@ -521,7 +528,6 @@
   "practiceTask.personal-intro.generatingFeedback": "Generating feedback…",
   "practiceTask.personal-intro.prompt": "Prompt",
   "practiceTask.personal-intro.yourIntroduction": "Your Introduction",
-
   "practiceTask.describe-image.desc": "Study the image for {prepTime}s, then describe it in detail. You have {recordTime}s to speak.",
   "practiceTask.describe-image.idleDesc": "A chart, map, or diagram will appear. Study it during the preparation phase, then describe what you see when recording starts.",
   "practiceTask.describe-image.loadImage": "Load Image",
@@ -531,7 +537,6 @@
   "practiceTask.describe-image.imageDescription": "Image Description",
   "practiceTask.describe-image.yourDescription": "Your Description",
   "practiceTask.describe-image.newImage": "New Image",
-
   "practiceTask.re-tell-lecture.desc": "Listen to a short lecture, then re-tell it in your own words. You have {prepTime}s to prepare and {recordTime}s to respond.",
   "practiceTask.re-tell-lecture.idleDesc": "An AI-generated lecture will be synthesized as audio. Listen carefully, prepare for 10s, then re-tell the key points.",
   "practiceTask.re-tell-lecture.generateLecture": "Generate Lecture",
@@ -550,7 +555,6 @@
   "practiceTask.re-tell-lecture.newLecture": "New Lecture",
   "practiceTask.re-tell-lecture.errorGenerate": "Failed to generate lecture",
   "practiceTask.re-tell-lecture.recordingStartsIn": "Recording starts automatically in {sec}s",
-
   "practiceTask.summarize-written-text.desc": "Read the passage, then write a one-sentence summary (5–75 words). 10 minutes.",
   "practiceTask.summarize-written-text.idleDesc": "An AI-generated passage will appear. Write a one-sentence summary capturing the main idea.",
   "practiceTask.summarize-written-text.generatePassage": "Generate Passage",
@@ -559,7 +563,6 @@
   "practiceTask.summarize-written-text.evaluating": "Evaluating your summary…",
   "practiceTask.summarize-written-text.summaryPlaceholder": "Write your one-sentence summary here…",
   "practiceTask.summarize-written-text.emptySummaryError": "Please write your summary before submitting.",
-
   "practiceTask.write-essay.desc": "Write a {minWords}–{maxWords} word essay in response to the prompt. 20 minutes.",
   "practiceTask.write-essay.idleDesc": "An AI-generated essay question will appear. Write a structured {minWords}–{maxWords} word response.",
   "practiceTask.write-essay.getEssayQuestion": "Get Essay Question",
@@ -572,7 +575,6 @@
   "practiceTask.write-essay.essayPlaceholder": "Write your essay here. Aim for {minWords}–{maxWords} words with a clear structure: introduction, body paragraphs, conclusion.",
   "practiceTask.write-essay.wordStatusBelow": "(aim for {min}+)",
   "practiceTask.write-essay.wordStatusOver": "(max {max})",
-
   "practiceTask.write-from-dictation.desc": "Listen to the sentence, then type exactly what you heard. Every word counts.",
   "practiceTask.write-from-dictation.idleDesc": "An AI-generated sentence will be read aloud. Type exactly what you hear — word for word.",
   "practiceTask.write-from-dictation.getSentence": "Get Sentence",
@@ -588,7 +590,6 @@
   "practiceTask.write-from-dictation.replayOnce": "Replay once",
   "practiceTask.write-from-dictation.checking": "Checking your transcription…",
   "practiceTask.write-from-dictation.dictatedSentence": "Dictated Sentence",
-
   "practiceTask.summarize-spoken-text.desc": "Listen to a short academic passage, then write a 50–70 word summary. You have 10 minutes to write.",
   "practiceTask.summarize-spoken-text.idleDesc": "An AI-generated academic passage will be synthesized as audio. Listen carefully, then write a concise 50–70 word summary.",
   "practiceTask.summarize-spoken-text.generatePassage": "Generate Passage",
@@ -603,7 +604,6 @@
   "practiceTask.summarize-spoken-text.afterPassage": "After the passage ends, you will have 10 minutes to write your summary.",
   "practiceTask.summarize-spoken-text.listenTimer": "Listen carefully. The writing timer starts when the passage ends.",
   "practiceTask.summarize-spoken-text.yourSummary": "Your Summary",
-
   "practiceTask.fill-in-the-blanks-listening.desc": "Listen to a passage, then select the correct word from the dropdown for each blank. 7 minutes.",
   "practiceTask.fill-in-the-blanks-listening.idleDesc": "An AI-generated academic passage will be read aloud. After listening, fill in the blanks using the dropdown options.",
   "practiceTask.fill-in-the-blanks-listening.getPassage": "Get Passage",
@@ -614,7 +614,6 @@
   "practiceTask.fill-in-the-blanks-listening.evaluating": "Evaluating your answers…",
   "practiceTask.fill-in-the-blanks-listening.passageWithAnswers": "Passage (with answers)",
   "practiceTask.fill-in-the-blanks-listening.yourAnswers": "Your Answers",
-
   "practiceTask.highlight-correct-summary.desc": "Listen to a passage, then select the summary that best matches what you heard. 5 minutes.",
   "practiceTask.highlight-correct-summary.idleDesc": "An AI-generated passage will be read aloud. After listening, select the one summary that accurately captures the main idea and key points.",
   "practiceTask.highlight-correct-summary.getQuestion": "Get Question",
@@ -627,14 +626,12 @@
   "practiceTask.highlight-correct-summary.evaluating": "Evaluating your answer…",
   "practiceTask.highlight-correct-summary.passageSummaries": "Passage & Summaries",
   "practiceTask.highlight-correct-summary.yourAnswer": "Your Answer",
-
   "practiceTask.fill-in-the-blanks.desc": "Read the passage and select the correct word from the dropdown for each blank. 7 minutes.",
   "practiceTask.fill-in-the-blanks.idleDesc": "An AI-generated academic passage will appear with blanks. Choose the best word for each gap from the dropdown options.",
   "practiceTask.fill-in-the-blanks.getPassage": "Get Passage",
   "practiceTask.fill-in-the-blanks.generating": "Generating passage…",
   "practiceTask.fill-in-the-blanks.evaluating": "Evaluating your answers…",
   "practiceTask.fill-in-the-blanks.yourAnswers": "Your Answers",
-
   "practiceTask.re-order-paragraphs.desc": "Drag the paragraph tiles into the correct logical order. 3 minutes.",
   "practiceTask.re-order-paragraphs.idleDesc": "Shuffled paragraph tiles will appear. Drag them or use the arrows to arrange them in the correct order.",
   "practiceTask.re-order-paragraphs.getParagraphs": "Get Paragraphs",
@@ -644,12 +641,23 @@
   "practiceTask.re-order-paragraphs.evaluating": "Evaluating your order…",
   "practiceTask.re-order-paragraphs.correctOrder": "Correct Order",
   "practiceTask.re-order-paragraphs.yourOrder": "Your Order",
-
   "practiceTask.multiple-choice.desc": "Read the passage and select the one correct answer from the five options. 4 minutes.",
   "practiceTask.multiple-choice.idleDesc": "An AI-generated passage with a comprehension question will appear. Read carefully and select the best answer.",
   "practiceTask.multiple-choice.getQuestion": "Get Question",
   "practiceTask.multiple-choice.generating": "Generating question…",
   "practiceTask.multiple-choice.evaluating": "Evaluating your answer…",
   "practiceTask.multiple-choice.passageQuestion": "Passage & Question",
-  "practiceTask.multiple-choice.yourAnswer": "Your Answer"
+  "practiceTask.multiple-choice.yourAnswer": "Your Answer",
+  "studyAssistant.title": "Study Assistant",
+  "studyAssistant.launcher": "Open Study Assistant",
+  "studyAssistant.placeholder": "Ask me anything about PTE…",
+  "studyAssistant.send": "Send",
+  "studyAssistant.thinking": "Thinking…",
+  "studyAssistant.error": "Something went wrong. Please try again.",
+  "studyAssistant.startPractice": "Start Practice",
+  "studyAssistant.close": "Close Study Assistant",
+  "studyAssistant.preset1": "How do I start a mock exam?",
+  "studyAssistant.preset2": "Generate a Write Essay on technology",
+  "studyAssistant.preset3": "What does Summarize Written Text test?",
+  "studyAssistant.preset4": "Give me recent-news practice"
 }
