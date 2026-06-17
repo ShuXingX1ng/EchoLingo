@@ -60,7 +60,7 @@ export default function MultipleChoicePage() {
 
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectedRef = useRef<number | null>(null)
-  const submittedResponseRef = useRef("")
+  const [submittedResponse, setSubmittedResponse] = useState("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { parsedRef.current = parsed }, [parsed])
@@ -84,7 +84,7 @@ export default function MultipleChoicePage() {
     const finalSelected = selectedRef.current ?? 0
     const feedbackStimulus = buildStimulusForFeedback(p)
     const feedbackResponse = buildResponseForFeedback(p, finalSelected)
-    submittedResponseRef.current = feedbackResponse
+    setSubmittedResponse(feedbackResponse)
     await submit({ feedbackStimulus, feedbackResponse })
   }, [submit])
 
@@ -192,7 +192,7 @@ export default function MultipleChoicePage() {
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
               stimulusLabel={t('practiceTask.multiple-choice.passageQuestion')}
-              responseText={submittedResponseRef.current}
+              responseText={submittedResponse}
               responseLabel={t('practiceTask.multiple-choice.yourAnswer')}
             />
             <div className="flex gap-3 justify-center">

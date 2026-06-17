@@ -1,0 +1,37 @@
+task_type: fill_in_the_blanks_listening
+description: PTE Academic Fill in the Blanks (Listening) scoring rubric
+dimensions:
+  - name: accuracy
+    weight: 1
+    max_score: 1
+    description: >
+      Each blank is scored individually. Score 1 per blank: the word selected (or
+      typed, on the real exam) exactly matches the word spoken in the recording,
+      with correct spelling. Score 0 per blank: a different word, a misspelling,
+      or an empty blank. The spoken recording is the sole authority — a word that
+      fits grammatically but differs from what was said earns no credit.
+    criteria:
+      1: Word matches the recording exactly.
+      0: Different word, misspelling, or blank left empty.
+
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Comprehension (aggregate, reported at task level) reflects how well the
+      candidate followed the recording while reading the transcript — tracking
+      the speaker's position in the text and catching each gapped word as it is
+      spoken. Low scores usually indicate losing the place in the transcript or
+      relying on grammatical guessing instead of listening.
+    criteria:
+      high: Nearly all blanks match the recording; tracking maintained throughout.
+      medium: About half the blanks correct; tracking lost intermittently.
+      low: Few blanks correct; answers guessed from context rather than heard.
+
+scoring_notes: >
+  Fill in the Blanks (Listening) is a listening task. The candidate hears a
+  recording while reading its transcript, which has several words gapped out.
+  Each correctly filled blank earns 1 point; partial credit applies and there is
+  no penalty for wrong answers. The skill tested is simultaneous listening and
+  reading — feedback should distinguish listening errors (wrong word heard) from
+  tracking errors (lost place in the transcript).

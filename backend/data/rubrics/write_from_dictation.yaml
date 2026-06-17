@@ -1,0 +1,37 @@
+task_type: write_from_dictation
+description: PTE Academic Write from Dictation scoring rubric
+dimensions:
+  - name: accuracy
+    weight: 1
+    max_score: 1
+    description: >
+      Each correct word written in the response earns 1 point. A word counts as
+      correct when it appears in the response with correct spelling; word order
+      errors do not remove credit for words that are present, but missing,
+      misspelled, or substituted words earn no credit. Contractions must match
+      the spoken form. There is no penalty for extra incorrect words, though they
+      earn nothing.
+    criteria:
+      1: Word from the dictated sentence present and correctly spelled.
+      0: Word missing, misspelled, or replaced by a different word.
+
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Comprehension (aggregate, reported at task level) reflects how much of the
+      dictated sentence the candidate captured. High scores indicate the candidate
+      held the full sentence in memory and reproduced it; low scores indicate only
+      fragments were caught. Strategies such as writing initials first and
+      expanding afterwards still require accurate listening.
+    criteria:
+      high: Nearly all words captured; sentence meaning fully reproduced.
+      medium: Roughly half the words captured; partial sentence meaning.
+      low: Few words captured; sentence meaning lost.
+
+scoring_notes: >
+  Write from Dictation is a listening task. The candidate hears a sentence once
+  (about 8–12 words) and types it. Every correctly spelled word earns 1 point —
+  partial credit applies, so writing as many words as possible always helps.
+  Spelling must follow one consistent convention (American or British). This task
+  contributes heavily to both Listening and Writing scores on the real exam.

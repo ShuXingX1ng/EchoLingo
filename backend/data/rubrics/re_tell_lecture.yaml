@@ -1,0 +1,66 @@
+task_type: re_tell_lecture
+description: PTE Academic Re-tell Lecture scoring rubric
+dimensions:
+  - name: content
+    weight: 5
+    max_score: 5
+    description: >
+      Content measures how accurately and completely the candidate re-tells the
+      lecture's main points, supporting details, and the relationships between
+      them. Score 5: all main points and key supporting details re-told with
+      correct relationships. Score 4: most main points with some supporting
+      detail. Score 3: some main points but details or connections missing.
+      Score 2: only fragments of the lecture captured. Score 1: mentions the
+      topic only. Score 0: nothing related to the lecture.
+    criteria:
+      5: All main points and key details with correct relationships.
+      4: Most main points; some supporting detail included.
+      3: Some main points; details or logical connections missing.
+      2: Only isolated fragments of the lecture captured.
+      1: Only the general topic mentioned.
+      0: No content related to the lecture.
+
+  - name: oral_fluency
+    weight: 5
+    max_score: 5
+    description: >
+      Oral Fluency measures smooth, continuous delivery during the 40-second
+      response. Score 5: smooth native-like rhythm with effective phrasing.
+      Score 4: minor hesitations that do not disrupt the re-telling. Score 3:
+      noticeable pauses while recalling content. Score 2: frequent hesitations
+      that fragment the response. Score 1: halting speech with long silences.
+      Score 0: unintelligible or no attempt.
+    criteria:
+      5: Smooth, continuous delivery; native-like rhythm.
+      4: Occasional minor hesitations; overall fluent.
+      3: Noticeable pauses while recalling content.
+      2: Frequent hesitations; response fragmented.
+      1: Halting delivery with long silences.
+      0: Unintelligible or no meaningful output.
+
+  - name: pronunciation
+    weight: 5
+    max_score: 5
+    description: >
+      Pronunciation assesses clarity of phonemes, word stress, and intonation.
+      Score 5: all sounds clear with native-like stress and intonation. Score 4:
+      minor accent features with no comprehension impact. Score 3: some phoneme
+      errors but overall comprehensible. Score 2: frequent errors requiring
+      listener effort. Score 1: many serious errors, barely comprehensible.
+      Score 0: unintelligible.
+    criteria:
+      5: All phonemes clear; native-like stress and intonation.
+      4: Minor accent; no comprehension impact.
+      3: Some phoneme errors; listener can follow with effort.
+      2: Frequent errors; hard to understand.
+      1: Many serious errors; barely comprehensible.
+      0: Unintelligible.
+
+scoring_notes: >
+  Re-tell Lecture is a speaking task. The candidate listens to a lecture
+  (up to 90 seconds), has 10 seconds to prepare, then re-tells it in 40 seconds.
+  Content, oral fluency, and pronunciation each contribute up to 5 points
+  (maximum 15). Strong responses state the lecture topic, cover the speaker's
+  main points in order, and mention conclusions or implications. Candidates are
+  not penalised for paraphrasing — conveying the meaning matters more than
+  repeating exact wording. Partial credit applies within each dimension.

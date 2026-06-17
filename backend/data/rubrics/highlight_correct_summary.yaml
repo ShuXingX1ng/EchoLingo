@@ -1,0 +1,38 @@
+task_type: highlight_correct_summary
+description: PTE Academic Highlight Correct Summary scoring rubric
+dimensions:
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Highlight Correct Summary is scored 1 or 0. Score 1: the candidate selects
+      the summary that best matches the recording's main idea and supporting
+      points. Score 0: any other summary or no selection. Comprehension requires
+      grasping the recording's overall argument rather than isolated details —
+      distractor summaries typically distort the conclusion, exaggerate a minor
+      detail, or contradict the speaker.
+    criteria:
+      1: Summary matching the recording's main idea and conclusions selected.
+      0: Distractor summary selected or no selection.
+
+  - name: accuracy
+    weight: 1
+    max_score: 1
+    description: >
+      Accuracy reflects the candidate's ability to verify each summary option
+      against what was actually said: checking whether the relationships, causes,
+      and conclusions stated in the option occurred in the recording. Common
+      failure modes are choosing an option because it reuses words from the
+      recording (verbatim trap) or because it is factually plausible despite
+      never being said.
+    criteria:
+      high: Options verified point-by-point against the recording; traps rejected.
+      medium: Main idea identified but detail-level distortions missed.
+      low: Choice based on word overlap or outside knowledge, not the recording.
+
+scoring_notes: >
+  Highlight Correct Summary is a listening task. The candidate hears a recording
+  (30–90 seconds) and selects, from several written summaries, the one that best
+  represents it. Scoring is 1 point for the correct summary, 0 otherwise, with no
+  negative marking. Feedback should explain what makes the correct summary
+  faithful and identify the specific distortion in the option the candidate chose.

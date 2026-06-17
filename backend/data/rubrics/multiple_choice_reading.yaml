@@ -1,0 +1,37 @@
+task_type: multiple_choice_reading
+description: PTE Academic Multiple Choice (Reading, single answer) scoring rubric
+dimensions:
+  - name: comprehension
+    weight: 1
+    max_score: 1
+    description: >
+      Multiple Choice (single answer) is scored 1 or 0. Score 1: the correct
+      option is selected. Score 0: a wrong option is selected or no answer is
+      given. Comprehension covers identifying the main idea, locating specific
+      details, drawing inferences, and recognising the writer's purpose or tone —
+      the question stem determines which skill is being tested.
+    criteria:
+      1: Correct option selected.
+      0: Incorrect option or no selection.
+
+  - name: vocabulary
+    weight: 1
+    max_score: 1
+    description: >
+      Vocabulary reflects the candidate's ability to handle paraphrase between
+      the passage and the options: correct options almost never repeat the
+      passage wording verbatim, while distractors often reuse exact words from
+      the passage in a misleading way. Strong candidates match meaning rather
+      than surface wording.
+    criteria:
+      high: Paraphrased meaning matched; verbatim-word distractors rejected.
+      medium: Partial paraphrase recognition; sometimes lured by repeated words.
+      low: Choice driven by surface word matching; paraphrase missed.
+
+scoring_notes: >
+  Multiple Choice (Reading, single answer) presents a passage and one question
+  with several options, exactly one of which is correct. Scoring is 1 point for
+  the correct option, 0 otherwise — there is no negative marking for the
+  single-answer variant. Effective feedback should explain why the correct
+  option matches the passage and why each chosen distractor fails (out of scope,
+  contradicts the passage, or verbatim-word trap).

@@ -38,7 +38,8 @@ yarn-error.log*
 !.env.example
 
 # ECDICT dictionary data (fetched via backend/scripts/import_ecdict.py)
-backend/data/
+backend/data/*
+!backend/data/rubrics/
 
 # vercel
 .vercel

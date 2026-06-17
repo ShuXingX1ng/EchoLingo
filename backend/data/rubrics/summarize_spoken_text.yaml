@@ -1,0 +1,42 @@
+task_type: summarize_spoken_text
+description: PTE Academic Summarize Spoken Text scoring rubric
+dimensions:
+  - name: comprehension
+    weight: 2
+    max_score: 2
+    description: >
+      Comprehension (content) measures whether the summary captures the lecture's
+      main points and key supporting details. Score 2: all main points accurately
+      summarised. Score 1: main idea captured but key points missing or partially
+      inaccurate. Score 0: summary omits or misrepresents the main idea. Listing
+      disconnected details without showing the lecture's central argument limits
+      the score.
+    criteria:
+      2: All main points and the central argument accurately summarised.
+      1: Main idea present; some key points missing or inaccurate.
+      0: Main idea omitted or misrepresented.
+
+  - name: accuracy
+    weight: 2
+    max_score: 2
+    description: >
+      Accuracy aggregates the written-quality components of the official rubric —
+      form (50–70 words), grammar, vocabulary, and spelling. Score 2: within the
+      word limit, grammatically correct sentences, appropriate word choice, and
+      correct spelling throughout. Score 1: within or near the word limit with
+      some grammar, vocabulary, or spelling errors that do not obscure meaning.
+      Score 0: outside the 50–70 word range, or errors so frequent that meaning
+      breaks down.
+    criteria:
+      2: 50–70 words; correct grammar, vocabulary, and spelling.
+      1: Minor grammar, vocabulary, or spelling errors; meaning clear.
+      0: Outside word limit or errors obscure meaning.
+
+scoring_notes: >
+  Summarize Spoken Text is a listening task. The candidate hears a lecture
+  (60–90 seconds) and writes a 50–70 word summary in 10 minutes. The official
+  rubric scores content (0–2), form (0–2), grammar (0–2), vocabulary (0–2), and
+  spelling (0–2); here content maps to the comprehension dimension and the
+  written-quality components map to accuracy. The form requirement is strict:
+  summaries under 50 or over 70 words lose the form points entirely, so checking
+  word count is essential feedback.
