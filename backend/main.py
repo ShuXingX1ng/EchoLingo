@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 # Load environment variables before any service modules are imported
 load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routers import tts, pronunciation, pte_stimulus, pte_feedback, word_lookup, onboarding, study_assistant
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from routers import tts, pronunciation, pte_stimulus, pte_feedback, word_lookup, onboarding, study_assistant  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(

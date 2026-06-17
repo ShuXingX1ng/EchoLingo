@@ -52,7 +52,7 @@ async def assess_pronunciation(
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
         print(f"Pronunciation assessment error: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
