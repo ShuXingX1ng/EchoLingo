@@ -64,7 +64,7 @@ export default function FillInTheBlanksPage() {
 
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectionsRef = useRef<(string | null)[]>([])
-  const submittedResponseRef = useRef("")
+  const [submittedResponse, setSubmittedResponse] = useState("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { parsedRef.current = parsed }, [parsed])
@@ -87,7 +87,7 @@ export default function FillInTheBlanksPage() {
     if (timerRef.current) clearInterval(timerRef.current)
     const feedbackStimulus = buildStimulusForFeedback(p)
     const feedbackResponse = buildResponseForFeedback(p, selectionsRef.current)
-    submittedResponseRef.current = feedbackResponse
+    setSubmittedResponse(feedbackResponse)
     await submit({ feedbackStimulus, feedbackResponse })
   }, [submit])
 
@@ -194,7 +194,7 @@ export default function FillInTheBlanksPage() {
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
               stimulusLabel={t('practiceTask.common.passage')}
-              responseText={submittedResponseRef.current}
+              responseText={submittedResponse}
               responseLabel={t('practiceTask.fill-in-the-blanks.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">

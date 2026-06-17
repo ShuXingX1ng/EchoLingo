@@ -1,0 +1,65 @@
+task_type: describe_image
+description: PTE Academic Describe Image scoring rubric
+dimensions:
+  - name: content
+    weight: 5
+    max_score: 5
+    description: >
+      Content measures how completely and accurately the candidate describes the
+      key elements of the image (title, axes, main trends, extremes, comparisons,
+      and an implication or conclusion). Score 5: all key elements and their
+      relationships described, with a clear conclusion. Score 4: most key elements
+      with some relationships. Score 3: several elements mentioned but relationships
+      or conclusion missing. Score 2: only isolated elements named. Score 1: mentions
+      the image topic only. Score 0: no relevant content.
+    criteria:
+      5: All key elements, relationships, and a conclusion or implication.
+      4: Most key elements and some relationships described.
+      3: Several elements; relationships or conclusion missing.
+      2: Isolated elements named without connection.
+      1: Only the general topic of the image mentioned.
+      0: No content related to the image.
+
+  - name: oral_fluency
+    weight: 5
+    max_score: 5
+    description: >
+      Oral Fluency measures smooth, natural-paced delivery within the 40-second
+      response window. Score 5: smooth native-like phrasing with no unnatural
+      hesitations. Score 4: minor hesitations that do not disrupt the description.
+      Score 3: noticeable pauses or restarts while searching for words. Score 2:
+      frequent hesitations that fragment the description. Score 1: halting speech
+      with long silences. Score 0: unintelligible or no attempt.
+    criteria:
+      5: Smooth, well-paced delivery; no unnatural pauses.
+      4: Occasional minor hesitations; overall fluent.
+      3: Noticeable pausing or restarts; meaning preserved.
+      2: Frequent hesitations; description fragmented.
+      1: Halting delivery with long silences.
+      0: Unintelligible or no meaningful output.
+
+  - name: pronunciation
+    weight: 5
+    max_score: 5
+    description: >
+      Pronunciation assesses how clearly phonemes, word stress, and intonation are
+      produced. Score 5: all sounds clear with native-like stress and intonation.
+      Score 4: minor accent features with no comprehension impact. Score 3: some
+      phoneme errors but overall comprehensible. Score 2: frequent errors requiring
+      listener effort. Score 1: many serious errors, barely comprehensible.
+      Score 0: unintelligible.
+    criteria:
+      5: All phonemes clear; native-like stress and intonation.
+      4: Minor accent; no comprehension impact.
+      3: Some phoneme errors; listener can follow with effort.
+      2: Frequent errors; hard to understand.
+      1: Many serious errors; barely comprehensible.
+      0: Unintelligible.
+
+scoring_notes: >
+  Describe Image is a speaking task. The candidate has 25 seconds to study an
+  image (chart, graph, map, or picture) and 40 seconds to describe it. Content,
+  oral fluency, and pronunciation each contribute up to 5 points (maximum 15).
+  Strong responses follow a structure: introduce the image, describe the main
+  trend or feature, give one or two specific data points or comparisons, and end
+  with a conclusion or implication. Partial credit applies within each dimension.

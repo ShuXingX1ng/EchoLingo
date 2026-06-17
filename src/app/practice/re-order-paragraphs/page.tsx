@@ -64,7 +64,7 @@ export default function ReOrderParagraphsPage() {
 
   const correctOrderRef = useRef<Paragraph[]>([])
   const displayOrderRef = useRef<Paragraph[]>([])
-  const submittedResponseRef = useRef("")
+  const [submittedResponse, setSubmittedResponse] = useState("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { correctOrderRef.current = correctOrder }, [correctOrder])
@@ -85,7 +85,7 @@ export default function ReOrderParagraphsPage() {
     if (timerRef.current) clearInterval(timerRef.current)
     const feedbackStimulus = buildStimulusForFeedback(correctOrderRef.current)
     const feedbackResponse = buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current)
-    submittedResponseRef.current = feedbackResponse
+    setSubmittedResponse(feedbackResponse)
     await submit({ feedbackStimulus, feedbackResponse })
   }, [submit])
 
@@ -230,7 +230,7 @@ export default function ReOrderParagraphsPage() {
               feedback={feedback}
               stimulus={buildStimulusForFeedback(correctOrder)}
               stimulusLabel={t('practiceTask.re-order-paragraphs.correctOrder')}
-              responseText={submittedResponseRef.current}
+              responseText={submittedResponse}
               responseLabel={t('practiceTask.re-order-paragraphs.yourOrder')}
             />
             <div className="flex gap-3 justify-center">

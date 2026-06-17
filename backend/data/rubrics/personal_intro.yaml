@@ -1,0 +1,36 @@
+task_type: personal_intro
+description: PTE Academic Personal Introduction guidance rubric (unscored)
+dimensions:
+  - name: structure
+    weight: 0
+    max_score: 0
+    description: >
+      Personal Introduction is not scored, but a strong introduction follows a
+      clear structure within the 30-second recording window: who you are, your
+      study or work background, why you are taking the test, and a brief personal
+      interest or goal. Aim for 3–5 complete sentences delivered at a natural pace.
+    criteria:
+      strong: Clear opening, 3–5 complete sentences, natural close within 30 seconds.
+      adequate: Covers identity and purpose but trails off or runs out of time.
+      weak: Single sentence, long silences, or recording cut off mid-thought.
+
+  - name: delivery
+    weight: 0
+    max_score: 0
+    description: >
+      Delivery guidance: speak at a steady, conversational pace; avoid memorised-
+      sounding recitation; keep tone natural and confident. Fillers ("um", "uh")
+      and long pauses make the introduction harder to follow even though it is
+      not scored. The recording is sent to institutions along with score reports,
+      so clarity and a confident tone still matter.
+    criteria:
+      strong: Steady pace, natural tone, minimal fillers.
+      adequate: Understandable but noticeably hesitant or rushed.
+      weak: Frequent fillers, long pauses, or monotone recitation.
+
+scoring_notes: >
+  Personal Introduction is an unscored speaking task recorded once at the start
+  of the PTE Academic test. The candidate has 25 seconds to read the prompt and
+  30 seconds to record. It does not contribute to any score, but the recording
+  is sent to institutions selected by the candidate. Feedback should focus on
+  structure, pacing, and clarity rather than scores.
