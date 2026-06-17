@@ -1,7 +1,6 @@
 """
 Middleware integration tests - CORS headers, JWT auth on real endpoints.
 """
-import json
 import pytest
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
@@ -16,7 +15,7 @@ from main import app
 async def test_cors_allowed_origin():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -33,7 +32,7 @@ async def test_cors_allowed_origin():
 async def test_cors_disallowed_origin():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "https://evil-site.com",
                 "Access-Control-Request-Method": "POST",
@@ -49,7 +48,7 @@ async def test_cors_disallowed_origin():
 async def test_cors_methods_allowed():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -65,7 +64,7 @@ async def test_cors_methods_allowed():
 async def test_cors_credentials_allowed():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -80,7 +79,7 @@ async def test_cors_credentials_allowed():
 async def test_cors_headers_allowed():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -96,7 +95,7 @@ async def test_cors_headers_allowed():
 async def test_cors_alt_origin():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.options("/api/examiner",
+        response = await client.options("/api/pte/feedback",
             headers={
                 "Origin": "http://localhost:3001",
                 "Access-Control-Request-Method": "POST",
@@ -109,50 +108,6 @@ async def test_cors_alt_origin():
 # ============================================================
 # Auth Middleware on Real Endpoints
 # ============================================================
-
-@pytest.mark.anyio
-async def test_examiner_no_auth_required():
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = "What is your name?"
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/api/examiner", json={
-                "mode": "ielts_part_1",
-                "messages": [
-                    {"id": "1", "role": "user", "content": "Hello.", "createdAt": "2024-01-01T00:00:00Z"},
-                ],
-            })
-
-    assert response.status_code == 200
-
-
-@pytest.mark.anyio
-async def test_feedback_no_auth_required():
-    mock_feedback = json.dumps({
-        "estimatedBand": 6.0,
-        "fluencyAndCoherence": "Good",
-        "lexicalResource": "Adequate",
-        "grammarRangeAndAccuracy": "Fair",
-        "pronunciation": "Clear",
-        "strengths": ["Good"],
-        "weaknesses": ["Limited"],
-        "improvementSuggestions": ["Practice more", "Read more", "Speak more"],
-        "improvedSampleAnswer": "Sample answer here.",
-        "errorAnnotations": [],
-    })
-    with patch("services.llm.llm_service.call_llm", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = mock_feedback
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/api/feedback", json={
-                "mode": "ielts_part_1",
-                "messages": [
-                    {"id": "1", "role": "user", "content": "Hello.", "createdAt": "2024-01-01T00:00:00Z"},
-                ],
-            })
-
-    assert response.status_code == 200
-
 
 @pytest.mark.anyio
 async def test_tts_no_auth_required():

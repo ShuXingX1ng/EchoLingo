@@ -5,14 +5,17 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
 import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
+import { loadStimulusText } from "@/lib/stimulus-loader"
+import { apiPost, apiPostBlob } from "@/lib/api-client"
 import type { TaskFeedback } from "@/types"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 600 // 10 minutes to write summary
 
 type Phase = "idle" | "generating" | "ready" | "listening" | "writing" | "processing" | "done" | "error"
 
 export default function SummarizeSpokenTextPage() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("idle")
   const [passageText, setPassageText] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -27,7 +30,10 @@ export default function SummarizeSpokenTextPage() {
   const submitRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+  }, [])
 
   useEffect(() => {
     if (phase !== "writing") return
@@ -41,42 +47,26 @@ export default function SummarizeSpokenTextPage() {
   }, [phase])
 
   const generate = useCallback(async () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPhase("generating")
     setError(""); setFeedback(null); setSummary(""); setPlayed(false); setSeconds(TIME_LIMIT)
     if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
 
     try {
-      let text: string
-      const cached = getStimulusFromBank("summarize_spoken_text")
-      if (cached) {
-        text = cached
-      } else {
-        const stimRes = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "summarize_spoken_text" }),
-        })
-        if (!stimRes.ok) throw new Error("Failed to generate passage")
-        text = ((await stimRes.json()) as { text: string }).text
-        addStimulusToBank("summarize_spoken_text", text)
-      }
+      const text = await loadStimulusText({ taskType: "summarize_spoken_text" })
       setPassageText(text)
 
-      const ttsRes = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural", rate: 0.85 }),
-      })
-      if (!ttsRes.ok) throw new Error("TTS synthesis failed")
-      const blob = await ttsRes.blob()
+      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setPhase("ready")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate passage")
+      setError(e instanceof Error ? e.message : t('practiceTask.read-aloud.errorGenerate'))
       setPhase("error")
     }
-  }, [audioUrl])
+  }, [audioUrl, t])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { generate() }, [])
 
   const playPassage = useCallback(() => {
     if (!audioUrl) return
@@ -92,9 +82,11 @@ export default function SummarizeSpokenTextPage() {
     }
 
     setPhase("listening")
-    audio.play().catch(() => {
-      setPhase("ready")
-      audioRef.current = null
+    requestAnimationFrame(() => {
+      audio.play().catch(() => {
+        setPhase("ready")
+        audioRef.current = null
+      })
     })
   }, [audioUrl])
 
@@ -109,16 +101,11 @@ export default function SummarizeSpokenTextPage() {
 
     let result: TaskFeedback | null = null
     try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "summarize_spoken_text",
-          stimulus: passageText,
-          response: summary.trim(),
-        }),
-      })
-      if (res.ok) result = (await res.json()) as TaskFeedback
+      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
+        taskType: "summarize_spoken_text",
+        stimulus: passageText,
+        response: summary.trim(),
+      }, { timeoutMs: 90000 })
     } catch { /* ignore */ }
 
     const fb: TaskFeedback = result ?? {
@@ -157,31 +144,31 @@ export default function SummarizeSpokenTextPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Summarize Spoken Text</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Listening
+            {t('practiceTask.common.pteListening')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Summarize Spoken Text</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Listen to a short academic passage, then write a 50–70 word summary. You have 10 minutes to write.
+            {t('practiceTask.summarize-spoken-text.desc')}
           </p>
         </div>
 
         {phase === "idle" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-sm mx-auto">
-              An AI-generated academic passage will be synthesized as audio. Listen carefully, then write a concise 50–70 word summary.
+              {t('practiceTask.summarize-spoken-text.idleDesc')}
             </p>
             <button
               onClick={generate}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
-              Generate Passage
+              {t('practiceTask.summarize-spoken-text.generatePassage')}
             </button>
           </div>
         )}
@@ -189,15 +176,15 @@ export default function SummarizeSpokenTextPage() {
         {phase === "generating" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Generating passage audio…</p>
-            <p className="text-xs text-[var(--text-muted)]">Writing passage text and synthesizing speech</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.common.generatingPassageAudio')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.common.writingPassageText')}</p>
           </div>
         )}
 
         {phase === "ready" && audioUrl && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-              Passage ready — listen carefully
+              {t('practiceTask.common.passageReady')}
             </p>
             <button
               onClick={playPassage}
@@ -206,10 +193,10 @@ export default function SummarizeSpokenTextPage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5.14v14l11-7-11-7z" />
               </svg>
-              Play Passage
+              {t('practiceTask.common.playPassage')}
             </button>
             <p className="text-xs text-[var(--text-muted)]">
-              After the passage ends, you will have 10 minutes to write your summary.
+              {t('practiceTask.summarize-spoken-text.afterPassage')}
             </p>
           </div>
         )}
@@ -228,8 +215,8 @@ export default function SummarizeSpokenTextPage() {
                 />
               ))}
             </div>
-            <p className="text-sm font-medium text-[var(--foreground)] mb-1">Passage playing…</p>
-            <p className="text-xs text-[var(--text-muted)]">Listen carefully. The writing timer starts when the passage ends.</p>
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">{t('practiceTask.common.passagePlaying')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('practiceTask.summarize-spoken-text.listenTimer')}</p>
             <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
           </div>
         )}
@@ -237,17 +224,17 @@ export default function SummarizeSpokenTextPage() {
         {phase === "writing" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Write your summary</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.summarize-spoken-text.writeSummary')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
             </div>
             <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
-              <p className="text-xs text-slate-400 mb-2">Write a 50–70 word summary of the passage you heard.</p>
+              <p className="text-xs text-slate-400 mb-2">{t('practiceTask.summarize-spoken-text.summaryHint')}</p>
               <textarea
                 value={summary}
                 onChange={e => setSummary(e.target.value)}
-                placeholder="Write your summary here…"
+                placeholder={t('practiceTask.summarize-spoken-text.summaryPlaceholder')}
                 rows={6}
                 className="w-full resize-none rounded border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--foreground)] placeholder-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
               />
@@ -260,7 +247,7 @@ export default function SummarizeSpokenTextPage() {
                   disabled={!summary.trim()}
                   className="rounded-xl bg-slate-950 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
                 >
-                  Submit Summary
+                  {t('practiceTask.summarize-spoken-text.submitSummary')}
                 </button>
               </div>
             </div>
@@ -269,7 +256,7 @@ export default function SummarizeSpokenTextPage() {
                 onClick={playPassage}
                 className="text-xs text-slate-400 hover:text-[var(--foreground)] underline"
               >
-                Replay passage
+                {t('practiceTask.summarize-spoken-text.replayPassage')}
               </button>
             )}
           </div>
@@ -278,7 +265,7 @@ export default function SummarizeSpokenTextPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your summary…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.summarize-spoken-text.evaluating')}</p>
           </div>
         )}
 
@@ -286,19 +273,19 @@ export default function SummarizeSpokenTextPage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulusLabel="Passage (from audio)"
+              stimulusLabel={t('practiceTask.summarize-spoken-text.passageFromAudio')}
               responseText={summary.trim()}
-              responseLabel="Your Summary"
+              responseLabel={t('practiceTask.summarize-spoken-text.yourSummary')}
             />
             <div className="flex gap-3 justify-center">
               <button
                 onClick={generate}
                 className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
               >
-                New Passage
+                {t('practiceTask.summarize-spoken-text.newPassage')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -308,7 +295,7 @@ export default function SummarizeSpokenTextPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

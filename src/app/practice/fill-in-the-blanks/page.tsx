@@ -4,15 +4,13 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import type { TaskFeedback } from "@/types"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useTranslation } from "@/lib/i18n"
 
 const TIME_LIMIT = 420 // 7 minutes
 
 type BlankDef = { options: string[]; correct: number }
 type ParsedStimulus = { passage: string; blanks: BlankDef[] }
-type Phase = "idle" | "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -54,119 +52,62 @@ function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | 
 }
 
 export default function FillInTheBlanksPage() {
-  const [phase, setPhase] = useState<Phase>("idle")
+  const { t } = useTranslation()
+  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
+    taskType: "fill_in_the_blanks_reading",
+    responseKind: "text",
+  })
+
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
   const [selections, setSelections] = useState<(string | null)[]>([])
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
   const [seconds, setSeconds] = useState(TIME_LIMIT)
 
-  const startedAtRef = useRef("")
+  const parsedRef = useRef<ParsedStimulus | null>(null)
+  const selectionsRef = useRef<(string | null)[]>([])
+  const [submittedResponse, setSubmittedResponse] = useState("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
 
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
+  useEffect(() => { selectionsRef.current = selections }, [selections])
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
+  // Parse JSON stimulus when hook loads it
   useEffect(() => {
-    if (phase !== "ready") return
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelections(new Array(p.blanks.length).fill(null))
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
+
+  const handleSubmit = useCallback(async () => {
+    const p = parsedRef.current
+    if (!p) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    const feedbackStimulus = buildStimulusForFeedback(p)
+    const feedbackResponse = buildResponseForFeedback(p, selectionsRef.current)
+    setSubmittedResponse(feedbackResponse)
+    await submit({ feedbackStimulus, feedbackResponse })
+  }, [submit])
+
+  // Timer while the user is answering
+  useEffect(() => {
+    if (phase !== "writing") return
     timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
       })
     }, 1000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    setPhase("generating")
-    setError(""); setFeedback(null); setSelections([]); setSeconds(TIME_LIMIT)
-    try {
-      let raw: string
-      const cached = getStimulusFromBank("fill_in_the_blanks_reading")
-      if (cached) {
-        raw = cached
-      } else {
-        const res = await fetch("/api/pte/stimulus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType: "fill_in_the_blanks_reading" }),
-        })
-        if (!res.ok) throw new Error("Failed to generate stimulus")
-        raw = ((await res.json()) as { text: string }).text
-        addStimulusToBank("fill_in_the_blanks_reading", raw)
-      }
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-      setRawStimulus(raw)
-      setParsed(p)
-      setSelections(new Array(p.blanks.length).fill(null))
-      startedAtRef.current = new Date().toISOString()
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [])
-
-  const handleSubmit = useCallback(async () => {
-    if (!parsed) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
-
-    const stimulusForFeedback = buildStimulusForFeedback(parsed)
-    const responseForFeedback = buildResponseForFeedback(parsed, selections)
-
-    let result: TaskFeedback | null = null
-    try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "fill_in_the_blanks_reading",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
-      })
-      if (res.ok) result = (await res.json()) as TaskFeedback
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "fill_in_the_blanks_reading",
-        stimulus: { kind: "text", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [parsed, selections, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 60
   const allAnswered = parsed ? selections.every((s) => s !== null) : false
-
   const segments = parsed ? splitPassage(parsed.passage) : []
 
   return (
@@ -174,43 +115,29 @@ export default function FillInTheBlanksPage() {
       <DesktopNav active="practice" maxWidth="4xl" />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <Link href="/practice" className="hover:text-[var(--foreground)]">Practice</Link>
+          <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
           <span className="text-[var(--foreground)] font-medium">Fill in the Blanks</span>
         </div>
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">PTE Reading</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteReading')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Fill in the Blanks</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Read the passage and select the correct word from the dropdown for each blank. 7 minutes.
+            {t('practiceTask.fill-in-the-blanks.desc')}
           </p>
         </div>
 
-        {phase === "idle" && (
-          <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
-            <p className="text-sm text-[var(--text-secondary)] mb-8">
-              An AI-generated academic passage will appear with blanks. Choose the best word for each gap from the dropdown options.
-            </p>
-            <button
-              onClick={generate}
-              className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            >
-              Get Passage
-            </button>
-          </div>
-        )}
-
-        {phase === "generating" && (
+        {(phase === "idle" || phase === "generating") && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Generating passage…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks.generating')}</p>
           </div>
         )}
 
-        {phase === "ready" && parsed && (
+        {phase === "writing" && parsed && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.passage')}</p>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
                 {timeStr}
               </span>
@@ -248,7 +175,7 @@ export default function FillInTheBlanksPage() {
                 disabled={!allAnswered}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
               >
-                Submit Answers
+                {t('practiceTask.common.submitAnswers')}
               </button>
             </div>
           </div>
@@ -257,7 +184,7 @@ export default function FillInTheBlanksPage() {
         {phase === "processing" && (
           <div className="border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm text-[var(--text-secondary)]">Evaluating your answers…</p>
+            <p className="text-sm text-[var(--text-secondary)]">{t('practiceTask.fill-in-the-blanks.evaluating')}</p>
           </div>
         )}
 
@@ -266,16 +193,16 @@ export default function FillInTheBlanksPage() {
             <TaskFeedbackDisplay
               feedback={feedback}
               stimulus={buildStimulusForFeedback(parsed)}
-              stimulusLabel="Passage"
-              responseText={buildResponseForFeedback(parsed, selections)}
-              responseLabel="Your Answers"
+              stimulusLabel={t('practiceTask.common.passage')}
+              responseText={submittedResponse}
+              responseLabel={t('practiceTask.fill-in-the-blanks.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">
               <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-                Try Another
+                {t('practiceTask.common.tryAnother')}
               </button>
               <Link href="/practice" className="rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--foreground)]">
-                Back to Practice
+                {t('practiceTask.common.backToPractice')}
               </Link>
             </div>
           </div>
@@ -285,7 +212,7 @@ export default function FillInTheBlanksPage() {
           <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
             <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-              Try Again
+              {t('practiceTask.common.tryAgain')}
             </button>
           </div>
         )}

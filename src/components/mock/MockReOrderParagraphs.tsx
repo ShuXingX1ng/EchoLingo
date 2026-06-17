@@ -1,15 +1,13 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { saveTask } from "@/lib/unified-task-history"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import type { PracticeTask, TaskFeedback } from "@/types"
+import { useState, useRef, useCallback, useEffect } from "react"
+import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import type { PracticeTask } from "@/types"
 
 const TIME_LIMIT = 180 // 3 min
 
 type Paragraph = { label: string; text: string }
 type ParsedStimulus = { paragraphs: Paragraph[] }
-type Phase = "generating" | "ready" | "processing" | "done" | "error"
 
 function parseStimulus(raw: string): ParsedStimulus | null {
   try {
@@ -46,134 +44,54 @@ function buildResponseForFeedback(userOrder: Paragraph[], correctOrder: Paragrap
 }
 
 export default function MockReOrderParagraphs({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
-  const [phase, setPhase] = useState<Phase>("generating")
+  const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
+    taskType: "re_order_paragraphs",
+    responseKind: "text",
+  })
+
   const [correctOrder, setCorrectOrder] = useState<Paragraph[]>([])
   const [displayOrder, setDisplayOrder] = useState<Paragraph[]>([])
-  const [rawStimulus, setRawStimulus] = useState("")
   const [seconds, setSeconds] = useState(TIME_LIMIT)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
-  const [error, setError] = useState("")
 
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
   const correctOrderRef = useRef<Paragraph[]>([])
   const displayOrderRef = useRef<Paragraph[]>([])
-  const rawStimulusRef = useRef("")
-
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
-
-  useEffect(() => {
-    if (phase !== "ready") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) {
-          clearInterval(timerRef.current!)
-          submitRef.current()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { correctOrderRef.current = correctOrder }, [correctOrder])
   useEffect(() => { displayOrderRef.current = displayOrder }, [displayOrder])
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+
+  // Parse JSON stimulus when hook loads it
+  useEffect(() => {
+    if (!stimulus) return
+    const p = parseStimulus(stimulus)
+    if (!p) return
+    setCorrectOrder(p.paragraphs)
+    setDisplayOrder(shuffleArray(p.paragraphs))
+    setSeconds(TIME_LIMIT)
+  }, [stimulus])
 
   const handleSubmit = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const startedAt = startedAtRef.current || endedAt
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-    const stimulusForFeedback = buildStimulusForFeedback(correctOrderRef.current)
-    const responseForFeedback = buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current)
+    await submit({
+      feedbackStimulus: buildStimulusForFeedback(correctOrderRef.current),
+      feedbackResponse: buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current),
+    })
+  }, [submit])
 
-    let fb: TaskFeedback | null = null
-    try {
-      const res = await fetch("/api/pte/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: "re_order_paragraphs",
-          stimulus: stimulusForFeedback,
-          response: responseForFeedback,
-        }),
-      })
-      if (res.ok) fb = await res.json() as TaskFeedback
-    } catch { /* best-effort */ }
-
-    const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "re_order_paragraphs",
-        stimulus: { kind: "text", content: rawStimulusRef.current },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "re_order_paragraphs",
-        stimulus: { kind: "text", content: rawStimulusRef.current },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
-
+  // Timer while the user is reordering
   useEffect(() => {
-    const generate = async () => {
-      try {
-        let raw: string
-        const cached = getStimulusFromBank("re_order_paragraphs")
-        if (cached) {
-          raw = cached
-        } else {
-          const res = await fetch("/api/pte/stimulus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskType: "re_order_paragraphs" }),
-          })
-          if (!res.ok) throw new Error("Failed to generate stimulus")
-          raw = ((await res.json()) as { text: string }).text
-          addStimulusToBank("re_order_paragraphs", raw)
-        }
-        const nextParsed = parseStimulus(raw)
-        if (!nextParsed) throw new Error("Invalid stimulus format")
-
-        const shuffled = shuffleArray(nextParsed.paragraphs)
-        correctOrderRef.current = nextParsed.paragraphs
-        displayOrderRef.current = shuffled
-        rawStimulusRef.current = raw
-        startedAtRef.current = new Date().toISOString()
-        setCorrectOrder(nextParsed.paragraphs)
-        setDisplayOrder(shuffled)
-        setRawStimulus(raw)
-        setPhase("ready")
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed")
-        setPhase("error")
-      }
-    }
-    generate()
-  }, [])
+    if (phase !== "writing") return
+    timerRef.current = setInterval(() => {
+      setSeconds(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [phase, handleSubmit])
 
   const moveUp = (idx: number) => {
     if (idx === 0) return
@@ -204,11 +122,11 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 30
 
-  const skipTask = () => {
+  const skipTask = (): void => {
     onComplete({
       id: `mock_${Date.now()}`,
       taskType: "re_order_paragraphs",
-      stimulus: { kind: "text", content: rawStimulus },
+      stimulus: { kind: "text", content: stimulus },
       response: { kind: "text", content: "" },
       durationSeconds: 0,
       createdAt: new Date().toISOString(),
@@ -217,14 +135,14 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
 
   return (
     <div className="space-y-5">
-      {phase === "generating" && (
+      {(phase === "idle" || phase === "generating") && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Generating paragraphs...</p>
         </div>
       )}
 
-      {phase === "ready" && displayOrder.length > 0 && (
+      {phase === "writing" && displayOrder.length > 0 && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Drag to reorder</p>
@@ -284,14 +202,14 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
         </div>
       )}
 
-      {phase === "done" && doneTask && (
+      {phase === "done" && savedTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">AI Feedback</p>
-            <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{doneTask.feedback?.summary}</p>
+            <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{savedTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
-            <button onClick={() => onComplete(doneTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+            <button onClick={() => onComplete(savedTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
               Continue to Next Task
             </button>
           </div>

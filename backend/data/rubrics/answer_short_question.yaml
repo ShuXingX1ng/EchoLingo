@@ -1,0 +1,23 @@
+task_type: answer_short_question
+description: PTE Academic Answer Short Question scoring rubric
+dimensions:
+  - name: content
+    weight: 1
+    max_score: 1
+    description: >
+      Answer Short Question is scored on correctness alone. Score 1: the response
+      contains the appropriate word or short phrase that correctly answers the
+      question; minor pronunciation imperfections are acceptable as long as the
+      answer is clearly identifiable. Score 0: the answer is wrong, irrelevant,
+      unintelligible, or no response is given. Synonyms and equivalent expressions
+      that correctly answer the question receive full credit.
+    criteria:
+      1: Correct word or phrase that answers the question; clearly identifiable.
+      0: Incorrect, irrelevant, unintelligible, or no response.
+
+scoring_notes: >
+  Answer Short Question is a speaking task. The candidate hears or reads a short
+  question and answers with one word or a few words. Only vocabulary/content is
+  scored (1 or 0 per question) — oral fluency and pronunciation are not separately
+  scored, but the answer must be intelligible to receive credit. Hedging or
+  multiple guesses ("a lion... no, a tiger") are scored on the final answer given.

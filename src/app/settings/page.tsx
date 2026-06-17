@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Settings2, Target, Bell, Volume2, UserCircle2 } from "lucide-react";
 import DesktopNav from "@/components/DesktopNav";
 import { AZURE_VOICES } from "@/components/VoiceOutput";
 import { useTranslation } from "@/lib/i18n";
@@ -157,15 +158,34 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen">
       <DesktopNav active="settings" />
 
       <main className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Page hero */}
+        <div className="rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6 animate-enter">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-[15px] border border-indigo-200 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 flex items-center justify-center shrink-0">
+              <Settings2 className="w-6 h-6" strokeWidth={2} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">Preferences</p>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">Settings</h1>
+            </div>
+          </div>
+        </div>
+
         {/* Practice Goals */}
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
-            {t("settings.practiceGoals")}
-          </h2>
+        <div className="bg-white dark:bg-slate-900 rounded-[22px] border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <div className="h-12 w-12 rounded-[15px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center shrink-0">
+              <Target className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">Goals</p>
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.practiceGoals")}</h2>
+            </div>
+          </div>
 
           {goalProgress && (
             <div className="mb-6 space-y-4">
@@ -282,10 +302,16 @@ export default function SettingsPage() {
         </div>
 
         {/* Learning Reminders */}
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
-            {t("reminder.title")}
-          </h2>
+        <div className="bg-white dark:bg-slate-900 rounded-[22px] border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <div className="h-12 w-12 rounded-[15px] border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-400">Reminders</p>
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("reminder.title")}</h2>
+            </div>
+          </div>
 
           {/* Current Status */}
           <div className="mb-6 space-y-3">
@@ -380,7 +406,7 @@ export default function SettingsPage() {
               onClick={() => setDailyReminderEnabled(!dailyReminderEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 dailyReminderEnabled
-                  ? "bg-[var(--foreground)]"
+                  ? "bg-[var(--brand)]"
                   : "bg-[var(--border)]"
               }`}
             >
@@ -426,10 +452,16 @@ export default function SettingsPage() {
         </div>
 
         {/* Voice Settings */}
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-6">
-            {t("settings.voiceSettings")}
-          </h2>
+        <div className="bg-white dark:bg-slate-900 rounded-[22px] border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <div className="h-12 w-12 rounded-[15px] border border-indigo-200 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 flex items-center justify-center shrink-0">
+              <Volume2 className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">Voice</p>
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.voiceSettings")}</h2>
+            </div>
+          </div>
 
           <div className="mb-6 flex items-center justify-between p-4 bg-[var(--background)] rounded-xl">
             <div>
@@ -445,7 +477,7 @@ export default function SettingsPage() {
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 isMuted
                   ? "bg-[var(--border)]"
-                  : "bg-[var(--foreground)]"
+                  : "bg-[var(--brand)]"
               }`}
             >
               <span
@@ -515,10 +547,16 @@ export default function SettingsPage() {
 
         {/* Account */}
         {user && (
-          <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
-            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-              {t("settings.account")}
-            </h2>
+          <div className="bg-white dark:bg-slate-900 rounded-[22px] border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-12 w-12 rounded-[15px] border border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 flex items-center justify-center shrink-0">
+                <UserCircle2 className="w-5 h-5" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-slate-500 dark:text-slate-400">Account</p>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.account")}</h2>
+              </div>
+            </div>
             <p className="text-sm text-[var(--text-muted)] mb-4">
               {user.email}
             </p>
@@ -540,7 +578,7 @@ export default function SettingsPage() {
         )}
 
         {/* Info */}
-        <div className="bg-[var(--background)] border border-[var(--border)] rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-900 border border-[#dce4ee] rounded-[22px] shadow-[0_10px_26px_rgba(15,23,42,.055)] p-4">
           <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-2">
             {t("settings.aboutTitle")}
           </h3>

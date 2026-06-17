@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { BarChart2, TrendingUp, AlertTriangle, Target } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import { BarChart, LineChart } from "@/components/Chart"
 import { getTasks } from "@/lib/unified-task-history"
 import { deriveTaskTypeWeakness, rankWeaknesses, ALL_TASK_TYPES } from "@/lib/task-weakness"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -86,7 +88,6 @@ function aggregateProfileScores(
   }))
 }
 
-// Overall score for a single task — uses dimension scores when available, otherwise heuristic
 function taskOverallScore(task: PracticeTask): number | null {
   if (!task.feedback) return null
   const ds = task.feedback.dimensionScores
@@ -149,7 +150,6 @@ function computeStats(tasks: PracticeTask[]): PteStats {
     ["comprehension", "accuracy"],
   )
 
-  // Last 8 week buckets
   const weekStarts: Date[] = []
   for (let i = 7; i >= 0; i--) {
     const ws = new Date(weekStart)
@@ -171,7 +171,6 @@ function computeStats(tasks: PracticeTask[]): PteStats {
   for (const task of tasks) typeCount.set(task.taskType, (typeCount.get(task.taskType) ?? 0) + 1)
   const taskTypeBreakdown = ALL_TASK_TYPES.map((tt) => ({ taskType: tt, count: typeCount.get(tt) ?? 0 }))
 
-  // Weekly average overall score per task type
   const weeklyScores = new Map<PteTaskType, Array<{ week: string; avgScore: number | null }>>()
   for (const taskType of ALL_TASK_TYPES) {
     weeklyScores.set(
@@ -270,6 +269,7 @@ function RadarChart({ dims, target }: { dims: DimProfile; target: number }) {
 // ── Gap Analysis ──────────────────────────────────────────────────────────────
 
 function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-3">
       {dims.map(({ label, score }) => {
@@ -286,9 +286,13 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
               <span className="tabular-nums">
                 <span className="text-slate-500">{score} / 100</span>
                 {gap > 0 ? (
-                  <span className="ml-2 text-red-500 dark:text-red-400">−{gap} to target</span>
+                  <span className="ml-2 text-red-500 dark:text-red-400">
+                    {t("stats.gapToTarget", { gap: String(gap) })}
+                  </span>
                 ) : (
-                  <span className="ml-2 text-emerald-600 dark:text-emerald-400">+{Math.abs(gap)} above</span>
+                  <span className="ml-2 text-emerald-600 dark:text-emerald-400">
+                    {t("stats.aboveTarget", { n: String(Math.abs(gap)) })}
+                  </span>
                 )}
               </span>
             </div>
@@ -303,7 +307,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
         )
       })}
       <p className="text-[11px] text-[var(--text-muted)]">
-        Yellow line = target ({target}). Scores are 0–100 internal reference values, not official PTE scores.
+        {t("stats.gapLegend", { target: String(target) })}
       </p>
     </div>
   )
@@ -312,6 +316,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
 // ── WeaknessBar (with expandable sub-dimensions) ──────────────────────────────
 
 function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const score = weakness.score
   const barColor = score < 40 ? "bg-red-500" : score < 65 ? "bg-amber-400" : "bg-emerald-500"
@@ -334,7 +339,7 @@ function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
         </span>
         <div className="flex items-center gap-2">
           {weakness.recentCount === 0 && (
-            <span className="text-[var(--text-muted)] italic">no data</span>
+            <span className="text-[var(--text-muted)] italic">{t("stats.noData")}</span>
           )}
           <span className={`font-semibold tabular-nums ${labelColor}`}>
             {weakness.recentCount > 0 ? score : "—"}
@@ -353,10 +358,14 @@ function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
       </div>
       {weakness.recentCount > 0 && (
         <p className="text-[11px] text-[var(--text-muted)]">
-          {weakness.recentCount} task{weakness.recentCount !== 1 ? "s" : ""}
-          {weakness.lastPracticed
-            ? ` · last: ${new Date(weakness.lastPracticed).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : ""}
+          {(() => {
+            const dateStr = weakness.lastPracticed
+              ? new Date(weakness.lastPracticed).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : ""
+            return weakness.recentCount === 1
+              ? t("stats.taskCountSingle", { date: dateStr })
+              : t("stats.taskCount", { count: String(weakness.recentCount), date: dateStr })
+          })()}
         </p>
       )}
 
@@ -414,6 +423,7 @@ function QuickStat({ label, value }: { label: string; value: number }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  const { t } = useTranslation()
   const [stats, setStats] = useState<PteStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [targetScore, setTargetScore] = useState(75)
@@ -428,10 +438,8 @@ export default function StatsPage() {
         if (mounted) {
           const s = computeStats(tasks)
           setStats(s)
-          // Default progress task to the most-practiced task type
           const practiced = s.weaknesses.find((w) => w.recentCount > 0)
           if (practiced) setSelectedProgressTask(practiced.taskType)
-          // Default profile tab to whichever section has data
           if (!s.speakingProfile) {
             if (s.writingProfile) setProfileTab("writing")
             else if (s.listeningProfile) setProfileTab("listening")
@@ -448,7 +456,7 @@ export default function StatsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-[var(--background)]">
+      <div className="flex flex-col min-h-screen">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center">
           <div className="flex gap-2">
@@ -464,18 +472,18 @@ export default function StatsPage() {
 
   if (!stats || stats.totalTasks === 0) {
     return (
-      <div className="flex flex-col min-h-screen bg-[var(--background)]">
+      <div className="flex flex-col min-h-screen">
         <DesktopNav active="stats" />
         <main className="flex-1 flex items-center justify-center px-6">
           <div className="text-center animate-fade-in">
-            <div className="text-6xl mb-6">📊</div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">No practice data yet</h1>
-            <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md">
-              Complete a PTE practice task to see your task-type weakness profile and progress trends.
-            </p>
+            <div className="h-16 w-16 rounded-[20px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center mx-auto mb-6">
+              <BarChart2 className="w-8 h-8" strokeWidth={2} />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">{t("stats.emptyTitle")}</h1>
+            <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md">{t("stats.emptyDesc")}</p>
             <Link href="/practice"
               className="inline-flex items-center justify-center h-12 px-8 rounded-xl bg-[var(--brand)] text-white font-medium transition-all hover:bg-[var(--brand-hover)] hover:shadow-lg">
-              Start Practicing
+              {t("stats.emptyCta")}
             </Link>
           </div>
         </main>
@@ -494,7 +502,6 @@ export default function StatsPage() {
     : !!stats.listeningProfile,
   )
 
-  // Progress curve: show weeks that have at least one data point for the selected task
   const progressData = selectedProgressTask
     ? (stats.weeklyScores.get(selectedProgressTask) ?? [])
         .filter((w) => w.avgScore !== null)
@@ -502,27 +509,42 @@ export default function StatsPage() {
     : []
 
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--background)]">
+    <div className="flex flex-col min-h-screen">
       <DesktopNav active="stats" />
 
       <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto max-w-4xl space-y-6">
 
+          {/* Page hero */}
+          <div className="animate-enter rounded-[28px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)] p-6">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-[15px] border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <BarChart2 className="w-6 h-6" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">
+                  {t("stats.analytics")}
+                </p>
+                <h1 className="text-xl font-bold text-[var(--foreground)]">{t("stats.yourProgress")}</h1>
+              </div>
+            </div>
+          </div>
+
           {/* Section 1: Overview */}
           <section className="animate-fade-in">
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                Practice Overview
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-300">
+                {t("stats.practiceOverview")}
               </p>
               <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-5xl font-semibold text-[var(--foreground)]">{stats.totalTasks}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">total practice tasks</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{t("stats.totalPracticeTasks")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                  <QuickStat label="This week" value={stats.thisWeekTasks} />
-                  <QuickStat label="Total tasks" value={stats.totalTasks} />
-                  <QuickStat label="Practice days" value={stats.practiceDays} />
+                  <QuickStat label={t("stats.thisWeek")} value={stats.thisWeekTasks} />
+                  <QuickStat label={t("stats.totalSessions")} value={stats.totalTasks} />
+                  <QuickStat label={t("stats.practiceDays")} value={stats.practiceDays} />
                 </div>
               </div>
             </div>
@@ -530,15 +552,20 @@ export default function StatsPage() {
 
           {/* Section 2: Task-Type Weakness */}
           <section className="animate-card-in">
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6">
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6">
               <div className="flex items-start justify-between mb-5">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
-                    Task-Type Weakness
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    Score 0–100, lower means weaker. Tap a row to expand per-dimension breakdown.
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className="h-12 w-12 rounded-[15px] border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-300">
+                      {t("stats.taskTypeWeakness")}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {t("stats.weaknessDesc")}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4">
@@ -549,21 +576,25 @@ export default function StatsPage() {
             </div>
           </section>
 
-          {/* Section 3: Dimension Profile + Gap Analysis (shown only when dimension data exists) */}
+          {/* Section 3: Dimension Profile + Gap Analysis */}
           {hasDimensionData && (
             <section className="animate-card-in">
-              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm sm:p-6 space-y-5">
+              <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] sm:p-6 space-y-5">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-400">
-                      Learner Profile
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      Aggregate dimension scores across all practiced task types.
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="h-12 w-12 rounded-[15px] border border-indigo-200 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                      <Target className="w-5 h-5" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">
+                        {t("stats.learnerProfile")}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {t("stats.profileDesc")}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Section tab switcher — shown when 2+ sections have data */}
                   {availableProfileTabs.length >= 2 && (
                     <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
                       {availableProfileTabs.map((tab) => (
@@ -573,7 +604,7 @@ export default function StatsPage() {
                               ? "bg-[var(--brand)] text-white"
                               : "text-[var(--text-secondary)] hover:bg-[var(--background)]"
                           }`}>
-                          {tab}
+                          {t(`stats.section.${tab}`)}
                         </button>
                       ))}
                     </div>
@@ -582,19 +613,17 @@ export default function StatsPage() {
 
                 {activeProfile ? (
                   <div className="grid gap-6 sm:grid-cols-2 items-start">
-                    {/* Radar chart */}
                     <div>
                       <RadarChart dims={activeProfile} target={targetScore} />
                       <p className="text-center text-[11px] text-[var(--text-muted)] -mt-1">
-                        Green = your scores · Dashed = target ({targetScore})
+                        {t("stats.radarLegend", { target: String(targetScore) })}
                       </p>
                     </div>
 
-                    {/* Target slider + gap analysis */}
                     <div className="space-y-4">
                       <div>
                         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                          Target score: <span className="text-[var(--foreground)] font-semibold">{targetScore}</span>
+                          {t("stats.targetScore", { score: String(targetScore) })}
                         </label>
                         <input
                           type="range" min={40} max={95} step={1} value={targetScore}
@@ -610,7 +639,7 @@ export default function StatsPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-[var(--text-muted)]">
-                    No {profileTab} dimension data yet. Complete some {profileTab} tasks to see your profile.
+                    {t("stats.noProfileData", { section: t(`stats.section.${profileTab}`) })}
                   </p>
                 )}
               </div>
@@ -619,8 +648,15 @@ export default function StatsPage() {
 
           {/* Section 4: Focus areas + Recommended actions */}
           <div className="grid gap-4 sm:grid-cols-2 animate-card-in">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-500/30 dark:bg-amber-500/10">
-              <h3 className="text-sm font-semibold text-amber-950 dark:text-amber-100">Focus areas</h3>
+            <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)] dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-[10px] border border-amber-300 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+                </div>
+                <h3 className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-300">
+                  {t("feedback.focusAreas")}
+                </h3>
+              </div>
               {topWeaknesses.length > 0 ? (
                 <ul className="mt-3 space-y-2">
                   {topWeaknesses.map((w) => (
@@ -630,7 +666,7 @@ export default function StatsPage() {
                         {TASK_LABELS[w.taskType]}
                       </Link>
                       <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-amber-800 shadow-sm dark:text-amber-200">
-                        score {w.score}
+                        {w.score}
                       </span>
                     </li>
                   ))}
@@ -638,36 +674,42 @@ export default function StatsPage() {
               ) : (
                 <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
                   {stats.weaknesses.every((w) => w.recentCount === 0)
-                    ? "No tasks practiced yet."
-                    : "No weak areas detected. Keep it up!"}
+                    ? t("stats.emptyTitle")
+                    : t("stats.noWeakAreas")}
                 </p>
               )}
             </div>
 
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-              <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Recommended next steps</h3>
+            <div className="rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 p-5 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-[10px] border border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" strokeWidth={2} />
+                </div>
+                <h3 className="text-xs font-bold uppercase tracking-[0.19em] text-slate-700 dark:text-slate-300">
+                  {t("stats.recommendedActions")}
+                </h3>
+              </div>
               <div className="space-y-3">
-                <ActionLink href="/practice" label="Task Practice" desc="Pick any PTE task type and drill with AI feedback." color="emerald" />
-                <ActionLink href="/mock" label="Mock Exam" desc="Sequence all task types under exam conditions." color="cyan" />
-                <ActionLink href="/history" label="Review History" desc="Browse past practice tasks and revisit feedback." color="slate" />
+                <ActionLink href="/practice" label={t("stats.actionTaskPractice")} desc={t("stats.actionTaskPracticeDesc")} color="emerald" />
+                <ActionLink href="/mock" label={t("stats.actionMockExam")} desc={t("stats.actionMockExamDesc")} color="cyan" />
+                <ActionLink href="/history" label={t("stats.actionHistory")} desc={t("stats.actionBrowseHistory")} color="slate" />
               </div>
             </div>
           </div>
 
           {/* Section 5: Score Trajectory */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
               <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
-                Score trajectory by task type
-                <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
-                <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
+                {t("stats.scoreTrajectory")}
+                <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">{t("stats.show")}</span>
+                <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">{t("stats.hide")}</span>
               </summary>
               <div className="px-5 pb-5 sm:px-6 sm:pb-6 space-y-4">
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Weekly average overall score (0–100). Select a task type to view its trend.
+                  {t("stats.trajectoryDesc")}
                 </p>
 
-                {/* Task type pills — only practiced ones */}
                 <div className="flex flex-wrap gap-2">
                   {stats.weaknesses.filter((w) => w.recentCount > 0).map((w) => (
                     <button key={w.taskType}
@@ -691,7 +733,7 @@ export default function StatsPage() {
                     />
                   ) : (
                     <p className="text-sm text-[var(--text-muted)] py-4 text-center">
-                      Not enough weekly data for {TASK_LABELS[selectedProgressTask]} yet.
+                      {t("stats.notEnoughData", { taskType: TASK_LABELS[selectedProgressTask] })}
                     </p>
                   )
                 )}
@@ -701,11 +743,11 @@ export default function StatsPage() {
 
           {/* Section 6: Practice distribution */}
           <section className="animate-card-in">
-            <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
               <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
-                Practice distribution
-                <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
-                <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
+                {t("stats.distribution")}
+                <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">{t("stats.show")}</span>
+                <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">{t("stats.hide")}</span>
               </summary>
               <div className="px-5 pb-5 sm:px-6 sm:pb-6">
                 <BarChart
@@ -731,11 +773,11 @@ export default function StatsPage() {
           {/* Section 7: Weekly activity */}
           {stats.weeklyActivity.some((w) => w.count > 0) && (
             <section className="animate-card-in">
-              <details className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <details className="group rounded-[22px] border border-[#dce4ee] bg-white dark:bg-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.055)]">
                 <summary className="cursor-pointer list-none p-5 font-semibold text-[var(--foreground)] sm:p-6">
-                  Weekly activity
-                  <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">Show</span>
-                  <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
+                  {t("stats.weeklyActivity")}
+                  <span className="float-right text-sm font-normal text-slate-500 group-open:hidden">{t("stats.show")}</span>
+                  <span className="float-right hidden text-sm font-normal text-slate-500 group-open:inline">{t("stats.hide")}</span>
                 </summary>
                 <div className="px-5 pb-5 sm:px-6 sm:pb-6">
                   <BarChart
@@ -755,7 +797,7 @@ export default function StatsPage() {
       </main>
 
       <footer className="py-6 text-center text-sm text-[var(--text-secondary)] border-t border-[var(--border)]">
-        <p>EchoLingo — PTE Academic practice</p>
+        <p>{t("home.footer")}</p>
       </footer>
     </div>
   )

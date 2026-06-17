@@ -65,6 +65,12 @@ export type DimensionWeakness = {
   score: number  // 0–100, lower is weaker
 }
 
+// Task score: how many points earned out of the task maximum
+export type TaskScoreCard = {
+  earned: number
+  max: number
+}
+
 // Generic Feedback Envelope — drives shared UI (history, stats, daily plan)
 export type TaskFeedback = {
   summary: string
@@ -74,6 +80,7 @@ export type TaskFeedback = {
   details?: TaskFeedbackDetails
   pronunciationAssessment?: PronunciationAssessmentResult
   dimensionScores?: DimensionScores
+  scoreCard?: TaskScoreCard
   coachSuggestions?: string[]
   judgeLog?: JudgeLog
 }
@@ -245,6 +252,35 @@ export type PronunciationAssessmentResult = {
   completenessScore: number;
   words: WordAssessment[];
   summary: string; // 简要反馈
+  recognizedText?: string; // Azure STT 识别出的原文，比浏览器 Web Speech 更准确
+};
+
+// ── Study Aids: Word Lookup & Vocabulary List ───────────────────────────────
+
+/** One part-of-speech-grouped sense on a Word Lookup card. */
+export type WordLookupEntry = {
+  pos: string; // e.g. "n.", "v.", "phrase", or "" when unknown
+  meaning: string; // Simplified Chinese gloss
+};
+
+/** Unified Word Lookup response from either ECDICT or the DeepSeek fallback. */
+export type WordLookupResult = {
+  source: "dictionary" | "ai";
+  text: string; // the cleaned word or phrase
+  phonetic: string; // IPA without slashes; empty for phrases/misses
+  entries: WordLookupEntry[];
+  tags: string[]; // exam labels e.g. ["雅思", "托福"]
+};
+
+/** A word the learner explicitly saved to their Vocabulary List. */
+export type VocabularyEntry = {
+  id: string;
+  text: string;
+  phonetic: string;
+  source: WordLookupResult["source"];
+  entries: WordLookupEntry[];
+  tags: string[];
+  createdAt: string; // ISO timestamp
 };
 
 export type SessionFeedback = {

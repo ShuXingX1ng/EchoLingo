@@ -19,6 +19,7 @@ vi.mock("./supabase-task-history", () => ({
 }))
 
 import * as unified from "./unified-task-history"
+import { _resetCacheForTesting } from "./unified-task-history"
 import * as local from "./task-history"
 import * as cloud from "./supabase-task-history"
 import type { PracticeTask } from "@/types"
@@ -38,6 +39,9 @@ const LOCAL_TASK: PracticeTask = { ...TASK_STUB, id: "local-1" }
 describe("unified-task-history", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset the login/list caches so each test gets a fresh isLoggedIn() call
+    // rather than a stale cached result from the previous test.
+    _resetCacheForTesting()
   })
 
   // ── saveTask ─────────────────────────────────────────────────────────────────

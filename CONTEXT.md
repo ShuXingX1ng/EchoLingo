@@ -33,8 +33,12 @@ What the learner submits for a Practice Task. May be spoken audio, typed text, o
 _Avoid_: answer, submission, input
 
 **Task Bank**:
-The pool of Stimuli available for a given Task Type. Text Task Types draw from AI-generated Stimuli; audio Task Types draw from pre-cached Azure TTS recordings.
+The pool of Stimuli available for a given Task Type. Text Task Types draw from AI-generated Stimuli (for the corpus-grounded path, generation is seeded by retrieved **Stimulus Exemplars**); audio Task Types draw from pre-cached Azure TTS recordings. Note: `src/lib/task-bank.ts` is only a client-side localStorage *cache* of already-served Stimuli — it is not the authoritative pool.
 _Avoid_: question bank, content library
+
+**Stimulus Exemplar**:
+A piece of real or open-source PTE-style source text (a "机经" recall item or an open-corpus passage) ingested into Supabase to seed Stimulus generation. It is **retrieval-only**: the corpus-grounded generation path retrieves the most similar Exemplars for a Task Type and uses them as few-shot anchors so the LLM produces an original Stimulus in matching style, difficulty, and topic — the Exemplar text itself is never served verbatim to a learner on the default path. Distinct from **Stimulus** (what the learner actually receives). Stored gitignored / out of the public repo when sourced from copyrighted recall material.
+_Avoid_: scraped question, 机经 (use in prose only), seed (overloaded), sample
 
 ### Modes
 
@@ -43,8 +47,12 @@ A learner-directed session where the learner picks a Task Type and completes one
 _Avoid_: free practice, drill mode
 
 **Mock Exam**:
-A full simulated PTE Academic exam following the official task sequence and strict timing. Covers all supported Task Types in order.
+A full simulated PTE Academic exam following the official task sequence and strict timing. Covers all supported Task Types in order. The learner cannot choose a topic; Stimuli are selected randomly (Exemplar-grounded generation with topic conditioning off) to preserve authenticity.
 _Avoid_: full test, simulation mode
+
+**Theme Practice**:
+A Task Practice variant where the learner types a theme (e.g. "environment", "technology") and the system generates Stimuli on that theme. Backed by hybrid retrieval over **Stimulus Exemplars** — dense (pgvector) + sparse (Postgres `tsvector`) fused with RRF — so the theme keyword drives few-shot selection for topic-controllable generation. The only mode where topic conditioning (and therefore hybrid retrieval) is active.
+_Avoid_: topic mode, custom practice, keyword practice
 
 ### Feedback
 
@@ -64,6 +72,27 @@ _Avoid_: extended feedback, metadata
 The Azure-powered word-level and phoneme-level scoring applied to spoken Responses. Used in Read Aloud and Repeat Sentence. Distinct from AI Feedback — it runs in parallel and feeds into Feedback Details. Azure is the authoritative source for pronunciation data on these two task types; Whisper (speech-to-text transcription) is a separate tool used only where Azure Pronunciation Assessment does not apply (e.g. Describe Image, Answer Short Question) to produce a transcript for AI Feedback.
 _Avoid_: pronunciation score, Azure score
 
+### Study Aids
+
+**Word Lookup**:
+A helper available on Task Practice pages (never in a Mock Exam) that translates a word or short phrase the learner selects from any on-page text. The learner selects text and taps the "译" pill that appears beside the selection (all platforms); the result card opens with the translation. (Earlier versions also offered a persistent floating button with a desktop drag-and-drop route — both were removed because the selection pill alone is sufficient.) Single English words resolve against the ECDICT dictionary database (instant, offline); phrases — and dictionary misses — fall through to the DeepSeek LLM. It is a learning aid only and does not produce Feedback.
+_Avoid_: translator, dictionary, assistant, chat helper, glossary (reserved for CONTEXT.md term list)
+
+**Vocabulary List**:
+The learner's saved collection of looked-up words. A word enters the Vocabulary List only by explicit action (a save/star control on the Word Lookup card) — looking a word up does not add it. Stored per learner in Supabase when logged in, with localStorage fallback when not. Viewed on the `/vocabulary` page (view and delete only; no spaced-repetition review in v1).
+_Avoid_: word book, saved words, flashcards, SRS deck
+
+**Study Assistant**:
+The learner-facing, tool-using conversational agent. It holds a multi-turn conversation (single session, not persisted) and decides which of its tools to call to help the learner. Reachable from a global floating entry point on every page **except during an in-progress Mock Exam** (same exclusion rule as **Word Lookup**). Answers follow the current UI language; preset "common question" buttons lower the barrier to entry. It is a tool-using agent in the technical sense, but it is **not** an **Agent** in this project's vocabulary — that term is reserved for the internal feedback/scoring pipeline stages (see `docs/agent-architecture.md`, ADR-0004), which the Study Assistant never invokes.
+
+Its MVP tools are:
+1. **Navigation / app help** — answers "how / where / what is" questions and returns clickable jump links drawn from a fixed route allow-list, grounded by a hand-authored knowledge file (app feature map + PTE FAQ), not RAG over dev docs.
+2. **Generate practice on a topic** — produces an original **Stimulus** (text Task Types only at MVP) for a learner-named topic. Grounding defaults to the **Stimulus Exemplar** corpus (the existing **Theme Practice** path); it switches to live-news grounding only on explicit learner recency intent. Either way the source text is never served verbatim — the **originality guard** applies — so it stays consistent with ADR-0008.
+3. **PTE knowledge Q&A** — answers exam-format, scoring-dimension, and study-tip questions.
+
+**Action boundary**: the Study Assistant may generate practice content and navigate the learner into a **Practice Task**, but it never submits a **Response**, never scores, and never alters saved learner data on the learner's behalf. It produces no **Feedback** of its own.
+_Avoid_: Agent (reserved for the feedback/scoring pipeline), assistant (bare — reserved by Word Lookup's avoid-list), chatbot, support bot, tutor, Coach (reserved for the Coach Agent)
+
 ### Progress
 
 **Task-Type Weakness**:
@@ -71,8 +100,8 @@ A signal derived from a learner's Feedback history for a given Task Type, indica
 _Avoid_: weak area, error pattern (legacy IELTS term), skill gap
 
 **Daily Plan**:
-The home-page set of recommended Practice Tasks, generated from Task-Type Weaknesses for logged-in learners.
-_Avoid_: learning plan, daily tasks
+The home-page set of recommended Practice Tasks, generated from Task-Type Weaknesses for logged-in learners. When surfaced as a dedicated practice entry point it is called **Targeted Practice** — the same weakness-driven engine, not a new concept; Stimulus selection there filters Exemplars by Task Type plus difficulty/feature metadata (no topic, no hybrid retrieval).
+_Avoid_: learning plan, daily tasks, targeted practice (use only as the UI label for the Daily Plan engine)
 
 ## Relationships
 

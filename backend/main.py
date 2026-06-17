@@ -1,22 +1,24 @@
 """
 EchoLingo FastAPI Backend
 
-Python backend for EchoLingo IELTS speaking practice platform.
+Python backend for the EchoLingo PTE Academic practice platform.
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-from routers import examiner, feedback, tts, pronunciation, pte_stimulus, pte_feedback
+# Load environment variables before any service modules are imported
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
-# Load environment variables
-load_dotenv()
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from routers import tts, pronunciation, pte_stimulus, pte_feedback, word_lookup, onboarding, study_assistant  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(
     title="EchoLingo API",
-    description="Backend API for EchoLingo IELTS speaking practice platform",
+    description="Backend API for the EchoLingo PTE Academic practice platform",
     version="1.0.0",
 )
 
@@ -24,23 +26,27 @@ app = FastAPI(
 # Allow frontend domain and localhost for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev server
-        "http://localhost:3001",  # Alternative dev port
-        "https://echolingo.vercel.app",  # Production (update with actual domain)
-    ],
+    allow_origins=[o.strip() for o in [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        *os.getenv("ALLOWED_ORIGINS", "").split(","),
+    ] if o.strip()],
+    # Also allow any LAN IP (192.168.x.x, 10.x.x.x, 172.16-31.x.x) on any port — covers
+    # dev access via local network IP (e.g. http://192.168.110.101:3000).
+    allow_origin_regex=r"http://(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(examiner.router, prefix="/api", tags=["examiner"])
-app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 app.include_router(tts.router, prefix="/api", tags=["tts"])
 app.include_router(pronunciation.router, prefix="/api", tags=["pronunciation"])
 app.include_router(pte_stimulus.router, prefix="/api", tags=["pte"])
 app.include_router(pte_feedback.router, prefix="/api", tags=["pte"])
+app.include_router(word_lookup.router, prefix="/api", tags=["word-lookup"])
+app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
+app.include_router(study_assistant.router, prefix="/api", tags=["study-assistant"])
 
 
 @app.get("/health")

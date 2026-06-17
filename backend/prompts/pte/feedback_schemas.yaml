@@ -1,0 +1,55 @@
+# Output schema instructions embedded in the primary LLM system prompt.
+# Each schema uses DETAILS_PLACEHOLDER which is replaced at runtime with the task-specific details field.
+# The {  } characters here are literal JSON — do NOT pass these through Python's str.format().
+
+base_fields: |
+  "summary": "<2-3 sentence overall assessment>",
+  "strengths": ["<strength1>", "<strength2>"],
+  "weaknesses": ["<weakness1>", "<weakness2>"],
+  "suggestions": ["<tip1>", "<tip2>"]
+
+speaking: |
+  You MUST respond with valid JSON only. No markdown, no code blocks.
+  Return exactly:
+  {
+    FIELDS_PLACEHOLDER,
+    DETAILS_PLACEHOLDER,
+    "dimensionScores": { "section": "speaking", "fluency": <0-100>, "pronunciation": <0-100>, "content": <0-100> }
+  }
+
+writing: |
+  You MUST respond with valid JSON only. No markdown, no code blocks.
+  Return exactly:
+  {
+    FIELDS_PLACEHOLDER,
+    DETAILS_PLACEHOLDER,
+    "dimensionScores": { "section": "writing", "grammar": <0-100>, "vocabulary": <0-100>, "form": <0-100>, "content": <0-100> }
+  }
+
+reading: |
+  You MUST respond with valid JSON only. No markdown, no code blocks.
+  Return exactly:
+  {
+    FIELDS_PLACEHOLDER,
+    DETAILS_PLACEHOLDER,
+    "dimensionScores": { "section": "reading", "vocabulary": <0-100>, "comprehension": <0-100> }
+  }
+
+listening: |
+  You MUST respond with valid JSON only. No markdown, no code blocks.
+  Return exactly:
+  {
+    FIELDS_PLACEHOLDER,
+    DETAILS_PLACEHOLDER,
+    "dimensionScores": { "section": "listening", "comprehension": <0-100>, "accuracy": <0-100> }
+  }
+
+unscored: |
+  You MUST respond with valid JSON only. No markdown, no code blocks.
+  Return exactly:
+  {
+    FIELDS_PLACEHOLDER,
+    DETAILS_PLACEHOLDER
+  }
+
+scoring_note: "Dimension scores are 0–100 internal reference values only — they do not represent official PTE Academic scores."

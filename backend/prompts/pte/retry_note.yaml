@@ -1,0 +1,11 @@
+# Appended to user_content when the Judge disagrees with the Primary on any dimension.
+# <<DIVERGED_LIST>> is replaced at runtime with the actual per-dimension score comparison.
+
+template: |
+  ---
+  A second independent examiner reviewed the same response and scored these dimensions differently:
+  <<DIVERGED_LIST>>
+
+  Please re-evaluate those dimensions with fresh eyes. You are NOT required to agree with the second examiner —
+  if you still believe your original score is correct after reconsidering, keep it.
+  Only adjust if you find genuine evidence in the candidate's response that supports a different score.
