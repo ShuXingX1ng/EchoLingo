@@ -52,3 +52,7 @@ export async function getTasksByType(taskType: PracticeTask["taskType"]): Promis
 export function clearAllTasksLocal(): void {
   localHistory.clearAllTasks()
 }
+
+export function _resetCacheForTesting(): void {
+  store._resetCache()
+}
