@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { loadStimulusText } from "@/lib/stimulus-loader"
-import { saveTask } from "@/lib/unified-task-history"
+import { saveTask, getTasksByType } from "@/lib/unified-task-history"
 import { apiPost, apiPostForm } from "@/lib/api-client"
 import { useRecordingSession } from "@/hooks/useRecordingSession"
 import { blobToWav } from "@/lib/wav-encoder"
@@ -64,6 +64,39 @@ export interface PracticeTaskRunnerReturn {
   submit: (overrides?: { feedbackStimulus?: string; feedbackResponse?: string }) => Promise<void>
   /** Re-generate the stimulus and restart the task lifecycle. */
   generate: () => Promise<void>
+}
+
+async function computeHistoricalWeaknesses(taskType: PteTaskType): Promise<Record<string, number> | undefined> {
+  try {
+    const tasks = await getTasksByType(taskType)
+    const dimSums: Record<string, number> = {}
+    const dimCounts: Record<string, number> = {}
+    for (const t of tasks.slice(-15)) {
+      const ds = t.feedback?.dimensionScores
+      if (!ds) continue
+      let entries: Array<[string, number]> = []
+      if (ds.section === "speaking") {
+        entries = [["fluency", ds.fluency], ["pronunciation", ds.pronunciation], ["content", ds.content]]
+      } else if (ds.section === "writing") {
+        entries = [["grammar", ds.grammar], ["vocabulary", ds.vocabulary], ["form", ds.form], ["content", ds.content]]
+      } else if (ds.section === "reading") {
+        entries = [["vocabulary", ds.vocabulary], ["comprehension", ds.comprehension]]
+      } else if (ds.section === "listening") {
+        entries = [["comprehension", ds.comprehension], ["accuracy", ds.accuracy]]
+      }
+      for (const [dim, score] of entries) {
+        dimSums[dim] = (dimSums[dim] ?? 0) + score
+        dimCounts[dim] = (dimCounts[dim] ?? 0) + 1
+      }
+    }
+    const result: Record<string, number> = {}
+    for (const [dim, sum] of Object.entries(dimSums)) {
+      result[dim] = Math.round(sum / dimCounts[dim])
+    }
+    return Object.keys(result).length > 0 ? result : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function usePracticeTaskRunner({
@@ -129,12 +162,14 @@ export function usePracticeTaskRunner({
     setTranscript(effectiveTranscript)
 
     // Step 2: LLM feedback with the best available transcript
+    const historicalWeaknesses = await computeHistoricalWeaknesses(taskType)
     let feedbackResult: TaskFeedback | null = null
     try {
       feedbackResult = await apiPost<TaskFeedback>(feedbackEndpoint, {
         taskType,
         stimulus: stimulusRef.current,
         response: effectiveTranscript,
+        ...(historicalWeaknesses ? { historicalWeaknesses } : {}),
       }, { timeoutMs: 90000 })
     } catch {}
 
@@ -231,12 +266,14 @@ export function usePracticeTaskRunner({
       (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000
     )
 
+    const historicalWeaknesses = await computeHistoricalWeaknesses(taskType)
     let result: TaskFeedback | null = null
     try {
       result = await apiPost<TaskFeedback>(feedbackEndpoint, {
         taskType,
         stimulus: effectiveStimulus,
         response: effectiveResponse,
+        ...(historicalWeaknesses ? { historicalWeaknesses } : {}),
       }, { timeoutMs: 90000 })
     } catch {}
 

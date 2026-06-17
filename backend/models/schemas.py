@@ -90,6 +90,7 @@ class PteStimulusRequest(BaseModel):
     topic: Optional[str] = None              # theme query (theme mode only)
     targeting: Optional[Dict[str, Any]] = None  # {difficulty?, features?} for targeted mode
     verbatim: bool = False                   # private path: serve an Exemplar verbatim
+    source: Literal["exemplars", "news"] = "exemplars"  # generation anchor source
 
 
 class PteStimulusResponse(BaseModel):
@@ -103,3 +104,4 @@ class PteFeedbackRequest(BaseModel):
     stimulus: str = ""
     response: str
     pronunciationAssessment: Optional[Dict[str, Any]] = None
+    historicalWeaknesses: Optional[Dict[str, float]] = None

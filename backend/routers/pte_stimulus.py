@@ -38,6 +38,7 @@ async def generate_pte_stimulus(request: PteStimulusRequest):
             topic=request.topic,
             targeting=request.targeting,
             verbatim=request.verbatim,
+            source=request.source,
         )
     except ValueError as e:
         raise HTTPException(status_code=502, detail=str(e))

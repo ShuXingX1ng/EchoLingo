@@ -24,9 +24,9 @@ interface LoadStimulusOptions {
  * Must be called in a browser context (reads window.location.search).
  */
 export async function loadStimulusText({ taskType, randomEndpoint, timeoutMs = 45000 }: LoadStimulusOptions): Promise<string> {
-  const { mode, topic } = parsePracticeModeFromUrl(window.location.search)
+  const { mode, topic, source } = parsePracticeModeFromUrl(window.location.search)
   const isSeeded = mode !== "random"
-  const extras = buildStimulusExtras(mode, topic)
+  const extras = buildStimulusExtras(mode, topic, source)
 
   const opts = { timeoutMs }
 

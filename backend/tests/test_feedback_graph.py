@@ -346,6 +346,7 @@ async def test_run_feedback_graph_happy_path():
         stimulus = "The quick brown fox."
         response = "The quick brown fox."
         pronunciationAssessment = None
+        historicalWeaknesses = None
 
     with (
         patch("services.rag.aembed_query", new=AsyncMock(return_value=[0.0] * 1536)),
@@ -374,6 +375,7 @@ async def test_run_feedback_graph_divergence_triggers_retry():
         stimulus = "Test."
         response = "Test."
         pronunciationAssessment = None
+        historicalWeaknesses = None
 
     with (
         patch("services.rag.aembed_query", new=AsyncMock(return_value=[0.0] * 1536)),
