@@ -7,7 +7,6 @@ and the full clean_exemplars() pipeline (LLM gate mocked throughout).
 
 from unittest.mock import patch
 
-import pytest
 
 from scripts.scrape_exemplars.base import RawExemplar
 from scripts.scrape_exemplars.cleaner import (

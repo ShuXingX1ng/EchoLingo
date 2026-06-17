@@ -2,7 +2,6 @@
 Tests for Authentication Middleware.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
