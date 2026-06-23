@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import VoiceVisualizer from "./VoiceVisualizer";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useTranslation } from "@/lib/i18n";
 
 type VoiceState = "idle" | "listening" | "processing" | "speaking";
 
@@ -28,6 +29,7 @@ export default function VoiceControls({
   maxAnswerTime = 60,
   onTimeout,
 }: VoiceControlsProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<VoiceState>("idle");
   const [interimText, setInterimText] = useState("");
   const [isSupported, setIsSupported] = useState(false);
@@ -187,7 +189,7 @@ export default function VoiceControls({
   if (!isSupported) {
     return (
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        Voice not supported in this browser
+        {t("voiceControls.notSupported")}
       </p>
     );
   }
@@ -202,11 +204,11 @@ export default function VoiceControls({
     switch (state) {
       case "listening":
         if (interimText) return interimText;
-        return `Listening... ${formatTime(elapsedTime)}/${formatTime(maxAnswerTime)}`;
+        return `${t("voiceControls.listening")} ${formatTime(elapsedTime)}/${formatTime(maxAnswerTime)}`;
       case "processing":
-        return "AI is thinking...";
+        return t("voiceControls.aiThinking");
       default:
-        return "Tap to speak";
+        return t("voiceControls.tapToSpeak");
     }
   };
 
@@ -235,7 +237,7 @@ export default function VoiceControls({
         onClick={handleMainButton}
         disabled={disabled || state === "processing"}
         className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white transition-all shadow-lg active:scale-95 ${getButtonColor()}`}
-        aria-label={state === "listening" ? "Stop listening" : "Start speaking"}
+        aria-label={state === "listening" ? t("voiceControls.stopListening") : t("voiceControls.startSpeaking")}
       >
         {state === "listening" ? (
           <svg

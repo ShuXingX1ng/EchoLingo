@@ -30,22 +30,26 @@ const TASK_SHORT: Record<PteTaskType, string> = {
   highlight_correct_summary: "HCS",
 }
 
-const TASK_LABELS: Record<PteTaskType, string> = {
-  read_aloud: "Read Aloud",
-  repeat_sentence: "Repeat Sentence",
-  answer_short_question: "Answer Short Question",
-  summarize_written_text: "Summarize Written Text",
-  write_essay: "Write Essay",
-  personal_intro: "Personal Intro",
-  write_from_dictation: "Write from Dictation",
-  describe_image: "Describe Image",
-  re_tell_lecture: "Re-tell Lecture",
-  fill_in_the_blanks_reading: "Fill in the Blanks (R)",
-  re_order_paragraphs: "Re-order Paragraphs",
-  multiple_choice_reading: "Multiple Choice",
-  summarize_spoken_text: "Summarize Spoken Text",
-  fill_in_the_blanks_listening: "Fill in the Blanks (L)",
-  highlight_correct_summary: "Highlight Correct Summary",
+type TFunc = (key: string) => string
+
+function getTaskLabels(t: TFunc): Record<PteTaskType, string> {
+  return {
+    read_aloud: t("mock.taskLabel.read_aloud"),
+    repeat_sentence: t("mock.taskLabel.repeat_sentence"),
+    answer_short_question: t("mock.taskLabel.answer_short_question"),
+    summarize_written_text: t("mock.taskLabel.summarize_written_text"),
+    write_essay: t("mock.taskLabel.write_essay"),
+    personal_intro: t("mock.taskLabel.personal_intro"),
+    write_from_dictation: t("mock.taskLabel.write_from_dictation"),
+    describe_image: t("mock.taskLabel.describe_image"),
+    re_tell_lecture: t("mock.taskLabel.re_tell_lecture"),
+    fill_in_the_blanks_reading: t("mock.taskLabel.fill_in_the_blanks"),
+    re_order_paragraphs: t("mock.taskLabel.re_order_paragraphs"),
+    multiple_choice_reading: t("mock.taskLabel.multiple_choice"),
+    summarize_spoken_text: t("mock.taskLabel.summarize_spoken_text"),
+    fill_in_the_blanks_listening: t("mock.taskLabel.fill_in_the_blanks_listening"),
+    highlight_correct_summary: t("mock.taskLabel.highlight_correct_summary"),
+  }
 }
 
 const SPEAKING_SCORED_TASKS = new Set<PteTaskType>([
@@ -268,6 +272,13 @@ function RadarChart({ dims, target }: { dims: DimProfile; target: number }) {
 
 // ── Gap Analysis ──────────────────────────────────────────────────────────────
 
+function getDimLabel(t: TFunc, label: string): string {
+  const key = `stats.dimension.${label.toLowerCase()}`
+  const translated = t(key)
+  // If the key is not found (returns the key itself), fall back to the label
+  return translated === key ? label : translated
+}
+
 function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
   const { t } = useTranslation()
   return (
@@ -282,7 +293,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
         return (
           <div key={label} className="space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-[var(--text-secondary)]">{label}</span>
+              <span className="font-medium text-[var(--text-secondary)]">{getDimLabel(t, label)}</span>
               <span className="tabular-nums">
                 <span className="text-slate-500">{score} / 100</span>
                 {gap > 0 ? (
@@ -317,6 +328,7 @@ function GapAnalysis({ dims, target }: { dims: DimProfile; target: number }) {
 
 function WeaknessBar({ weakness }: { weakness: TaskTypeWeakness }) {
   const { t } = useTranslation()
+  const TASK_LABELS = getTaskLabels(t)
   const [expanded, setExpanded] = useState(false)
   const score = weakness.score
   const barColor = score < 40 ? "bg-red-500" : score < 65 ? "bg-amber-400" : "bg-emerald-500"
@@ -424,6 +436,7 @@ function QuickStat({ label, value }: { label: string; value: number }) {
 
 export default function StatsPage() {
   const { t } = useTranslation()
+  const TASK_LABELS = getTaskLabels(t)
   const [stats, setStats] = useState<PteStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [targetScore, setTargetScore] = useState(75)

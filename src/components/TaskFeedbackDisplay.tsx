@@ -1,6 +1,7 @@
 "use client"
 
 import PronunciationFeedback from "@/components/PronunciationFeedback"
+import { useTranslation } from "@/lib/i18n"
 import type { TaskFeedback, DimensionScores, TaskScoreCard } from "@/types"
 
 interface Props {
@@ -14,10 +15,11 @@ interface Props {
 export default function TaskFeedbackDisplay({
   feedback,
   stimulus,
-  stimulusLabel = "Stimulus",
+  stimulusLabel,
   responseLabel,
   responseText,
 }: Props) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-5">
       {feedback.scoreCard && (
@@ -26,7 +28,7 @@ export default function TaskFeedbackDisplay({
 
       {stimulus && (
         <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/50">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{stimulusLabel}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{stimulusLabel ?? t("practiceTask.common.passage")}</p>
           <p className="text-sm leading-7 text-slate-700 dark:text-slate-300 font-serif">{stimulus}</p>
         </div>
       )}
@@ -34,7 +36,7 @@ export default function TaskFeedbackDisplay({
       {responseText && (
         <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">
-            {responseLabel ?? "Your Response"}
+            {responseLabel ?? t("taskFeedback.yourResponse")}
           </p>
           <p className="text-sm leading-7 text-slate-600 dark:text-slate-300 italic">{responseText}</p>
         </div>
@@ -43,14 +45,14 @@ export default function TaskFeedbackDisplay({
       {feedback.pronunciationAssessment && (
         <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-            Azure Pronunciation
+            {t("practiceTask.read-aloud.azurePronunciation")}
           </p>
           <div className="grid grid-cols-4 gap-3 mb-5">
             {[
-              { label: "Overall", score: feedback.pronunciationAssessment.score },
-              { label: "Accuracy", score: feedback.pronunciationAssessment.accuracyScore },
-              { label: "Fluency", score: feedback.pronunciationAssessment.fluencyScore },
-              { label: "Completeness", score: feedback.pronunciationAssessment.completenessScore },
+              { label: t("pronunciation.overall"), score: feedback.pronunciationAssessment.score },
+              { label: t("pronunciation.accuracy"), score: feedback.pronunciationAssessment.accuracyScore },
+              { label: t("pronunciation.fluency"), score: feedback.pronunciationAssessment.fluencyScore },
+              { label: t("pronunciation.completeness"), score: feedback.pronunciationAssessment.completenessScore },
             ].map(({ label, score }) => (
               <div key={label} className="text-center">
                 <ScoreBadge score={score} />
@@ -67,7 +69,7 @@ export default function TaskFeedbackDisplay({
       )}
 
       <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">AI Feedback</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{t("practiceTask.common.aiFeedback")}</p>
 
         <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{feedback.summary}</p>
 
@@ -75,7 +77,7 @@ export default function TaskFeedbackDisplay({
 
         {feedback.strengths.length > 0 && (
           <div className="border-t border-slate-100 dark:border-white/10 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 mb-2">Strengths</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 mb-2">{t("practiceTask.common.strengths")}</p>
             <ul className="space-y-1">
               {feedback.strengths.map((s, i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -88,7 +90,7 @@ export default function TaskFeedbackDisplay({
 
         {feedback.weaknesses.length > 0 && (
           <div className="border-t border-slate-100 dark:border-white/10 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-600 dark:text-red-400 mb-2">Areas to Improve</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-600 dark:text-red-400 mb-2">{t("practiceTask.common.areasToImprove")}</p>
             <ul className="space-y-1">
               {feedback.weaknesses.map((w, i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -101,7 +103,7 @@ export default function TaskFeedbackDisplay({
 
         {feedback.suggestions.length > 0 && (
           <div className="border-t border-slate-100 dark:border-white/10 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">Suggestions</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">{t("practiceTask.common.suggestions")}</p>
             <ul className="space-y-1">
               {feedback.suggestions.map((s, i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -115,7 +117,7 @@ export default function TaskFeedbackDisplay({
         {feedback.coachSuggestions && feedback.coachSuggestions.length > 0 && (
           <div className="border-t border-slate-100 dark:border-white/10 pt-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600 dark:text-blue-400 mb-2">
-              Targeted Coaching
+              {t("taskFeedback.targetedCoaching")}
             </p>
             <ul className="space-y-1">
               {feedback.coachSuggestions.map((s, i) => (
@@ -132,6 +134,7 @@ export default function TaskFeedbackDisplay({
 }
 
 function ScoreCardBlock({ card }: { card: TaskScoreCard }) {
+  const { t } = useTranslation()
   const pct = card.max > 0 ? card.earned / card.max : 0
   const color = pct >= 0.8
     ? "text-emerald-700 dark:text-emerald-300"
@@ -146,11 +149,11 @@ function ScoreCardBlock({ card }: { card: TaskScoreCard }) {
 
   return (
     <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-3">Score</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-3">{t("taskFeedback.score")}</p>
       <div className="flex items-end gap-2 mb-3">
         <span className={`text-4xl font-bold tabular-nums ${color}`}>{card.earned}</span>
         <span className="text-xl text-slate-400 mb-0.5">/ {card.max}</span>
-        <span className="text-sm text-slate-400 mb-1 ml-1">pts</span>
+        <span className="text-sm text-slate-400 mb-1 ml-1">{t("taskFeedback.pts")}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
         <div
@@ -176,29 +179,30 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 function DimensionScoresBlock({ scores }: { scores: DimensionScores }) {
+  const { t } = useTranslation()
   let dims: Array<{ label: string; score: number }> = []
   if (scores.section === "speaking") {
     dims = [
-      { label: "Fluency", score: scores.fluency },
-      { label: "Pronunciation", score: scores.pronunciation },
-      { label: "Content", score: scores.content },
+      { label: t("feedback.fluency"), score: scores.fluency },
+      { label: t("feedback.pronunciation"), score: scores.pronunciation },
+      { label: t("taskFeedback.dim.content"), score: scores.content },
     ]
   } else if (scores.section === "writing") {
     dims = [
-      { label: "Grammar", score: scores.grammar },
-      { label: "Vocabulary", score: scores.vocabulary },
-      { label: "Form", score: scores.form },
-      { label: "Content", score: scores.content },
+      { label: t("feedback.grammar"), score: scores.grammar },
+      { label: t("feedback.vocabulary"), score: scores.vocabulary },
+      { label: t("taskFeedback.dim.form"), score: scores.form },
+      { label: t("taskFeedback.dim.content"), score: scores.content },
     ]
   } else if (scores.section === "reading") {
     dims = [
-      { label: "Vocabulary", score: scores.vocabulary },
-      { label: "Comprehension", score: scores.comprehension },
+      { label: t("feedback.vocabulary"), score: scores.vocabulary },
+      { label: t("taskFeedback.dim.comprehension"), score: scores.comprehension },
     ]
   } else if (scores.section === "listening") {
     dims = [
-      { label: "Comprehension", score: scores.comprehension },
-      { label: "Accuracy", score: scores.accuracy },
+      { label: t("taskFeedback.dim.comprehension"), score: scores.comprehension },
+      { label: t("taskFeedback.dim.accuracy"), score: scores.accuracy },
     ]
   }
 
@@ -206,9 +210,9 @@ function DimensionScoresBlock({ scores }: { scores: DimensionScores }) {
     <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
       <div className="flex items-baseline justify-between mb-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Dimension Scores
+          {t("taskFeedback.dimensionScores")}
         </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">for reference only</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">{t("taskFeedback.referenceOnly")}</p>
       </div>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
         {dims.map(({ label, score }) => (
@@ -223,25 +227,26 @@ function DimensionScoresBlock({ scores }: { scores: DimensionScores }) {
 }
 
 function DetailsBlock({ details }: { details: NonNullable<TaskFeedback["details"]> }) {
+  const { t } = useTranslation()
   const rows: Array<{ label: string; value: string }> = []
 
-  if ("oralFluency" in details) rows.push({ label: "Oral Fluency", value: details.oralFluency })
-  if ("pronunciation" in details) rows.push({ label: "Pronunciation", value: details.pronunciation })
-  if ("contentAccuracy" in details) rows.push({ label: "Content Accuracy", value: details.contentAccuracy })
-  if ("contentCoverage" in details) rows.push({ label: "Content Coverage", value: details.contentCoverage })
-  if ("fluency" in details) rows.push({ label: "Fluency", value: details.fluency })
-  if ("wordAccuracy" in details && details.wordAccuracy) rows.push({ label: "Word Accuracy", value: details.wordAccuracy })
-  if ("content" in details && details.content) rows.push({ label: "Content", value: details.content })
-  if ("grammar" in details && details.grammar) rows.push({ label: "Grammar", value: details.grammar })
-  if ("vocabulary" in details && details.vocabulary) rows.push({ label: "Vocabulary", value: details.vocabulary })
-  if ("structure" in details && details.structure) rows.push({ label: "Structure", value: details.structure })
-  if ("accuracy" in details) rows.push({ label: "Accuracy", value: details.accuracy })
-  if ("orderAccuracy" in details) rows.push({ label: "Order Accuracy", value: details.orderAccuracy })
-  if ("logicFeedback" in details) rows.push({ label: "Text Logic", value: details.logicFeedback })
-  if ("answerAccuracy" in details) rows.push({ label: "Answer Accuracy", value: details.answerAccuracy })
-  if ("readingComprehension" in details) rows.push({ label: "Reading Comprehension", value: details.readingComprehension })
-  if ("writingQuality" in details) rows.push({ label: "Writing Quality", value: details.writingQuality })
-  if ("listeningComprehension" in details) rows.push({ label: "Listening Comprehension", value: details.listeningComprehension })
+  if ("oralFluency" in details) rows.push({ label: t("taskFeedback.detail.oralFluency"), value: details.oralFluency })
+  if ("pronunciation" in details) rows.push({ label: t("feedback.pronunciation"), value: details.pronunciation })
+  if ("contentAccuracy" in details) rows.push({ label: t("taskFeedback.detail.contentAccuracy"), value: details.contentAccuracy })
+  if ("contentCoverage" in details) rows.push({ label: t("taskFeedback.detail.contentCoverage"), value: details.contentCoverage })
+  if ("fluency" in details) rows.push({ label: t("feedback.fluency"), value: details.fluency })
+  if ("wordAccuracy" in details && details.wordAccuracy) rows.push({ label: t("taskFeedback.detail.wordAccuracy"), value: details.wordAccuracy })
+  if ("content" in details && details.content) rows.push({ label: t("taskFeedback.detail.content"), value: details.content })
+  if ("grammar" in details && details.grammar) rows.push({ label: t("feedback.grammar"), value: details.grammar })
+  if ("vocabulary" in details && details.vocabulary) rows.push({ label: t("feedback.vocabulary"), value: details.vocabulary })
+  if ("structure" in details && details.structure) rows.push({ label: t("taskFeedback.detail.structure"), value: details.structure })
+  if ("accuracy" in details) rows.push({ label: t("taskFeedback.detail.accuracy"), value: details.accuracy })
+  if ("orderAccuracy" in details) rows.push({ label: t("taskFeedback.detail.orderAccuracy"), value: details.orderAccuracy })
+  if ("logicFeedback" in details) rows.push({ label: t("taskFeedback.detail.textLogic"), value: details.logicFeedback })
+  if ("answerAccuracy" in details) rows.push({ label: t("taskFeedback.detail.answerAccuracy"), value: details.answerAccuracy })
+  if ("readingComprehension" in details) rows.push({ label: t("taskFeedback.detail.readingComprehension"), value: details.readingComprehension })
+  if ("writingQuality" in details) rows.push({ label: t("taskFeedback.detail.writingQuality"), value: details.writingQuality })
+  if ("listeningComprehension" in details) rows.push({ label: t("taskFeedback.detail.listeningComprehension"), value: details.listeningComprehension })
 
   if (rows.length === 0) return null
 

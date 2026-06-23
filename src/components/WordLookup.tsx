@@ -5,6 +5,7 @@ import Link from "next/link"
 import { lookupWord } from "@/lib/word-lookup"
 import { saveVocabulary } from "@/lib/unified-vocabulary"
 import { isSaved as isSavedLocally } from "@/lib/vocabulary"
+import { useTranslation } from "@/lib/i18n"
 import type { WordLookupResult } from "@/types"
 
 // Floating Word Lookup helper for Task Practice pages (never Mock Exam).
@@ -28,6 +29,7 @@ type Phase = "idle" | "loading" | "result" | "error"
 type SelPos = { x: number; y: number; text: string }
 
 export default function WordLookup() {
+  const { t } = useTranslation()
   const [sel, setSel] = useState<SelPos | null>(null)
   const [open, setOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>("idle")
@@ -88,10 +90,10 @@ export default function WordLookup() {
       setSaved(isSavedLocally(data.text))
       setPhase("result")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lookup failed")
+      setError(e instanceof Error ? e.message : t("wordLookup.lookupFailed"))
       setPhase("error")
     }
-  }, [])
+  }, [t])
 
   const handleSave = useCallback(async () => {
     if (!result || saved) return
@@ -125,11 +127,11 @@ export default function WordLookup() {
         <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-slide-up">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[70vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-              <span className="text-sm font-semibold text-[var(--foreground)]">查词</span>
+              <span className="text-sm font-semibold text-[var(--foreground)]">{t("wordLookup.title")}</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="关闭"
+                aria-label={t("wordLookup.close")}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 -mr-1 p-1 rounded-md transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
@@ -140,7 +142,7 @@ export default function WordLookup() {
 
             <div className="px-4 py-3 overflow-y-auto">
               {phase === "loading" && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">翻译中…</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">{t("wordLookup.loading")}</p>
               )}
 
               {phase === "error" && (
@@ -182,7 +184,7 @@ export default function WordLookup() {
 
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-xs text-gray-400">
-                      {result.source === "dictionary" ? "词典" : "AI 翻译"}
+                      {result.source === "dictionary" ? t("wordLookup.sourceDictionary") : t("wordLookup.sourceAI")}
                     </span>
                     <button
                       type="button"
@@ -203,7 +205,7 @@ export default function WordLookup() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.5a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
                         </svg>
                       )}
-                      {saved ? "已收藏" : "收藏"}
+                      {saved ? t("wordLookup.saved") : t("wordLookup.save")}
                     </button>
                   </div>
 
@@ -211,7 +213,7 @@ export default function WordLookup() {
                     href="/vocabulary"
                     className="block text-center text-xs text-emerald-600 dark:text-emerald-400 hover:underline pt-1"
                   >
-                    查看生词本 →
+                    {t("wordLookup.viewVocab")}
                   </Link>
                 </div>
               )}

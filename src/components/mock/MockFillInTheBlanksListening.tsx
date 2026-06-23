@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useTranslation } from "@/lib/i18n"
 import { saveTask } from "@/lib/unified-task-history"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
@@ -58,6 +59,7 @@ function buildTtsText(parsed: ParsedStimulus): string {
 }
 
 export default function MockFillInTheBlanksListening({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("generating")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [rawStimulus, setRawStimulus] = useState("")
@@ -228,36 +230,36 @@ export default function MockFillInTheBlanksListening({ onComplete }: { onComplet
       {phase === "generating" && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Generating passage and audio...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.common.generatingPassageAudio")}</p>
         </div>
       )}
 
       {phase === "ready" && audioUrl && (
         <div className="border border-slate-900 bg-white p-8 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)] dark:border-white/15 dark:bg-slate-900">
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Listen carefully - you can only play once
+            {t("mock.fillBlanksListening.listenOnce")}
           </p>
           <button
             onClick={() => playAudio(audioUrl)}
             className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
           >
-            Play Passage
+            {t("mock.common.playPassage")}
           </button>
-          <p className="mt-4 text-xs text-slate-400">Blanks open after the passage plays.</p>
+          <p className="mt-4 text-xs text-slate-400">{t("mock.fillBlanksListening.blanksOpenAfter")}</p>
         </div>
       )}
 
       {phase === "listening" && (
         <div className="border border-slate-900 bg-white p-8 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)] dark:border-white/15 dark:bg-slate-900">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Passage playing...</p>
-          <p className="mt-1 text-xs text-slate-400">Listen for the words that complete the blanks.</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t("mock.common.passagePlaying")}</p>
+          <p className="mt-1 text-xs text-slate-400">{t("mock.fillBlanksListening.listenForWords")}</p>
         </div>
       )}
 
       {phase === "answering" && parsed && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select the correct words</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.selectCorrectWords")}</p>
             <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>{timeStr}</span>
           </div>
           <div className="border border-slate-200 bg-white p-6 text-sm leading-9 text-slate-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100">
@@ -276,20 +278,20 @@ export default function MockFillInTheBlanksListening({ onComplete }: { onComplet
                   }}
                   className="mx-1 inline-block rounded border border-emerald-400 bg-white px-2 py-0.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-emerald-600 dark:bg-slate-800 dark:text-white"
                 >
-                  <option value="">choose</option>
+                  <option value="">{t("mock.common.choose")}</option>
                   {blank.options.map((option, optionIndex) => <option key={optionIndex} value={option}>{option}</option>)}
                 </select>
               )
             })}
           </div>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400">{selections.filter(Boolean).length} / {parsed.blanks.length} answered</p>
+            <p className="text-xs text-slate-400">{t("mock.common.answered", { n: selections.filter(Boolean).length, total: parsed.blanks.length })}</p>
             <button
               onClick={handleSubmit}
               disabled={!allAnswered}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
             >
-              Submit Answers
+              {t("mock.common.submitAnswers")}
             </button>
           </div>
         </div>
@@ -298,19 +300,19 @@ export default function MockFillInTheBlanksListening({ onComplete }: { onComplet
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your answers...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.common.evaluating")}</p>
         </div>
       )}
 
       {phase === "done" && doneTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">AI Feedback</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t("mock.common.aiFeedback")}</p>
             <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{doneTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
             <button onClick={() => onComplete(doneTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Continue to Next Task
+              {t("mock.common.continueNext")}
             </button>
           </div>
         </div>
@@ -320,7 +322,7 @@ export default function MockFillInTheBlanksListening({ onComplete }: { onComplet
         <div className="border border-red-300 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-900/20">
           <p className="mb-4 text-sm text-red-700 dark:text-red-300">{error}</p>
           <button onClick={skipTask} className="text-sm text-slate-500 underline hover:text-slate-700 dark:hover:text-slate-300">
-            Skip this task
+            {t("mock.common.skipTask")}
           </button>
         </div>
       )}

@@ -6,6 +6,7 @@ import {
   getErrorStats,
 } from "@/lib/supabase-error-patterns";
 import { useAuth } from "@/lib/auth-context";
+import { useTranslation } from "@/lib/i18n";
 
 interface PersonalizedSuggestionsProps {
   compact?: boolean;
@@ -14,6 +15,7 @@ interface PersonalizedSuggestionsProps {
 export default function PersonalizedSuggestions({
   compact = false,
 }: PersonalizedSuggestionsProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [stats, setStats] = useState<{
@@ -56,18 +58,17 @@ export default function PersonalizedSuggestions({
             />
           </svg>
           <h3 className="font-medium text-amber-800 dark:text-amber-200">
-            Personalized Tips
+            {t("suggestions.compactTitle")}
           </h3>
         </div>
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          Based on your practice history, we have {suggestions.length} tips for
-          you.
+          {t("suggestions.compactDesc", { count: suggestions.length })}
         </p>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="mt-2 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
         >
-          {isExpanded ? "Hide" : "Show"} Tips
+          {isExpanded ? t("suggestions.hideTips") : t("suggestions.showTips")}
         </button>
         {isExpanded && (
           <ul className="mt-3 space-y-2">
@@ -100,12 +101,12 @@ export default function PersonalizedSuggestions({
             <path d="M13.06 15.473a64.8 64.8 0 0 1 4.78-.946l2.27-2.27a.75.75 0 0 1 .994.044l.003.004.112.125a21.1 21.1 0 0 1 4.097 3.425.75.75 0 0 1 0 .762 21.1 21.1 0 0 1-4.097 3.425l-.112.125-.003.004a.75.75 0 0 1-.994-.044l-2.27-2.27a64.8 64.8 0 0 1-4.78.946c-1.576.374-3.168.69-4.78.946l-2.27 2.27a.75.75 0 0 1-.994-.044l-.003-.004-.112-.125a21.1 21.1 0 0 1-4.097-3.425.75.75 0 0 1 0-.762 21.1 21.1 0 0 1 4.097-3.425l.112-.125.003-.004a.75.75 0 0 1 .994.044l2.27 2.27a64.8 64.8 0 0 1 4.78-.946Z" />
           </svg>
           <h2 className="font-semibold text-gray-900 dark:text-white">
-            Personalized Learning
+            {t("suggestions.fullTitle")}
           </h2>
         </div>
         {stats && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Based on {stats.totalErrors} error patterns
+            {t("suggestions.errorPatternsDesc", { count: stats.totalErrors })}
           </span>
         )}
       </div>
@@ -114,7 +115,7 @@ export default function PersonalizedSuggestions({
       {stats && (
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Your Error Distribution
+            {t("suggestions.errorDistribution")}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {Object.entries(stats.byType).map(([type, count]) => (
@@ -137,7 +138,7 @@ export default function PersonalizedSuggestions({
       {/* Suggestions */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-          Improvement Suggestions
+          {t("suggestions.improvementTitle")}
         </h3>
         <ul className="space-y-3">
           {suggestions.map((suggestion, index) => (
@@ -160,8 +161,7 @@ export default function PersonalizedSuggestions({
       {stats && stats.totalErrors > 0 && (
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Keep practicing to reduce your error patterns and improve your band
-            score!
+            {t("suggestions.keepPracticing")}
           </p>
         </div>
       )}

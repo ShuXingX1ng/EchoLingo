@@ -326,7 +326,7 @@ export default function PracticeHubPage() {
                           {w.label}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                          {w.recentCount === 0 ? "Not tried yet" : `Score ${w.score}/100`}
+                          {w.recentCount === 0 ? t("practiceHub.targeted.notTried") : t("practiceHub.targeted.score", { score: w.score })}
                         </p>
                       </div>
                       <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-amber-500" strokeWidth={2} />
@@ -400,7 +400,7 @@ export default function PracticeHubPage() {
                         <div className="absolute right-4 top-4 flex gap-1.5">
                           {activeTheme && (
                             <span className="inline-flex h-7 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-                              Theme
+                              {t("practiceHub.theme.eyebrow")}
                             </span>
                           )}
                           {card.azure && !activeTheme && (

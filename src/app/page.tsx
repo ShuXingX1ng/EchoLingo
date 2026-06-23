@@ -233,7 +233,7 @@ export default function Home() {
                 </p>
               </div>
               <span className="mt-6 inline-flex h-11 min-w-[11rem] items-center justify-center gap-2 rounded-xl border border-[#c8d3df] bg-white text-sm font-bold text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,.045)] transition-shadow group-hover:shadow-[0_8px_22px_rgba(15,23,42,.08)] dark:bg-slate-800 dark:text-white dark:border-white/10">
-                Begin exam
+                {t("home.beginExamCta")}
                 <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
               </span>
             </Link>
@@ -258,7 +258,7 @@ export default function Home() {
                 </p>
               </div>
               <span className="mt-6 inline-flex h-11 min-w-[11rem] items-center justify-center gap-2 rounded-xl border border-[#c8d3df] bg-white text-sm font-bold text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,.045)] transition-shadow group-hover:shadow-[0_8px_22px_rgba(15,23,42,.08)] dark:bg-slate-800 dark:text-white dark:border-white/10">
-                View stats
+                {t("home.viewStatsCta")}
                 <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
               </span>
             </Link>

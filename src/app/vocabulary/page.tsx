@@ -1,10 +1,11 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { BookOpen, Trash2 } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import { getVocabulary, deleteVocabulary } from "@/lib/unified-vocabulary"
+import { useTranslation } from "@/lib/i18n"
 import type { VocabularyEntry } from "@/types"
 
 function formatDate(iso: string): string {
@@ -22,6 +23,7 @@ function VocabularyCard({
   entry: VocabularyEntry
   onDelete: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[22px] p-4 sm:p-5 border border-[#dce4ee] shadow-[0_10px_26px_rgba(15,23,42,.055)]">
       <div className="flex items-start justify-between gap-3">
@@ -63,8 +65,8 @@ function VocabularyCard({
         <button
           onClick={onDelete}
           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"
-          title="Delete"
-          aria-label={`删除 ${entry.text}`}
+          title={t("admin.delete")}
+          aria-label={`${t("admin.delete")} ${entry.text}`}
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -74,6 +76,7 @@ function VocabularyCard({
 }
 
 export default function VocabularyPage() {
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<VocabularyEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -101,10 +104,10 @@ export default function VocabularyPage() {
                 <BookOpen className="w-6 h-6" strokeWidth={2} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">Vocabulary</p>
-                <h1 className="text-xl font-bold text-[var(--foreground)]">生词本</h1>
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">{t("vocab.eyebrow")}</p>
+                <h1 className="text-xl font-bold text-[var(--foreground)]">{t("vocab.title")}</h1>
                 <p className="text-sm text-[var(--text-muted)]">
-                  {loading ? "加载中…" : `${entries.length} 个生词`}
+                  {loading ? t("loading") : t("vocab.wordCount", { count: entries.length })}
                 </p>
               </div>
             </div>
@@ -112,16 +115,16 @@ export default function VocabularyPage() {
               href="/practice"
               className="shrink-0 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              去练习 →
+              {t("vocab.goPractice")}
             </Link>
           </div>
         </div>
 
         {!loading && entries.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-[var(--text-muted)]">还没有收藏生词。</p>
+            <p className="text-[var(--text-muted)]">{t("vocab.emptyTitle")}</p>
             <p className="text-sm text-[var(--text-muted)] mt-1">
-              在练习页选中单词，点击“译”查词，再点收藏即可加入这里。
+              {t("vocab.emptyHint")}
             </p>
           </div>
         ) : (

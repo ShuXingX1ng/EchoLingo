@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useTranslation } from "@/lib/i18n"
 import { saveTask } from "@/lib/unified-task-history"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import { loadStimulusText } from "@/lib/stimulus-loader"
@@ -14,6 +15,7 @@ const RECORD_TIME = 40
 type Phase = "generating" | "ready" | "listening" | "prep" | "recording" | "processing" | "done" | "error"
 
 export default function MockReTellLecture({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("generating")
   const [lectureText, setLectureText] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -140,25 +142,25 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
       {phase === "generating" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Generating lecture audio…</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Writing lecture text and synthesizing speech</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">{t("mock.reTellLecture.generating")}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">{t("mock.reTellLecture.generatingSubtitle")}</p>
         </div>
       )}
 
       {phase === "ready" && audioUrl && (
         <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-            Lecture ready — listen carefully
+            {t("mock.reTellLecture.lectureReady")}
           </p>
           <button onClick={() => playLecture(audioUrl)}
             className="inline-flex items-center gap-3 rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 mb-4">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5.14v14l11-7-11-7z" />
             </svg>
-            Play Lecture
+            {t("mock.reTellLecture.playLecture")}
           </button>
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            After the lecture ends, you will have {PREP_TIME}s to prepare, then {RECORD_TIME}s to re-tell it.
+            {t("mock.reTellLecture.afterLecture", { prepTime: PREP_TIME, recordTime: RECORD_TIME })}
           </p>
         </div>
       )}
@@ -171,8 +173,8 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
                 style={{ height: `${16 + (i % 3) * 8}px`, animation: `pulse 0.8s ease-in-out ${i * 0.12}s infinite alternate` }} />
             ))}
           </div>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Lecture playing…</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Listen carefully. Preparation starts when the lecture ends.</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">{t("mock.reTellLecture.playing")}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">{t("mock.reTellLecture.listenHint")}</p>
           <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
         </div>
       )}
@@ -180,11 +182,11 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
       {phase === "prep" && (
         <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-            Preparation — organise your thoughts
+            {t("mock.reTellLecture.prepPhase")}
           </p>
           <CountdownRing seconds={prepSec} total={PREP_TIME} size={88} />
           <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
-            Recording starts automatically in {prepSec}s
+            {t("mock.reTellLecture.recordingStartsIn", { sec: prepSec })}
           </p>
         </div>
       )}
@@ -194,31 +196,31 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
           <div className="flex items-center justify-center gap-2 mb-4">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">
-              Recording — Re-tell the lecture now
+              {t("mock.reTellLecture.recordingPhase")}
             </p>
           </div>
           <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
-          <p className="mt-4 text-xs text-slate-400">Recording stops automatically when time is up</p>
+          <p className="mt-4 text-xs text-slate-400">{t("mock.common.recordingStopsAuto")}</p>
         </div>
       )}
 
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Analyzing your re-tell…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.reTellLecture.analyzing")}</p>
         </div>
       )}
 
       {phase === "done" && doneTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">AI Feedback</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">{t("mock.common.aiFeedback")}</p>
             <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{doneTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
             <button onClick={() => onComplete(doneTask)}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Continue to Next Task →
+              {t("mock.common.continueNext")}
             </button>
           </div>
         </div>
@@ -228,7 +230,7 @@ export default function MockReTellLecture({ onComplete }: { onComplete: (task: P
         <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
           <p className="text-sm text-red-700 dark:text-red-300 mb-4">{errorMsg}</p>
           <button onClick={skipTask} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline">
-            Skip this task
+            {t("mock.common.skipTask")}
           </button>
         </div>
       )}

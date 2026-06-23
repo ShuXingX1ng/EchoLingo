@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useTranslation } from "@/lib/i18n"
 import { saveTask } from "@/lib/unified-task-history"
 import { apiPost, apiPostBlob } from "@/lib/api-client"
 import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
@@ -11,6 +12,7 @@ const TYPING_TIME = 180 // 3 min
 type Phase = "generating" | "ready" | "typing" | "processing" | "done" | "error"
 
 export default function MockWriteFromDictation({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>("generating")
   const [sentence, setSentence] = useState("")
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
     if (timerRef.current) clearInterval(timerRef.current)
     const text = userTextRef.current.trim()
     const stim = sentenceRef.current
-    if (!text) { setError("Please type what you heard before submitting."); return }
+    if (!text) { setError(t("mock.writeFromDictation.emptyError")); return }
     setPhase("processing")
     const endedAt = new Date().toISOString()
     const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current || endedAt).getTime()) / 1000)
@@ -163,23 +165,23 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
       {phase === "generating" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Generating sentence and audio…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.writeFromDictation.generating")}</p>
         </div>
       )}
 
       {phase === "ready" && audioUrl && (
         <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
-            Listen carefully — you can only play once
+            {t("mock.writeFromDictation.listenOnce")}
           </p>
           <button onClick={() => playAudio(audioUrl)}
             className="inline-flex items-center gap-3 rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5.14v14l11-7-11-7z" />
             </svg>
-            Play Sentence
+            {t("mock.writeFromDictation.playSentence")}
           </button>
-          <p className="mt-4 text-xs text-slate-400">Typing area opens after the sentence plays</p>
+          <p className="mt-4 text-xs text-slate-400">{t("mock.writeFromDictation.typingStartsAfter")}</p>
         </div>
       )}
 
@@ -189,9 +191,9 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300 mb-1">
-                  Type what you heard
+                  {t("mock.writeFromDictation.typeWhatYouHeard")}
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">Do not replay. Type every word exactly as spoken.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">{t("mock.writeFromDictation.doNotReplay")}</p>
               </div>
               <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-amber-700 dark:text-amber-300"}`}>
                 {timeStr}
@@ -200,14 +202,14 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your Transcription</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.writeFromDictation.yourTranscription")}</p>
               <span className="text-xs text-slate-400 tabular-nums">{wordCount} words</span>
             </div>
             <textarea
               value={userText}
               onChange={e => setUserText(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
-              placeholder="Type the sentence here…"
+              placeholder={t("mock.writeFromDictation.placeholder")}
               autoFocus
               className="w-full rounded-lg border border-slate-300 bg-white p-4 text-sm leading-7 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-white/20 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 resize-none"
               rows={3}
@@ -216,7 +218,7 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
           <div className="flex justify-end">
             <button onClick={handleSubmit} disabled={!userText.trim()}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
-              Submit
+              {t("mock.common.submit")}
             </button>
           </div>
         </div>
@@ -225,24 +227,24 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Checking your transcription…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.writeFromDictation.checking")}</p>
         </div>
       )}
 
       {phase === "done" && doneTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">AI Feedback</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">{t("mock.common.aiFeedback")}</p>
             <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{doneTask.feedback?.summary}</p>
             {(doneTask.feedback?.strengths.length ?? 0) > 0 && (
               <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/10">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-2">Strengths</p>
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-2">{t("mock.common.strengths")}</p>
                 <ul className="space-y-1">{doneTask.feedback!.strengths.map((s, i) => <li key={i} className="flex gap-2 text-xs text-slate-600 dark:text-slate-300"><span className="text-emerald-500 shrink-0">+</span>{s}</li>)}</ul>
               </div>
             )}
             {(doneTask.feedback?.weaknesses.length ?? 0) > 0 && (
               <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/10">
-                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">Areas to Improve</p>
+                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2">{t("mock.common.areasToImprove")}</p>
                 <ul className="space-y-1">{doneTask.feedback!.weaknesses.map((w, i) => <li key={i} className="flex gap-2 text-xs text-slate-600 dark:text-slate-300"><span className="text-red-400 shrink-0">–</span>{w}</li>)}</ul>
               </div>
             )}
@@ -250,7 +252,7 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
           <div className="flex justify-end">
             <button onClick={() => onComplete(doneTask)}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Continue to Next Task →
+              {t("mock.common.continueNext")}
             </button>
           </div>
         </div>
@@ -260,7 +262,7 @@ export default function MockWriteFromDictation({ onComplete }: { onComplete: (ta
         <div className="border border-red-300 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20 text-center">
           <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
           <button onClick={skipTask} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline">
-            Skip this task
+            {t("mock.common.skipTask")}
           </button>
         </div>
       )}

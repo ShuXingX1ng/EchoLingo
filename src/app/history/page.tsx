@@ -9,22 +9,26 @@ import { getTasks, deleteTask, clearAllTasksLocal } from "@/lib/unified-task-his
 import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask, PteTaskType } from "@/types"
 
-const TASK_LABELS: Record<PteTaskType, string> = {
-  read_aloud: "Read Aloud",
-  repeat_sentence: "Repeat Sentence",
-  answer_short_question: "Answer Short Question",
-  summarize_written_text: "Summarize Written Text",
-  write_essay: "Write Essay",
-  personal_intro: "Personal Intro",
-  write_from_dictation: "Write from Dictation",
-  describe_image: "Describe Image",
-  re_tell_lecture: "Re-tell Lecture",
-  fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
-  re_order_paragraphs: "Re-order Paragraphs",
-  multiple_choice_reading: "Multiple Choice (Reading)",
-  summarize_spoken_text: "Summarize Spoken Text",
-  fill_in_the_blanks_listening: "Fill in the Blanks (Listening)",
-  highlight_correct_summary: "Highlight Correct Summary",
+type TFunc = (key: string) => string
+
+function getTaskLabels(t: TFunc): Record<PteTaskType, string> {
+  return {
+    read_aloud: t("mock.taskLabel.read_aloud"),
+    repeat_sentence: t("mock.taskLabel.repeat_sentence"),
+    answer_short_question: t("mock.taskLabel.answer_short_question"),
+    summarize_written_text: t("mock.taskLabel.summarize_written_text"),
+    write_essay: t("mock.taskLabel.write_essay"),
+    personal_intro: t("mock.taskLabel.personal_intro"),
+    write_from_dictation: t("mock.taskLabel.write_from_dictation"),
+    describe_image: t("mock.taskLabel.describe_image"),
+    re_tell_lecture: t("mock.taskLabel.re_tell_lecture"),
+    fill_in_the_blanks_reading: t("mock.taskLabel.fill_in_the_blanks"),
+    re_order_paragraphs: t("mock.taskLabel.re_order_paragraphs"),
+    multiple_choice_reading: t("mock.taskLabel.multiple_choice"),
+    summarize_spoken_text: t("mock.taskLabel.summarize_spoken_text"),
+    fill_in_the_blanks_listening: t("mock.taskLabel.fill_in_the_blanks_listening"),
+    highlight_correct_summary: t("mock.taskLabel.highlight_correct_summary"),
+  }
 }
 
 const TASK_SECTION_KEY: Record<PteTaskType, string> = {
@@ -71,22 +75,22 @@ function formatDate(iso: string, locale: string): string {
   })
 }
 
-function matchesSearch(task: PracticeTask, query: string): boolean {
+function matchesSearch(task: PracticeTask, query: string, labels: Record<PteTaskType, string>): boolean {
   const q = query.toLowerCase()
   return (
-    TASK_LABELS[task.taskType].toLowerCase().includes(q) ||
+    labels[task.taskType].toLowerCase().includes(q) ||
     (task.feedback?.summary?.toLowerCase().includes(q) ?? false) ||
     (task.feedback?.weaknesses.some((w) => w.toLowerCase().includes(q)) ?? false) ||
     (task.stimulus.kind === "text" && task.stimulus.content.toLowerCase().includes(q))
   )
 }
 
-function exportToCSV(tasks: PracticeTask[]): string {
+function exportToCSV(tasks: PracticeTask[], labels: Record<PteTaskType, string>): string {
   const headers = ["ID", "Date", "Task Type", "Section", "Duration (s)", "Feedback Summary"]
   const rows = tasks.map((t) => [
     t.id,
     new Date(t.createdAt).toLocaleDateString("en-US"),
-    TASK_LABELS[t.taskType],
+    labels[t.taskType],
     TASK_SECTION_KEY[t.taskType],
     t.durationSeconds,
     `"${(t.feedback?.summary ?? "").replace(/"/g, '""')}"`,
@@ -123,6 +127,7 @@ function TaskCard({
   onDelete: () => void
 }) {
   const { t, locale } = useTranslation()
+  const TASK_LABELS = getTaskLabels(t)
   const firstWeakness = task.feedback?.weaknesses?.[0]
 
   return (
@@ -211,6 +216,7 @@ function TaskDetail({
   onDelete: () => void
 }) {
   const { t, locale } = useTranslation()
+  const TASK_LABELS = getTaskLabels(t)
 
   return (
     <div className="min-h-screen">
@@ -286,6 +292,7 @@ function TaskDetail({
 
 export default function HistoryPage() {
   const { t } = useTranslation()
+  const TASK_LABELS = useMemo(() => getTaskLabels(t), [t])
   const [tasks, setTasks] = useState<PracticeTask[]>([])
   const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -312,9 +319,9 @@ export default function HistoryPage() {
   const filteredTasks = useMemo(() => {
     return tasks
       .filter((t) => filterType === "all" || t.taskType === filterType)
-      .filter((t) => !searchQuery || matchesSearch(t, searchQuery))
+      .filter((t) => !searchQuery || matchesSearch(t, searchQuery, TASK_LABELS))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [tasks, filterType, searchQuery])
+  }, [tasks, filterType, searchQuery, TASK_LABELS])
 
   const handleDelete = async (id: string) => {
     if (!confirm(t("history.confirmDelete"))) return false
@@ -348,7 +355,7 @@ export default function HistoryPage() {
       )
     } else {
       downloadBlob(
-        new Blob([exportToCSV(data)], { type: "text/csv" }),
+        new Blob([exportToCSV(data, TASK_LABELS)], { type: "text/csv" }),
         `echolingo-tasks-${Date.now()}.csv`
       )
     }

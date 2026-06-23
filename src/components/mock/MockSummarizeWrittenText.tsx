@@ -2,11 +2,13 @@
 
 import { useEffect } from "react"
 import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
 const TIME_LIMIT = 600
 
 export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const {
     phase, stimulus, seconds, error, savedTask,
     userText, setText, submit, generate,
@@ -40,14 +42,14 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
       {phase === "generating" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Generating passage…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.common.generatingPassage")}</p>
         </div>
       )}
 
       {phase === "writing" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.passage")}</p>
             <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
               {timeStr}
             </span>
@@ -57,13 +59,13 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Your Summary</p>
-              <span className="text-xs text-slate-400 tabular-nums">{wordCount} words (aim for 1 sentence)</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.yourSummary")}</p>
+              <span className="text-xs text-slate-400 tabular-nums">{t("mock.summarizeWrittenText.wordCount", { wordCount })}</span>
             </div>
             <textarea
               value={userText}
               onChange={e => setText(e.target.value)}
-              placeholder="Write a one-sentence summary of the passage…"
+              placeholder={t("mock.summarizeWrittenText.placeholder")}
               className="w-full rounded-lg border border-slate-300 bg-white p-4 text-sm leading-7 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-white/20 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 resize-none"
               rows={4}
             />
@@ -71,7 +73,7 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
           <div className="flex justify-end">
             <button onClick={() => submit()} disabled={!userText.trim()}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
-              Submit Summary
+              {t("mock.common.submitSummary")}
             </button>
           </div>
         </div>
@@ -80,7 +82,7 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 dark:border-white/10 dark:bg-slate-900 text-center">
           <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your summary…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.common.evaluating")}</p>
         </div>
       )}
 
@@ -91,10 +93,10 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
           <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
           <div className="flex gap-3 justify-center">
             <button onClick={generate} className="rounded-xl bg-slate-950 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-              Retry
+              {t("mock.common.retry")}
             </button>
             <button onClick={skipTask} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline">
-              Skip this task
+              {t("mock.common.skipTask")}
             </button>
           </div>
         </div>

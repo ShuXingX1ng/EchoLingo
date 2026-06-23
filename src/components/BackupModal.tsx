@@ -7,6 +7,7 @@ import {
   setLastBackupDate,
   type ImportResult,
 } from "@/lib/backup";
+import { useTranslation } from "@/lib/i18n";
 
 type BackupModalProps = {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function BackupModal({
   onClose,
   onImportComplete,
 }: BackupModalProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"export" | "import">("export");
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -57,7 +59,7 @@ export default function BackupModal({
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Backup & Restore
+              {t("backup.title")}
             </h2>
             <button
               onClick={onClose}
@@ -91,7 +93,7 @@ export default function BackupModal({
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
-              Export
+              {t("backup.exportTab")}
             </button>
             <button
               onClick={() => {
@@ -104,7 +106,7 @@ export default function BackupModal({
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
-              Import
+              {t("backup.importTab")}
             </button>
           </div>
 
@@ -112,40 +114,36 @@ export default function BackupModal({
             <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Export Your Data
+                  {t("backup.exportTitle")}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Download a backup file containing all your practice sessions,
-                  goals, and settings. You can use this file to restore your data
-                  later or transfer it to another device.
+                  {t("backup.exportDesc")}
                 </p>
                 <ul className="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-4">
-                  <li>• Practice sessions and feedback</li>
-                  <li>• Practice goals</li>
-                  <li>• Voice settings</li>
+                  <li>• {t("backup.exportItem1")}</li>
+                  <li>• {t("backup.exportItem2")}</li>
+                  <li>• {t("backup.exportItem3")}</li>
                 </ul>
               </div>
               <button
                 onClick={handleExport}
                 className="w-full px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
               >
-                Download Backup File
+                {t("backup.downloadBtn")}
               </button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Import Data
+                  {t("backup.importTitle")}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Restore your data from a previously exported backup file.
-                  Existing sessions will be merged with the imported data.
+                  {t("backup.importDesc")}
                 </p>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                   <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                    Note: Importing will merge data. Sessions with the same ID
-                    will not be duplicated.
+                    {t("backup.importNote")}
                   </p>
                 </div>
               </div>
@@ -162,7 +160,7 @@ export default function BackupModal({
                 htmlFor="backup-file-input"
                 className="block w-full px-4 py-3 text-sm font-medium text-center text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                {isImporting ? "Importing..." : "Select Backup File"}
+                {isImporting ? t("backup.importing") : t("backup.selectFile")}
               </label>
 
               {importResult && (

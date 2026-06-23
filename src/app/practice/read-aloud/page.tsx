@@ -46,14 +46,14 @@ export default function ReadAloudPage() {
         <div className="mb-6 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Link href="/" className="hover:text-[var(--foreground)]">{t("nav.home")}</Link>
           <span>/</span>
-          <span className="text-[var(--foreground)] font-medium">Read Aloud</span>
+          <span className="text-[var(--foreground)] font-medium">{t("practiceTask.read-aloud.title")}</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
             {t("practiceTask.common.pteSpeaking")}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Read Aloud</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.read-aloud.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {t("practiceTask.read-aloud.desc", { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
           </p>
