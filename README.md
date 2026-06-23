@@ -205,7 +205,28 @@ docs/
 
 ## Getting Started
 
-### Prerequisites
+Works on macOS, Windows, and Linux.
+
+### Option A — Docker (recommended, no Node/Python install needed)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+# 1. Copy and fill in both env files
+cp .env.example .env.local
+cp backend/.env.example backend/.env
+
+# 2. Start everything
+docker compose up --build
+```
+
+Open `http://localhost:3000`.
+
+To stop: `docker compose down`
+
+### Option B — Native install
+
+#### Prerequisites
 
 - Node.js 18+
 - Python 3.11+
@@ -214,11 +235,12 @@ docs/
 - DashScope API key for embeddings
 - Azure Speech Services key and region for speech features
 
-### Frontend Setup
+#### Frontend Setup
 
 ```bash
 npm install
-cp .env.example .env.local
+cp .env.example .env.local   # macOS/Linux
+copy .env.example .env.local  # Windows CMD
 ```
 
 Required frontend environment:
@@ -235,14 +257,32 @@ Run the frontend:
 npm run dev
 ```
 
-### Backend Setup
+#### Backend Setup
 
 ```bash
 cd backend
 python -m venv .venv
+```
+
+Activate the virtual environment:
+
+```bash
+# macOS/Linux
 source .venv/bin/activate
+
+# Windows CMD
+.venv\Scripts\activate.bat
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+Then install dependencies:
+
+```bash
 pip install -r requirements.txt
-cp .env.example .env
+cp .env.example .env   # macOS/Linux
+copy .env.example .env  # Windows CMD
 ```
 
 Required backend environment:
