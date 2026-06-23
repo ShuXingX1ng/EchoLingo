@@ -3,27 +3,11 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask, PteTaskType } from "@/types"
 
 const SESSION_KEY = "echo_mock_session"
 
-const TASK_LABELS: Record<PteTaskType, string> = {
-  personal_intro: "Personal Introduction",
-  read_aloud: "Read Aloud",
-  repeat_sentence: "Repeat Sentence",
-  answer_short_question: "Answer Short Question",
-  summarize_written_text: "Summarize Written Text",
-  write_essay: "Write Essay",
-  write_from_dictation: "Write from Dictation",
-  describe_image: "Describe Image",
-  re_tell_lecture: "Re-tell Lecture",
-  fill_in_the_blanks_reading: "Fill in the Blanks (Reading)",
-  re_order_paragraphs: "Re-order Paragraphs",
-  multiple_choice_reading: "Multiple Choice (Reading)",
-  summarize_spoken_text: "Summarize Spoken Text",
-  fill_in_the_blanks_listening: "Fill in the Blanks (Listening)",
-  highlight_correct_summary: "Highlight Correct Summary",
-}
 
 const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
   personal_intro: "/practice/personal-intro",
@@ -72,6 +56,7 @@ interface MockSession {
 }
 
 export default function MockSummaryPage() {
+  const { t } = useTranslation()
   const [session, setSession] = useState<MockSession | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -96,10 +81,10 @@ export default function MockSummaryPage() {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <DesktopNav active="practice" maxWidth="4xl" />
         <main className="mx-auto max-w-3xl px-4 py-12 text-center">
-          <p className="text-slate-600 dark:text-slate-300 mb-6">No mock exam session found.</p>
+          <p className="text-slate-600 dark:text-slate-300 mb-6">{t("mock.summary.noSession")}</p>
           <Link href="/mock"
             className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-            Start a Mock Exam
+            {t("mock.summary.startExam")}
           </Link>
         </main>
       </div>
@@ -136,16 +121,16 @@ export default function MockSummaryPage() {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         {/* Header */}
         <div className="mb-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link href="/mock" className="hover:text-slate-700 dark:hover:text-slate-200">Mock Exam</Link>
+          <Link href="/mock" className="hover:text-slate-700 dark:hover:text-slate-200">{t("mock.title")}</Link>
           <span>/</span>
-          <span className="text-slate-900 dark:text-white font-medium">Summary</span>
+          <span className="text-slate-900 dark:text-white font-medium">{t("mock.summary.breadcrumb")}</span>
         </div>
 
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-            PTE Academic
+            {t("mock.eyebrow")}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Exam Complete</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{t("mock.summary.title")}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             {formatDate(startedAt)} · {tasks.length} tasks · {formatDuration(totalDuration)} total
           </p>
@@ -155,18 +140,18 @@ export default function MockSummaryPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900 text-center">
             <p className="text-2xl font-bold text-slate-950 dark:text-white">{tasks.length}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Tasks Completed</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("mock.summary.tasksCompleted")}</p>
           </div>
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900 text-center">
             <p className="text-2xl font-bold text-slate-950 dark:text-white">{formatDuration(totalDuration)}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total Time</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("mock.summary.totalTime")}</p>
           </div>
           {avgPronunciationScore !== null && (
             <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900 text-center">
               <p className={`text-2xl font-bold ${avgPronunciationScore >= 80 ? "text-emerald-600 dark:text-emerald-400" : avgPronunciationScore >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
                 {avgPronunciationScore}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Avg. Pronunciation</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("mock.summary.avgPronunciation")}</p>
             </div>
           )}
         </div>
@@ -175,7 +160,7 @@ export default function MockSummaryPage() {
         {topWeaknesses.length > 0 && (
           <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)] mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-              Key Areas to Improve
+              {t("mock.summary.keyAreas")}
             </p>
             <ul className="space-y-2">
               {topWeaknesses.map((w, i) => (
@@ -190,7 +175,7 @@ export default function MockSummaryPage() {
 
         {/* Per-task breakdown */}
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-4">Task Breakdown</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-4">{t("mock.summary.taskBreakdown")}</p>
           <div className="space-y-3">
             {tasks.map((task, i) => (
               <div key={task.id} className="border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
@@ -202,13 +187,13 @@ export default function MockSummaryPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {TASK_LABELS[task.taskType]}
+                          {t("mock.taskLabel." + task.taskType)}
                         </p>
                         {task.feedback?.pronunciationAssessment && (
                           <div className="flex items-center gap-3 mt-1">
                             <ScoreDot score={task.feedback.pronunciationAssessment.score} />
                             <span className="text-xs text-slate-500">
-                              Pronunciation: {task.feedback.pronunciationAssessment.score}
+                              {t("mock.summary.pronunciationScore", { score: task.feedback.pronunciationAssessment.score })}
                             </span>
                           </div>
                         )}
@@ -238,7 +223,7 @@ export default function MockSummaryPage() {
                 <div className="border-t border-slate-100 dark:border-white/10 px-4 py-2">
                   <Link href={TASK_PRACTICE_PATHS[task.taskType]}
                     className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline">
-                    Practice {TASK_LABELS[task.taskType]} →
+                    {t("mock.summary.practiceTask", { taskLabel: t("mock.taskLabel." + task.taskType) })}
                   </Link>
                 </div>
               </div>
@@ -250,15 +235,15 @@ export default function MockSummaryPage() {
         <div className="flex flex-wrap gap-3">
           <Link href="/mock"
             className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
-            Take Another Mock Exam
+            {t("mock.summary.retake")}
           </Link>
           <Link href="/practice"
             className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white">
-            Practice Individual Tasks
+            {t("mock.summary.practiceIndividual")}
           </Link>
           <Link href="/stats"
             className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white">
-            View Progress
+            {t("mock.summary.viewProgress")}
           </Link>
         </div>
       </main>

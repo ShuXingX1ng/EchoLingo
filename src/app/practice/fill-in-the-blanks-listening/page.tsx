@@ -198,11 +198,11 @@ export default function FillInTheBlanksListeningPage() {
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
-          <span className="text-[var(--foreground)] font-medium">Fill in the Blanks (Listening)</span>
+          <span className="text-[var(--foreground)] font-medium">{t("practiceTask.fill-in-the-blanks-listening.title")}</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteListening')}</p>
-          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Fill in the Blanks</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.fill-in-the-blanks-listening.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {t('practiceTask.fill-in-the-blanks-listening.desc')}
           </p>
@@ -294,7 +294,7 @@ export default function FillInTheBlanksListeningPage() {
                     }}
                     className="mx-1 inline-block rounded border border-emerald-400 bg-[var(--surface)] px-2 py-0.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="">— choose —</option>
+                    <option value="">{t("practiceTask.common.chooseOption")}</option>
                     {blank.options.map((opt, oi) => (
                       <option key={oi} value={opt}>{opt}</option>
                     ))}
@@ -305,7 +305,7 @@ export default function FillInTheBlanksListeningPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <p className="text-xs text-slate-400">
-                  {selections.filter(Boolean).length} / {parsed.blanks.length} answered
+                  {t("practiceTask.common.answered", { filled: selections.filter(Boolean).length, total: parsed.blanks.length })}
                 </p>
                 {audioUrl && (
                   <button

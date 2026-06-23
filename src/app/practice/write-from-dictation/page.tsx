@@ -108,11 +108,11 @@ export default function WriteFromDictationPage() {
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
-          <span className="text-[var(--foreground)] font-medium">Write from Dictation</span>
+          <span className="text-[var(--foreground)] font-medium">{t("practiceTask.write-from-dictation.title")}</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteListening')}</p>
-          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Write from Dictation</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.write-from-dictation.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {t('practiceTask.write-from-dictation.desc')}
           </p>
@@ -187,7 +187,7 @@ export default function WriteFromDictationPage() {
                 value={userText}
                 onChange={e => setUserText(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
-                placeholder="Type the sentence here…"
+                placeholder={t("practiceTask.write-from-dictation.typingPlaceholder")}
                 autoFocus
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--foreground)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 rows={3}

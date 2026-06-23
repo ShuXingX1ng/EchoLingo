@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
 const TIME_LIMIT = 240 // 4 min
@@ -42,6 +43,7 @@ function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
 }
 
 export default function MockMultipleChoiceReading({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
     taskType: "multiple_choice_reading",
     responseKind: "text",
@@ -113,14 +115,14 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
       {(phase === "idle" || phase === "generating") && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Generating question...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.multipleChoice.generating")}</p>
         </div>
       )}
 
       {phase === "writing" && parsed && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Passage</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.passage")}</p>
             <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>{timeStr}</span>
           </div>
           <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
@@ -157,7 +159,7 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
               disabled={selected === null}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
             >
-              Submit Answer
+              {t("mock.common.submitAnswer")}
             </button>
           </div>
         </div>
@@ -166,19 +168,19 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your answer...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.common.evaluating")}</p>
         </div>
       )}
 
       {phase === "done" && savedTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">AI Feedback</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t("mock.common.aiFeedback")}</p>
             <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{savedTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
             <button onClick={() => onComplete(savedTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Continue to Next Task
+              {t("mock.common.continueNext")}
             </button>
           </div>
         </div>
@@ -188,7 +190,7 @@ export default function MockMultipleChoiceReading({ onComplete }: { onComplete: 
         <div className="border border-red-300 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-900/20">
           <p className="mb-4 text-sm text-red-700 dark:text-red-300">{error}</p>
           <button onClick={skipTask} className="text-sm text-slate-500 underline hover:text-slate-700 dark:hover:text-slate-300">
-            Skip this task
+            {t("mock.common.skipTask")}
           </button>
         </div>
       )}

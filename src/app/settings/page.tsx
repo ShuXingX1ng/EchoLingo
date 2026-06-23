@@ -169,7 +169,7 @@ export default function SettingsPage() {
               <Settings2 className="w-6 h-6" strokeWidth={2} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">Preferences</p>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">{t("settings.preferencesEyebrow")}</p>
               <h1 className="text-xl font-bold text-[var(--foreground)]">Settings</h1>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function SettingsPage() {
               <Target className="w-5 h-5" strokeWidth={2} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">Goals</p>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-400">{t("settings.goalsEyebrow")}</p>
               <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.practiceGoals")}</h2>
             </div>
           </div>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
               <Bell className="w-5 h-5" strokeWidth={2} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-400">Reminders</p>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-amber-700 dark:text-amber-400">{t("settings.remindersEyebrow")}</p>
               <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("reminder.title")}</h2>
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function SettingsPage() {
               <Volume2 className="w-5 h-5" strokeWidth={2} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">Voice</p>
+              <p className="text-xs font-bold uppercase tracking-[0.19em] text-indigo-700 dark:text-indigo-400">{t("settings.voiceEyebrow")}</p>
               <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.voiceSettings")}</h2>
             </div>
           </div>
@@ -553,7 +553,7 @@ export default function SettingsPage() {
                 <UserCircle2 className="w-5 h-5" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.19em] text-slate-500 dark:text-slate-400">Account</p>
+                <p className="text-xs font-bold uppercase tracking-[0.19em] text-slate-500 dark:text-slate-400">{t("settings.accountEyebrow")}</p>
                 <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("settings.account")}</h2>
               </div>
             </div>

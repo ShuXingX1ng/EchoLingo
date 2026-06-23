@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
+import { useTranslation } from "@/lib/i18n"
 import MockPersonalIntro from "@/components/mock/MockPersonalIntro"
 import MockReadAloud from "@/components/mock/MockReadAloud"
 import MockRepeatSentence from "@/components/mock/MockRepeatSentence"
@@ -46,6 +47,7 @@ const SESSION_KEY = "echo_mock_session"
 
 export default function MockExamPage() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [examPhase, setExamPhase] = useState<ExamPhase>("intro")
   const [taskIndex, setTaskIndex] = useState(0)
   const [results, setResults] = useState<PracticeTask[]>([])
@@ -87,37 +89,36 @@ export default function MockExamPage() {
           <div>
             <div className="mb-8">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
-                PTE Academic
+                {t("mock.eyebrow")}
               </p>
-              <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">Mock Exam</h1>
+              <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{t("mock.title")}</h1>
               <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                This mock exam covers 10 PTE task types in order. Timing is strictly enforced — speaking tasks
-                auto-submit when time is up; writing tasks auto-submit if you don&apos;t finish in time.
+                {t("mock.intro.desc")}
               </p>
             </div>
 
             <div className="border border-slate-900 bg-white p-6 dark:border-white/15 dark:bg-slate-900 shadow-[6px_6px_0_rgba(15,23,42,0.08)] mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-                Task Sequence ({TASK_SEQUENCE.length} tasks)
+                {t("mock.intro.taskSequence", { count: TASK_SEQUENCE.length })}
               </p>
               <ol className="space-y-3">
-                {TASK_SEQUENCE.map((t, i) => (
-                  <li key={t.type} className="flex items-start gap-3">
+                {TASK_SEQUENCE.map((task, i) => (
+                  <li key={task.type} className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {i + 1}
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{t.label}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{t.description}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{t("mock.taskLabel." + task.type)}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{task.description}</p>
                     </div>
-                    <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">{t.section}</span>
+                    <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">{t("mock.section." + (task.section === "Speaking & Writing" ? "speakingWriting" : task.section === "Reading" ? "reading" : "listening"))}</span>
                   </li>
                 ))}
               </ol>
             </div>
 
             <div className="border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20 mb-8 text-sm text-amber-700 dark:text-amber-300">
-              Allow microphone access when prompted. Have headphones ready for audio tasks.
+              {t("mock.intro.warning")}
             </div>
 
             <div className="flex gap-4">
@@ -125,13 +126,13 @@ export default function MockExamPage() {
                 onClick={() => setExamPhase("running")}
                 className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
               >
-                Start Mock Exam
+                {t("mock.startExam")}
               </button>
               <Link
                 href="/practice"
                 className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium text-slate-700 hover:border-slate-900 dark:border-white/20 dark:text-slate-300 dark:hover:border-white"
               >
-                Back to Practice
+                {t("mock.backToPractice")}
               </Link>
             </div>
           </div>
@@ -145,12 +146,12 @@ export default function MockExamPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Task {taskIndex + 1} of {TASK_SEQUENCE.length}
+                    {t("mock.taskProgress", { current: taskIndex + 1, total: TASK_SEQUENCE.length })}
                   </p>
                   <h2 className="mt-1 text-xl font-semibold text-slate-950 dark:text-white">
-                    {currentTask.label}
+                    {t("mock.taskLabel." + currentTask.type)}
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{currentTask.section}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t("mock.section." + (currentTask.section === "Speaking & Writing" ? "speakingWriting" : currentTask.section === "Reading" ? "reading" : "listening"))}</p>
                 </div>
               </div>
               {/* Progress bar */}
@@ -161,9 +162,9 @@ export default function MockExamPage() {
                 />
               </div>
               <div className="flex justify-between mt-1">
-                {TASK_SEQUENCE.map((t, i) => (
+                {TASK_SEQUENCE.map((task, i) => (
                   <div
-                    key={t.type}
+                    key={task.type}
                     className={`w-2 h-2 rounded-full -mt-3.5 ${i < taskIndex ? "bg-emerald-500" : i === taskIndex ? "bg-slate-900 dark:bg-white" : "bg-slate-200 dark:bg-slate-700"}`}
                   />
                 ))}
@@ -195,7 +196,7 @@ export default function MockExamPage() {
         {examPhase === "finished" && (
           <div className="text-center py-16">
             <div className="inline-block w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6" />
-            <p className="text-slate-600 dark:text-slate-300">Loading your results…</p>
+            <p className="text-slate-600 dark:text-slate-300">{t("mock.loadingResults")}</p>
           </div>
         )}
       </main>

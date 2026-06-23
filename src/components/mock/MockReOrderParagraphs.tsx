@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
 const TIME_LIMIT = 180 // 3 min
@@ -44,6 +45,7 @@ function buildResponseForFeedback(userOrder: Paragraph[], correctOrder: Paragrap
 }
 
 export default function MockReOrderParagraphs({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
+  const { t } = useTranslation()
   const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
     taskType: "re_order_paragraphs",
     responseKind: "text",
@@ -138,14 +140,14 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
       {(phase === "idle" || phase === "generating") && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Generating paragraphs...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.reOrderParagraphs.generating")}</p>
         </div>
       )}
 
       {phase === "writing" && displayOrder.length > 0 && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Drag to reorder</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.reOrderParagraphs.dragToReorder")}</p>
             <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>{timeStr}</span>
           </div>
           <div className="space-y-3">
@@ -171,13 +173,13 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
                   <button
                     onClick={() => moveUp(idx)}
                     disabled={idx === 0}
-                    aria-label="Move up"
+                    aria-label={t("mock.common.moveUp")}
                     className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 dark:hover:text-slate-200"
                   >↑</button>
                   <button
                     onClick={() => moveDown(idx)}
                     disabled={idx === displayOrder.length - 1}
-                    aria-label="Move down"
+                    aria-label={t("mock.common.moveDown")}
                     className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 dark:hover:text-slate-200"
                   >↓</button>
                 </div>
@@ -189,7 +191,7 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
               onClick={handleSubmit}
               className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
             >
-              Submit Order
+              {t("mock.reOrderParagraphs.submitOrder")}
             </button>
           </div>
         </div>
@@ -198,19 +200,19 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
       {phase === "processing" && (
         <div className="border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-slate-900">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Evaluating your order...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("mock.reOrderParagraphs.evaluating")}</p>
         </div>
       )}
 
       {phase === "done" && savedTask && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">AI Feedback</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t("mock.common.aiFeedback")}</p>
             <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{savedTask.feedback?.summary}</p>
           </div>
           <div className="flex justify-end">
             <button onClick={() => onComplete(savedTask)} className="rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-              Continue to Next Task
+              {t("mock.common.continueNext")}
             </button>
           </div>
         </div>
@@ -220,7 +222,7 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
         <div className="border border-red-300 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-900/20">
           <p className="mb-4 text-sm text-red-700 dark:text-red-300">{error}</p>
           <button onClick={skipTask} className="text-sm text-slate-500 underline hover:text-slate-700 dark:hover:text-slate-300">
-            Skip this task
+            {t("mock.common.skipTask")}
           </button>
         </div>
       )}

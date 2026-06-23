@@ -40,11 +40,11 @@ export default function WriteEssayPage() {
         <div className="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Link href="/practice" className="hover:text-[var(--foreground)]">{t('nav.practice')}</Link>
           <span>/</span>
-          <span className="text-[var(--foreground)] font-medium">Write Essay</span>
+          <span className="text-[var(--foreground)] font-medium">{t("practiceTask.write-essay.title")}</span>
         </div>
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteWriting')}</p>
-          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">Write Essay</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.write-essay.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {t('practiceTask.write-essay.desc', { minWords: String(MIN_WORDS), maxWords: String(MAX_WORDS) })}
           </p>
