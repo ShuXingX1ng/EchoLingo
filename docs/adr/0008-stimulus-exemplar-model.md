@@ -2,8 +2,9 @@
 
 ## Context
 
-Phase Data-1's original brief (see `docs/TASKS.md`) was to "scrape a public PTE
-question bank and serve it as an alternative to AI generation." Pursued
+Phase Data-1's original brief was to "scrape a public PTE question bank and
+serve it as an alternative to AI generation." The original task plan remains
+available through Git history. Pursued
 literally, that means **serving scraped questions verbatim**, which collides with
 two hard constraints:
 

@@ -155,8 +155,8 @@ Concretely:
 
 - **Migration is staged and reversible per route.** Each route can be cut over
   and verified independently before its Next implementation is removed, so the
-  cutover never requires a big-bang switch. See `docs/TASKS.md` →
-  *Phase: 前后端彻底分离* for the step-by-step task list.
+  cutover never requires a big-bang switch. The then-current step-by-step task
+  list remains available through Git history.
 
 - **ECDICT stays in-container** until a concrete scaling trigger appears; this
   ADR records that it was reconsidered and intentionally left as-is.
