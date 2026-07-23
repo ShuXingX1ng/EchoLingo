@@ -1,315 +1,129 @@
 # EchoLingo Project Context
 
+更新日期：2026-07-21
+
 ## Product
 
-EchoLingo is an AI-powered PTE Academic practice platform. Learners practice individual PTE task types, receive AI-generated feedback, track progress by task-type weakness, and take full mock exams.
+EchoLingo 是面向 PTE Academic 学习者的个人全栈 AI 练习平台。产品提供 15 个 Task Types 的单项练习、Mock Exam、结构化反馈、学习历史/统计、主题与弱项练习，以及学习辅助工具。
 
-Target users:
+评分与反馈只用于学习参考。系统不复刻、不预测 Pearson 官方 PTE 总分，也不应把 EchoLingo 或 Azure 输出表述为官方评分。
 
-- PTE Academic candidates
-- International students building English proficiency
-- Learners who want low-pressure, repeatable practice with structured feedback
+权威术语和领域边界见仓库根目录 [`CONTEXT.md`](../CONTEXT.md)。
 
-## Current Status
+## Current Stage
 
-| Area | Status |
-|------|--------|
-| Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4; DM Serif Display + DM Sans via `next/font/google` |
-| Backend | FastAPI is the single authoritative backend (ADR 0007). All Next.js API business routes have been migrated and deleted. |
-| Data | Supabase + localStorage + IndexedDB recordings |
-| Auth | Supabase email + Google OAuth |
-| Tests | 124 frontend unit tests (12 files), 55 E2E tests (14 PTE smoke + 12 listening + 14 reading + 9 mock exam + 6 other), 343 backend tests (full suite incl. 41 Study Assistant graph/tools/gnews tests) |
-| Quality gate | lint 0 errors; typecheck pass; build pass |
-| Pivot status | Mock exam complete — all 15 practice task types live; 15-task mock sequence covering all 15 PTE task types across all 4 sections; RAG infrastructure and local Dictionary seeded |
-| UI | Visual upgrade complete — gradient page background (body, no per-page bg override); lucide-react icon set; premium card system (`rounded-[22px]/rounded-[28px]`, `border-[#dce4ee]`, `shadow-[0_10px_26px_rgba(15,23,42,.055)]`); Home hero + glass metric card; Practice hero + color-coded task sections; Stats hero (BarChart2 tile) + section icon tiles (AlertTriangle/Target/TrendingUp); History hero (Clock violet tile) + lucide Search in toolbar; Vocabulary hero (BookOpen emerald tile); Settings hero (Settings2 indigo tile) + section icon tiles (Target/Bell/Volume2/UserCircle2) per card; DesktopNav icon tiles + active inset-shadow |
-| Documentation | GitHub/portfolio README refreshed to present the PTE product scope, Agent workflows, RAG/retrieval architecture, setup, tests, and Claude Code-assisted development workflow |
+PTE 产品 MVP 和平台架构已完成，当前进入 **Read Aloud Speech Evaluator** 阶段。
 
-## Architecture
+- 已完成：PTE 练习与 Mock、FastAPI 分离、LangGraph feedback、rubric RAG、Exemplar retrieval、Study Assistant、Onboarding、Supabase 同步、i18n。
+- 当前运行：Azure Pronunciation Assessment 为 Read Aloud 和 Repeat Sentence 提供语音证据。
+- 已确认但未实施：EchoLingo 自研 Read Aloud Speech Evaluator、独立 GPU worker、provider-neutral contract 和显式 compare mode。
+- 当前权威计划：[`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 与 ADR 0011–0013。
 
-### Frontend
+## Runtime Architecture
 
-- Framework: Next.js 16 App Router
-- UI: React + Tailwind CSS
-- State: React hooks + browser storage
-- i18n: `src/lib/i18n.tsx`, `src/locales/en.json`, `src/locales/zh.json`
-- Shared navigation: `src/components/DesktopNav.tsx`, `src/components/MobileNav.tsx`
+```mermaid
+flowchart LR
+    UI["Next.js 16 / React 19 UI"] -->|"NEXT_PUBLIC_API_BASE_URL"| API["FastAPI"]
+    UI --> AUTH["Supabase Auth"]
+    API --> FG["LangGraph Feedback Graph"]
+    API --> OA["Onboarding Graph"]
+    API --> SA["Study Assistant Graph"]
+    API --> AZ["Azure Speech / TTS"]
+    API --> LLM["OpenAI-compatible LLM"]
+    FG --> RR["Rubric RAG"]
+    API --> ER["Stimulus Exemplar Retrieval"]
+    RR --> DB["Supabase Postgres + pgvector"]
+    ER --> DB
+```
 
-Important: before editing Next.js code, read the relevant guide in `node_modules/next/dist/docs/` as required by `AGENTS.md`.
+FastAPI 是唯一业务后端。Next.js 中不存在 PTE、LLM、TTS、pronunciation 或 word lookup 的业务 API fallback；第三方密钥只属于 backend runtime。Next.js route handler 仅保留 Supabase auth callback 等前端平台职责。
 
-### Backend
+## Frontend
 
-**Target architecture (ADR 0007): FastAPI is the single authoritative backend.**
-All business and LLM logic lives in exactly one place — the Python backend.
-Next `src/app/api/*` business routes have been migrated to call FastAPI
-and **deleted**. The browser calls FastAPI directly via
-`NEXT_PUBLIC_API_BASE_URL`, with CORS configured on the backend.
-All third-party secrets (`LLM_API_KEY`, `AZURE_SPEECH_KEY`/`REGION`,
-`DASHSCOPE_API_KEY`, Supabase service-role key) live only in the backend runtime.
+- Next.js 16 App Router、React 19、TypeScript、Tailwind CSS 4。
+- 主要页面：home、practice hub、15 个 task pages、mock、history、stats、vocabulary、settings、onboarding、admin。
+- `src/lib/api-client.ts` 统一访问 FastAPI，并包含 timeout/circuit-breaker 行为。
+- `src/lib/task-type-registry.ts` 是前端 Task Type 元数据入口；`src/data/task-types.json` 为 Python backend 提供共享 slug 列表。
+- `usePracticeTaskRunner` 与 `useRecordingSession` 复用练习生命周期和录音状态。
+- Supabase 不可用时，适用的数据层使用本地存储降级；这不代表业务 API 有本地 fallback。
 
-| Path | Target end state | Current state |
-|------|------------------|---------------|
-| `src/app/api/pte/stimulus` · `pte/feedback` | Deleted | **Done** — routes deleted; all 42 callers now use `apiPost` via `api-client.ts` |
-| `src/app/api/read-aloud/stimulus` · `read-aloud/feedback` | Deleted | **Done** — Next routes deleted; `backend/routers/read_aloud.py` also deleted (C2); `practice/read-aloud/page.tsx` + `MockReadAloud.tsx` now use `/api/pte/stimulus` + `/api/pte/feedback` |
-| `src/app/api/tts` · `pronunciation` | Deleted | **Done** — routes deleted; callers migrated to `apiPostBlob`/`apiPostForm` via `api-client.ts` |
-| `src/app/api/word-lookup` | Deleted | **Done** — route deleted; callers migrated to `apiPost` via `api-client.ts` |
-| Python FastAPI (`backend/routers/*`) | Authoritative | Already implements all of the above via LangGraph + RAG + LLM-as-Judge (ADRs 0005, 0006) |
+## Backend
 
-Frontend requests go through `src/lib/api-client.ts`. Target behaviour:
+- FastAPI 入口：`backend/main.py`。
+- HTTP routers：TTS、pronunciation、PTE stimulus、PTE feedback、word lookup、onboarding、Study Assistant。
+- `feedback_graph.py`：rubric retrieval → pronunciation context → Primary/Judge 并行 → divergence check → optional retry → Coach → finalize。
+- `onboarding_graph.py`：并行评估诊断任务，生成 weakness profile 与第一周计划。
+- `study_assistant_graph.py`：最多四轮的工具调用循环；只能返回 allow-listed routes。
+- 外部付费服务不得进入普通 CI/E2E；测试默认 mock LLM、Azure、Supabase 与 embedding 调用。
 
-- `NEXT_PUBLIC_API_BASE_URL` is **required**; a missing value fails fast.
-- All requests target the FastAPI base URL directly.
+## API Authority
 
-**Backend-unavailable degradation principle (ADR 0007):** health check + friendly
-"temporarily unavailable" UI + bounded-timeout / circuit-breaker implemented — never
-surface a bare `502`.
+FastAPI 路由、OpenAPI 输出和 Pydantic models 是 API 的事实来源：
 
-FastAPI files: `backend/main.py`, `backend/routers/`, `backend/services/`, `backend/middleware/auth.py`, `backend/models/schemas.py`
+- 应用入口与 router 注册：`backend/main.py`。
+- HTTP 路由：`backend/routers/`。
+- 共享请求/响应模型：`backend/models/schemas.py` 与各 router 中的 Pydantic models。
+- 本地运行时 API 文档：`http://localhost:8000/docs`。
 
-## PTE Task Types (MVP Scope)
+本文件只记录 API 边界，不复制会随代码变化的完整 endpoint 或 schema 清单。需要静态 API 参考时，应由 ECC `/update-docs` 从上述来源生成并使用自动生成标记。
 
-| Task Type | Section | Input | Response | Azure Pronunciation |
-|---|---|---|---|---|
-| Read Aloud | Speaking & Writing | AI-generated text | Spoken audio | Yes |
-| Repeat Sentence | Speaking & Writing | Azure TTS audio | Spoken audio | Yes |
-| Answer Short Question | Speaking & Writing | AI-generated question | Spoken audio | No |
-| Summarize Written Text | Speaking & Writing | AI-generated passage | Typed text | No |
-| Write Essay | Speaking & Writing | AI-generated prompt | Typed text | No |
-| Personal Introduction | Speaking & Writing | Fixed prompt | Spoken audio (unscored) | No |
-| Write from Dictation | Listening | Azure TTS audio | Typed text | No |
-| Describe Image | Speaking & Writing | Hardcoded image bank (5 public-domain charts/maps) | Spoken audio | No |
-| Re-tell Lecture | Speaking & Writing | AI-generated text → Azure TTS audio | Spoken audio | No |
-| Fill in the Blanks (Reading) | Reading | AI-generated passage with blanks (JSON) | Dropdown selection | No |
-| Re-order Paragraphs | Reading | AI-generated shuffled paragraphs (JSON) | Drag-and-drop order | No |
-| Multiple Choice (Reading) | Reading | AI-generated passage + question (JSON) | Radio button selection | No |
-| Summarize Spoken Text | Listening | AI-generated text → Azure TTS audio | Typed summary (50–70 words) | No |
-| Fill in the Blanks (Listening) | Listening | AI-generated text → Azure TTS audio + blanks (JSON) | Dropdown selection | No |
-| Highlight Correct Summary | Listening | AI-generated text → Azure TTS audio + 5 summaries (JSON) | Radio button selection | No |
+## Practice and Feedback
 
-Deferred / planned task types (not yet implemented):
+平台覆盖 Speaking & Writing、Reading、Listening 共 15 个 Task Types。调用方始终知道 `taskType`，因此没有 Router Agent（ADR 0004）。
 
-| Task Type | Section | Blocker |
+Stimulus 路径：
+
+- `random`：普通 Task Practice 与 Mock。
+- `targeted`：根据 Task-Type Weakness 生成练习。
+- `theme`：使用 pgvector dense + Postgres full-text sparse retrieval，并通过 RRF 融合。
+- `news`：仅当 Study Assistant 检测到明确的实时/最新意图时使用 GNews 标题与摘要作为 anchor。
+
+Exemplar 默认只作为 few-shot grounding，不向学习者逐字提供。生成结果经过本地 4-gram Jaccard originality guard；依赖失败时静默退化到纯 AI 生成（ADR 0008–0010）。
+
+## Data
+
+| Data | Authority | Notes |
 |---|---|---|
+| Auth/profile/history/vocabulary | Supabase | 客户端同步；部分能力有 localStorage fallback |
+| Rubric chunks | Supabase pgvector | DashScope 1024-dim embeddings |
+| Stimulus exemplars | Postgres + pgvector + `tsvector` | 迁移 004/005；最后确认 14,005 rows / 14 task types |
+| ECDICT | Backend-local SQLite | 文件不进入普通 Git，部署时准备 |
+| Prompt/rubric/task metadata | Repository | YAML、JSON 和 TypeScript registry |
+| Speech datasets/checkpoints | Future external local storage | 必须通过 manifest 管理，不进入普通 Git |
 
-## Core Features (Target State)
+根目录 `supabase-migration-001.sql` 至 `006.sql` 记录 schema 演进。某个 migration 文件存在不等于目标环境已经应用；部署前必须核对数据库状态。
 
-- **All 15 PTE task types live**: Speaking, Writing, Reading, and Listening task routes each include stimulus, timed response, AI feedback, `saveTask`
-- **`/practice` hub page** — task-type grid with **Theme Practice** section (topic input + 6 preset chips; sets `?mode=theme&topic=` on task card hrefs) and **Targeted Practice** section (top-3 weakness cards from `task-weakness.ts`; links with `?mode=targeted`); Mock Exam CTA
-- **`/mock` page** — full mock exam orchestrator: intro screen → 15-task PTE sequence covering all 15 task types across all four sections (Speaking & Writing, Reading, Listening; strict timing) → `/mock/summary`
-- **`/mock/summary` page** — per-task feedback breakdown, top weaknesses, avg pronunciation score, practice links
-- **`/history` page** — displays `PracticeTask` records with task-type filter, search, delete, CSV/JSON export, detail view
-- **`/stats` page** — task-type weakness profile (ranked `WeaknessBar` rows, expandable per-dimension sub-bars); Learner Profile (SVG radar chart, speaking/writing/listening tabs, target score slider, gap analysis); Score Trajectory (weekly avg score line chart per task type); practice distribution, weekly activity
-- **Task Bank** — `src/lib/task-bank.ts` caches AI-generated stimuli per task type; wired into all 6 generating task pages
-- **Word Lookup** (Study Aid) — floating helper on Task Practice pages only (never Mock Exam): select text → "译" button or desktop drag-drop → one-shot translation card. Single English words resolve against the bundled ECDICT SQLite dictionary (instant, offline); phrases and dictionary misses fall through to DeepSeek. See ADR 0006.
-- **Vocabulary List** (Study Aid) — explicit save on the Word Lookup card adds a word; `/vocabulary` page (view + delete only, no SRS in v1); Supabase cloud sync from v1 with localStorage fallback; included in `backup.ts`. See ADR 0006.
-- **Study Assistant** (Study Aid) — global floating, multi-turn, session-only conversational tool-using helper on every page **except an in-progress Mock Exam** (`/mock*`); LangGraph tool loop (`POST /api/study-assistant/chat`) with three tools: navigation/app-help (clickable links from a fixed route allow-list, hand-authored knowledge file — no RAG), generate-practice (text Task Types only; default `source=exemplars`, `source=news` only on explicit recency cue → GNews title+summary anchor; deep-link handoff into a Practice Task, never serves verbatim), and PTE knowledge Q&A. Action boundary: generates content + navigates only — never submits a Response, scores, or saves data. Answers follow UI language. See ADR-0010 and CONTEXT.md.
-- **Min recording guard** — Stop/Done button disabled for first 5s on all 4 spoken task pages (Read Aloud, Repeat Sentence, Answer Short Question, Personal Intro)
-- PTE task-type practice with timed exercises
-- Full mock exam flow covering the original 7-task sequence plus 3 extended Listening tasks
-- AI-generated feedback: generic envelope (summary, strengths, weaknesses, suggestions) + task-specific details + per-dimension scores (0–100 internal scale) + targeted coaching suggestions via Coach Agent + LLM-as-Judge (independent parallel call; >15-point divergence triggers retry and `judgeLog`)
-- Azure Neural TTS for stimulus audio generation and caching
-- Azure Pronunciation Assessment for Read Aloud and Repeat Sentence
-- History page with Practice Task records, search/filter/export
-- Stats page: task-type weakness, trend, recommended actions
-- Home page: PTE-oriented entry cards (Practice / Mock Exam / Stats) + static practice-archive entry (the IELTS daily-plan subsystem was removed in Phase Cleanup)
-- Supabase auth and cloud sync
-- PWA, dark mode, responsive layout, i18n
+## Speech Evaluation Boundary
 
-## Data Model
+### Current
 
-Core types live in `src/types/index.ts`.
+- Read Aloud、Repeat Sentence：Azure 提供 word/phoneme 证据。
+- 其他需要转录的口语任务：使用现有 STT/LLM 路径生成学习反馈。
 
-Key domain types: `PracticeTask`, `TaskFeedback`, `FeedbackDetails`, `PronunciationAssessmentResult`, `WordAssessment`, `PhonemeAssessment`, `WordLookupResult`, `WordLookupEntry`, `VocabularyEntry`
+### Confirmed target for Read Aloud
 
-## Data Paths
+- 基于固定的 open pretrained speech encoder 构建 EchoLingo Speech Evaluator。
+- 评估 pronunciation、oral fluency、prosody 与 reference-derived completeness/content。
+- 默认 `echolingo` 与显式开发者 `compare` 是可见模式；Azure 不是静默 fallback。
+- 模型运行在独立私有 GPU worker；FastAPI 通过 provider-neutral contract 调用。
+- 10–90 仅为透明标注的 EchoLingo reference scale，直到独立 PTE-specific benchmark 支持校准。
+- Repeat Sentence 不自动迁移，必须另行收集标签并校准。
 
-| Module | Responsibility | Storage |
-|--------|----------------|---------|
-| `src/lib/unified-task-history.ts` | PracticeTask read/write entry point (new) | Supabase + local fallback |
-| `src/lib/task-history.ts` | Local PracticeTask storage (new) | localStorage |
-| `src/lib/supabase-task-history.ts` | Cloud PracticeTask storage — `practice_tasks` table (new) | Supabase |
-| `src/lib/task-weakness.ts` | Derive task-type weakness from PracticeTask history (new) | computed |
-| `src/lib/recommendations.ts` | IELTS recommendations (legacy) + `getPteRecommendations` (new) | task-type weakness |
-| `src/lib/unified-history.ts` | Legacy IELTS session read/write (retained for backup compat) | Supabase + local fallback |
-| `src/lib/supabase-error-patterns.ts` | Legacy error-pattern storage | Supabase |
-| `src/lib/wav-encoder.ts` | Convert browser audio Blob → WAV for Azure pronunciation API | computed (Web Audio API) |
-| `src/components/TaskFeedbackDisplay.tsx` | Shared feedback UI — Azure scores + AI summary/strengths/weaknesses/details | — |
-| `src/lib/practice-mode.ts` | Parse `mode` + `topic` + `source` (`news` when `?source=news`, else `exemplars`) from URL search params; build extras object for `apiPost` body (includes `source:"news"` only when set); consumed exclusively by `src/lib/stimulus-loader.ts` (all practice pages delegate through `loadStimulusText`) | computed |
-| `src/lib/stimulus-loader.ts` | `loadStimulusText({taskType,randomEndpoint?})` — cache-check → API call → cache-store; mode-aware (seeded path always calls `/api/pte/stimulus`; random path respects `randomEndpoint` override for legacy routes) | computed |
-| `src/hooks/useRecordingSession.ts` | `useRecordingSession({totalSeconds,minSeconds?,onComplete,onError?})` — encapsulates MediaRecorder, SpeechRecognition, countdown timer, cleanup; calls `onComplete(blob,transcript,startedAt)` on countdown expiry or manual stop | computed |
-| `src/hooks/usePracticeTaskRunner.ts` | `usePracticeTaskRunner(config)` — full Practice Task lifecycle: phase SM, countdown timer, `loadStimulusText`, feedback API call, `saveTask`, optional `useRecordingSession` + Azure pronunciation; `submit(overrides?)` allows JSON-stimulus pages to inject human-readable `feedbackStimulus`/`feedbackResponse` for the API call while storing raw JSON in task history; returns `savedTask: PracticeTask\|null` for Mock `onComplete` wiring. Covers 9 practice pages: text-response (write-essay, summarize-written-text), audio-response (read-aloud), and JSON-stimulus (multiple-choice, re-order-paragraphs, fill-in-the-blanks) + their 6 Mock components. TTS-audio-stimulus and fixed-prompt pages remain self-managed. | computed |
-| `src/components/CountdownRing.tsx` | Shared SVG countdown ring (seconds/total/size props); used by practice pages + Mock components (`src/components/mock/CountdownRing.tsx` re-exports this) | — |
-| `src/lib/task-bank.ts` | localStorage cache for AI-generated stimuli per task type (max 10/type); bypassed when `mode=theme` or `mode=targeted` (seeded sessions never read/write the random cache) | localStorage |
-| `src/lib/image-bank.ts` | Hardcoded bank of 5 public-domain image URLs (charts, maps) for Describe Image task type | static |
-| `backend/services/vector_store.py` | DashScope embedding client (`text-embedding-v4`) + Supabase pgvector `vecs` connection; `rubric_chunks` collection | Supabase pgvector |
-| `backend/services/rag.py` | `retrieve_context(task_type) -> str`; queries `rubric_chunks` with task_type filter; silent fallback | computed |
-| `src/lib/task-type-registry.ts` | Single source of truth for all 15 PTE task type metadata (`displayName`, `category`, `stimulusFormat`, `TimerConfig`); exports `TASK_TYPE_REGISTRY`, `ALL_TASK_TYPES`, `getTaskTypeMetadata`, `getTaskTypesByCategory` | static |
-| `src/data/task-types.json` | Canonical task type slug list consumed by Python backend routers to populate `VALID_TASK_TYPES`; generated from `task-type-registry.ts` and committed to git | static JSON |
-| `backend/services/feedback_graph.py` | LangGraph `StateGraph` for the PTE feedback pipeline; `FeedbackState` TypedDict; nodes: `retrieve_context`, `process_pronunciation` (formats pron scores → `pron_context` string), `call_primary`, `call_judge`, `check_divergence`, `retry_primary`, `finalize`; graph order: retrieve → process_pron → (primary ‖ judge) → divergence → …; exposes `run_feedback_graph(request)->dict` | computed |
-| `backend/data/rubrics/` | Hand-written YAML rubric files — one per PTE task type (15/15 complete); each file has `task_type`, `description`, `dimensions[]` (name/description/criteria) and `scoring_notes` | static YAML |
-| `backend/scripts/seed_rubrics.py` | One-time script: reads rubric YAMLs → embeds → upserts to Supabase `rubric_chunks` | — |
-| `src/lib/recordings.ts` | Audio recordings | IndexedDB |
-| `src/lib/backup.ts` | Export/import (now includes `vocabulary`) | local JSON/CSV backup |
-| `src/lib/word-lookup.ts` | Word Lookup client → `/api/word-lookup` proxy | — |
-| `src/components/WordLookup.tsx` | Floating Word Lookup helper (selection "译" button + desktop drag-drop card); mounted via `src/app/practice/layout.tsx`, excluded from `/mock` | — |
-| `src/lib/unified-vocabulary.ts` | Vocabulary List read/write entry point | Supabase + local fallback |
-| `src/lib/vocabulary.ts` | Local Vocabulary List storage | localStorage |
-| `src/lib/supabase-vocabulary.ts` | Cloud Vocabulary List — `vocabulary` table (migration 003) | Supabase |
-| `backend/services/ecdict.py` | Read-only ECDICT lookup (pos/tag parse); single-word offline path | SQLite `backend/data/ecdict.sqlite` (gitignored) |
-| `backend/scripts/import_ecdict.py` | Downloads ECDICT 1.0.28 sqlite from GitHub into `backend/data/` | — |
-| `backend/scripts/scrape_exemplars/base.py` | `RawExemplar` dataclass + `SourceAdapter` ABC | — |
-| `backend/scripts/scrape_exemplars/sources/wikipedia.py` | `WikipediaAdapter`: emits **14 task types** — text extracted from Wikipedia APIs (read_aloud, swt, re_tell_lecture, sst, repeat_sentence, write_from_dictation) + template-derived originals (write_essay, answer_short_question, describe_image) + 5 JSON task type passage anchors (fill_in_the_blanks_reading, multiple_choice_reading, re_order_paragraphs, fill_in_the_blanks_listening, highlight_correct_summary); rate-limited, UA-identified | network (gitignored output) |
-| `backend/scripts/scrape_exemplars/sources/jijing.py` | `JijingAdapter`: reads gitignored local JSONL (`backend/data/jijing_raw/jijing.jsonl`) of PTE recall questions; public code, private data pattern | local file (gitignored data) |
-| `backend/scripts/scrape_exemplars/__main__.py` | Pipeline entry point: runs a `SourceAdapter` (`wikipedia` or `jijing`) → `backend/data/exemplars_raw/<source>.jsonl` (gitignored) | — |
-| `backend/scripts/scrape_exemplars/cleaner.py` | Deterministic cleaning rules (markup strip, English filter, length gates, SHA-256 dedup) + optional DeepSeek accept/reject gate; exposes `clean_exemplars()` + `print_metrics()` | — |
-| `backend/scripts/clean_exemplars.py` | CLI wrapper: reads `exemplars_raw/<source>.jsonl` → applies `clean_exemplars()` → writes `exemplars_clean/<source>.jsonl` (gitignored) + prints metrics | — |
-| `backend/scripts/embed_exemplars.py` | Ingestion back-half: reads `status=accept` clean entries, `id=sha256(text)`, embeds via `vector_store.embed_texts` (DashScope, 1024-dim), per-`task_type` near-dup drop (cosine ≥ 0.95), idempotent `ON CONFLICT (id) DO UPDATE` upsert into `stimulus_exemplars` via direct `psycopg2`/`SUPABASE_DB_URL` (bypasses RLS); `--force`/`--source` | Supabase (service-role direct) |
-| `supabase-migration-004.sql` | `stimulus_exemplars` table — shared retrieval corpus for Stimulus Exemplar-grounded generation; `hnsw vector_cosine_ops` + GIN tsvector + task_type btree indexes; RLS enabled with no policies (PostgREST-deny; backend direct Postgres connection bypasses RLS, ADR 0009 §2) | Supabase pgvector |
-| `backend/services/exemplar_store.py` | Read path over `stimulus_exemplars`: `retrieve(task_type,mode,topic?,targeting?,n)` (`random`=`ORDER BY random()`; `targeted`=task_type+difficulty/`features @> jsonb`; `theme`=single-SQL hybrid dense `embedding <=>` + sparse `plainto_tsquery`, RRF-fused `FULL OUTER JOIN`) + `get_verbatim`; direct `psycopg2` via `asyncio.to_thread`, silent `[]` on any failure (ADR 0008 §4) | Supabase (service-role direct) |
-| `backend/services/originality.py` | Local word-shingle Jaccard guard (4-gram, threshold 0.5): `shingles`/`jaccard`/`max_overlap`/`is_too_similar`; no API calls (ADR 0008 §3) | computed |
-| `backend/services/stimulus_service.py` | Stimulus serving logic behind `POST /api/pte/stimulus`: three-tier fallback (verbatim → exemplar-grounded few-shot generation → empty-bank pure-AI → silent pure-AI) + originality guard (regenerate once if a generation overlaps an injected exemplar above threshold); `source=news` branch injects a GNews title+summary anchor through the same few-shot + originality path, silently degrading to the exemplar path on any GNews failure (ADR-0007/0008/0010) | computed |
-| `backend/services/study_assistant_graph.py` | LangGraph tool-calling loop for the Study Assistant (mirrors `call_coach_node`); recency gate (`recent/latest/current/news/real-time/最近新闻/实时新闻/最新事件`) lives in the node and sets `source`; assembles `{reply, links, practice}`; `run_study_assistant_graph(messages, locale)` (ADR-0010) | computed |
-| `backend/tools/study_assistant_tools.py` | Three `@lc_tool`s — `navigate_app` (allow-listed links), `generate_practice` (text Task Types only → deep-link payload), `pte_knowledge` (FAQ) — plus `filter_links` route allow-list enforcement | computed |
-| `backend/services/gnews.py` | GNews adapter `fetch_news_anchors(topic, n)` → `["title — summary", …]` (title+summary only, never full text); `[]` on missing `GNEWS_API_KEY`/timeout/error (never raises) | network |
-| `backend/prompts/study_assistant/knowledge.yaml` | Hand-authored Study Assistant grounding: `feature_map` + `route_allowlist` (22 routes) + `pte_faq`; loaded once via `prompt_loader` (no RAG) | static YAML |
-| `src/lib/study-assistant.ts` | Study Assistant client → `POST /api/study-assistant/chat`; exports request/response types | — |
-| `src/components/StudyAssistant.tsx` | Global floating Study Assistant panel; session-only multi-turn chat; preset question chips; renders allow-listed links + a practice deep-link `<Link>`; mounted in `ClientLayout`, hidden when `usePathname()` starts with `/mock` | — |
-| `backend/scripts/eval_originality.py` | Offline originality eval: samples generations vs injected exemplars, prints overlap distribution + over-threshold rate; real LLM/embedding/DB calls, NOT wired into CI | — |
+## Quality and Safety Rules
 
-Personalization policy:
+- Frontend gates：`npm run lint`、`npm run typecheck`、`npm run test:unit:run`、`npm run build`。
+- Backend gates：在 `backend/` 运行 `pytest`；按 CI 配置运行 ruff。
+- E2E：`npm run test:e2e`，外部调用使用 mock-first 策略。
+- 不在日志、客户端 bundle、截图或 committed fixtures 中放置密钥或学习者音频。
+- 新业务与 LLM 逻辑进入 FastAPI，不恢复 Next.js API 业务分叉。
+- 商业化、支付、订阅、排行榜、学习小组和社交分享保持 future/backlog，除非明确请求。
 
-- Logged-in: Supabase is the authority for personalized recommendations and daily plans.
-- Logged-out: show general entry points or a login prompt; do not show personalized recommendations.
-- Supabase failure: show generic or temporarily unavailable UI; do not fall back to localStorage as personalization.
-- localStorage: migration, backup, temporary local state, and graceful UI fallback only.
+## Documentation Ownership
 
-## API Endpoints
-
-Same `POST /api/*` paths are served on **both** runtimes today. Per ADR 0007 the
-authoritative implementation is FastAPI (`backend/routers/*`); the Next route of
-the same path is the legacy direct/proxy implementation being migrated away and
-deleted. In the end state these are served only by FastAPI and reached from the
-browser via `NEXT_PUBLIC_API_BASE_URL`.
-
-| Endpoint | Purpose | Request | Response |
-|----------|---------|---------|----------|
-| `POST /api/tts` | Azure TTS | `{ text, voice, rate }` | WAV audio stream |
-| `POST /api/pronunciation` | Azure pronunciation assessment | FormData audio + reference text | `PronunciationAssessmentResult` JSON |
-| `POST /api/pte/stimulus` | Generate stimulus for any PTE task type (Exemplar-grounded when a bank exists, else pure-AI; ADR 0008). `source=news` uses a GNews title+summary anchor (silent fallback to exemplars on failure) | `{ taskType, mode?: random\|targeted\|theme, topic?, targeting?, verbatim?, source?: exemplars\|news }` | `{ text: string }` |
-| `POST /api/pte/feedback` | AI feedback for any PTE task type | `{ taskType, stimulus, response, pronunciationAssessment? }` | `TaskFeedback` JSON |
-| `POST /api/word-lookup` | Translate a selected word/phrase (dictionary-first, LLM fallback) | `{ query: string }` | `WordLookupResult` JSON (`{ source, text, phonetic, entries, tags }`) |
-| `POST /api/study-assistant/chat` | Multi-turn Study Assistant (LangGraph tool loop; ADR-0010). Reply in request locale; links from a fixed route allow-list; optional practice deep-link | `{ messages: {role,content}[], locale: en\|zh }` | `{ reply, links: {label,route}[], practice: {taskType,taskSlug,topic,source,route}\|null }` |
-
-## Quality Gates
-
-```bash
-npm run lint
-npm run typecheck
-npm run test:unit:run
-npm run build        # when touching Next.js config, routes, or API client
-npm run test:e2e     # when touching cross-page behavior
-cd backend && pytest # when touching Python backend
-```
-
-## Agent Architecture (Portfolio Design)
-
-This section describes the AI agent pipeline designed for EchoLingo. It is a portfolio-level design intended to demonstrate architectural thinking. Implementation status is noted per component.
-
-### Pipeline (no Router layer — see ADR 0004)
-
-```
-User input (taskType + stimulus + response + audio?)
-        ↓
-Section Agent  ← invoked directly by caller, taskType always known
-(Speaking / Writing / Reading / Listening)
-        ↓
-Scoring Agent  ← per-dimension qualitative scores, not simulated PTE 10–90 (see ADR 0003)
-        ↓
-Diagnosis Agent  ← derives Task-Type Weakness from Feedback history
-        ↓
-Coach Agent  ← generates targeted suggestions
-        ↓
-LLM-as-Judge  ← independent model re-evaluates Coach output; disagreement triggers retry
-```
-
-### Section Agents — implementation status
-
-| Section Agent | Status | Implemented Task Types |
-|---|---|---|
-| Speaking Agent | Implemented | Read Aloud, Repeat Sentence, Answer Short Question, Personal Introduction |
-| Writing Agent | Implemented | Summarize Written Text, Write Essay |
-| Reading Agent | Implemented | Fill in the Blanks (Reading), Re-order Paragraphs, Multiple Choice (Reading) |
-| Listening Agent | Implemented | Write from Dictation, Summarize Spoken Text, Fill in the Blanks (Listening), Highlight Correct Summary |
-
-### Speaking Agent — key design decisions
-
-- Azure Pronunciation Assessment is the authoritative source for word-level and phoneme-level scoring on Read Aloud and Repeat Sentence. It runs in parallel with AI Feedback and results are merged into Feedback Details.
-- Whisper (speech-to-text) is used only for task types not covered by Azure Pronunciation Assessment (e.g. Answer Short Question, Describe Image) to produce a transcript for AI Feedback.
-- Scoring dimensions: fluency (pause rate, speech rate, filler words), pronunciation (Azure word/phoneme accuracy), content (keyword coverage rate).
-
-### Writing Agent — key design decisions
-
-Scoring dimensions and evaluation method differ by task type:
-
-| Task Type | Evaluation Method | Dimensions |
-|---|---|---|
-| Summarize Written Text | RAGAS Faithfulness + Answer Relevancy (original passage = context, student summary = answer) | Content accuracy, information coverage |
-| Write Essay | LLM-based rubric scoring | Grammar (error rate by type), Vocabulary (diversity index, academic word ratio), Form (word count, paragraph structure), Content (argument coherence) |
-
-RAGAS applies only to Summarize Written Text because it requires a source context (the original passage). Write Essay has no retrievable context — RAGAS metrics are not applicable there.
-
-### Scoring Agent — implemented
-
-Produces per-dimension qualitative scores (0–100 internal scale, for reference only) for each Feedback dimension. Speaking: fluency, pronunciation, content. Writing: grammar, vocabulary, form, content. Entry point: `src/app/api/pte/feedback/route.ts`.
-
-### Diagnosis Agent — implemented
-
-Extends `src/lib/task-weakness.ts`: `aggregateDimensions` computes per-dimension weighted averages from `PracticeTask` history; `scoreFromTask` uses actual dimension scores when available, falling back to the strengths/weaknesses heuristic. Results stored in `TaskTypeWeakness.dimensions`.
-
-### Coach Agent — implemented
-
-Generates targeted coaching tips per weak dimension. Returned in `TaskFeedback.coachSuggestions[]`. Produced inline by the primary LLM call as part of the same JSON response.
-
-### LLM-as-Judge — implemented
-
-An independent LLM call runs in parallel with the primary Scoring Agent call. Trigger rule: if any single dimension diverges by more than 15 points between the two calls, the system retries the primary call and attaches a `JudgeLog` record to `TaskFeedback.judgeLog`. Disagreement rate is a quantifiable quality metric for prompt iteration.
-
-Disagreement rate is a quantifiable quality metric for prompt iteration — e.g. "Judge agreement rate improved from 71% to 89% after prompt revision." Logged disagreement cases form a test set for ongoing prompt improvement.
-
-Note: a "direction-based" trigger (one model says strong, the other says weak) is not a separate signal — it is a subset of the score-divergence rule and covered by the 15-point threshold.
-
-### Learner Profile (adaptive task selection)
-
-Weakness profile keyed by Task Type (not Section), consistent with the Task-Type Weakness model in CONTEXT.md:
-
-```json
-{
-  "task_type_weakness": {
-    "read_aloud": { "fluency": 0.65, "pronunciation": 0.78, "content": 0.82 },
-    "write_essay": { "grammar_error_types": ["subject-verb agreement", "tense"], "vocab_diversity": 0.71 },
-    "repeat_sentence": { "overall": 0.58 }
-  },
-  "weak_task_types": ["repeat_sentence", "re_order_paragraphs"],
-  "study_history": []
-}
-```
-
-Daily Plan prioritises weak Task Types. This is the primary personalization signal for logged-in learners.
-
-### Learning Trajectory Visualisation — implemented
-
-- SVG radar chart overlaying actual vs target dimension scores (speaking: fluency/pronunciation/content; writing: grammar/vocabulary/form/content)
-- Target score slider (40–95) with live gap analysis bars per dimension
-- Score trajectory line chart per task type (weekly average, last 8 weeks), selectable via task-type pill buttons
-- All implemented in `src/app/stats/page.tsx`
-
-No absolute exam score prediction is made. Predicting a real PTE score from practice data is unverifiable and would conflict with ADR 0003's principle of not misleading learners with unvalidated numbers.
-
-## Project Conventions
-
-- Keep payment, subscription, commercial operations, leaderboard, learning groups, and social sharing in future/backlog unless explicitly requested.
-- Do not run CI/E2E against real LLM, Azure, Supabase, or paid external APIs.
-- Prefer mock-first E2E through Playwright `page.route()`.
-- FastAPI is the single authoritative backend (ADR 0007). Do not add new business or LLM logic to Next `src/app/api/*`; Next business routes are being migrated to FastAPI and deleted. All third-party secrets live only in the backend runtime.
-- After meaningful development work, update `docs/DEVELOPMENT_LOG.md`, `docs/PROJECT_CONTEXT.md`, `docs/TASKS.md`.
-- See `CONTEXT.md` at repo root for canonical domain terminology.
-- See `docs/adr/` for key architectural decisions.
+- 当前事实：本文件。
+- 阶段与战略优先级：`ROADMAP.md`。
+- Speech Evaluator 详细实施路线：`SPEECH_EVALUATOR_ROADMAP.md`。
+- 已完成里程碑与验证：`DEVELOPMENT_LOG.md`。
+- 决策理由：`adr/`。
+- 领域术语：根目录 `CONTEXT.md`。
+- 命令、依赖、路由和 schema：代码与 manifests；通过 ECC `/update-docs` 同步。

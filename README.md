@@ -42,9 +42,9 @@ DashScope Embeddings, Azure Speech SDK, Next.js, TypeScript
 
 **Testing:** pytest, Vitest, Playwright
 
-**Development workflow:** Claude Code-assisted development. I used Claude Code
-as an AI pair programmer while personally driving requirements breakdown,
-architecture, agent/RAG design, code review, testing, and documentation.
+**Development workflow:** Claude Code with ECC-assisted planning, verification,
+review, and documentation. Product scope and architecture decisions remain
+explicit repository artifacts rather than session-only context.
 
 ## Product Scope
 
@@ -200,14 +200,14 @@ docs/
   adr/                       Architecture decision records
   PROJECT_CONTEXT.md         Current project context and architecture notes
   DEVELOPMENT_LOG.md         Development log
-  TASKS.md                   Current and future work
+  ROADMAP.md                 Current phase and strategic priorities
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Python 3.11+
 - Supabase project with required migrations applied
 - OpenAI-compatible chat model credentials
@@ -312,7 +312,9 @@ data is not committed.
 
 The most useful project docs are:
 
+- `docs/README.md` for the documentation map and maintenance policy.
 - `docs/PROJECT_CONTEXT.md` for the current architecture and domain model.
+- `docs/ROADMAP.md` for the current phase and strategic priorities.
 - `docs/adr/0005-langgraph-rag-refactor.md` for the feedback pipeline decision.
 - `docs/adr/0008-stimulus-exemplar-model.md` for exemplar-grounded generation.
 - `docs/adr/0009-hybrid-retrieval-theme-practice.md` for hybrid retrieval.

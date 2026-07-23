@@ -3,7 +3,7 @@ fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6
 
-# AI/LLM — LangChain + OpenAI-compatible client
+# AI/LLM - LangChain + OpenAI-compatible client
 langchain-core>=0.3.0
 langchain-openai>=0.2.0
 langchain-community>=0.3.0
@@ -21,7 +21,7 @@ azure-cognitiveservices-speech>=1.35.0
 
 # Database
 supabase>=2.3.4
-psycopg2-binary>=2.9.9   # direct Postgres connection for stimulus_exemplars ingestion (embed_exemplars.py)
+psycopg2-binary>=2.9.9
 
 # Environment
 python-dotenv>=1.0.1
