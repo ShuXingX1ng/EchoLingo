@@ -12,14 +12,14 @@ EchoLingo 已完成 PTE 产品 MVP、前后端分离、反馈 Agent/RAG、Exempl
 
 ## 当前优先级
 
-1. **建立可复现基线**：完成 Speech Evaluator M0 环境、依赖、目录和 smoke test。
+1. **建立可复现基线**：M0 环境、依赖、目录和 smoke test 已完成（2026-07-23，见 `DEVELOPMENT_LOG.md`）；下一步是 M1 数据管线。
 2. **建立合法且可审计的数据管线**：完成 SpeechOcean 数据许可、不可变原始数据、speaker-independent split、manifest 与 hash。
 3. **训练并评估冻结编码器基线**：先获得可复现实验结果，再评估 LoRA、adapter 或其他候选改进。
 4. **通过独立 worker 集成**：模型验收后才建立 provider-neutral FastAPI contract 和显式 compare 模式。
 
 ## 下一道阶段门槛
 
-进入 M0 前，先完成 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 中 M0 的环境、依赖、存储与 smoke-test 前置条件，并重新运行当前前后端质量基线。具体清单不在本文件复制。
+M0（环境、依赖、存储与 smoke test）已完成并通过前后端质量基线回归。进入 M1 前，先完成 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 中 M1 的 SpeechOcean 数据许可、固定说话人切分、MFA 对齐与封存基准前置条件。具体清单不在本文件复制。
 
 ## 运维与文档
 

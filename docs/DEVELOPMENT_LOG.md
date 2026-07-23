@@ -6,6 +6,7 @@
 
 | 日期 | 阶段 | 实际完成 | 验证 |
 |---|---|---|---|
+| 2026-07-23 | Speech Evaluator M0 | 完成 WSL2 Ubuntu 环境（RTX 4070 GPU 可见）、`speech/` 包骨架（8 个子包 + config/paths/env_check）、`uv.lock` 锁定依赖（torch 2.5.1+cu121、transformers 5.14.1、mlflow 3.14.0）、固定 encoder revision（`facebook/wav2vec2-base-960h`@`22aad52d435eb6dbaf354bdad9b0da84ce7d6156`）、数据/artifact 目录结构（`~/echolingo-speech/{data,artifacts}`）。未下载数据集、未训练、未实现 M1–M6。 | WSL 内 `uv run pytest tests/` 9 passed（含真实 CUDA matmul、真实 encoder 前向推理、MLflow file-store round-trip）；`uv run ruff check` 通过；`config validate`/`env_check` 通过；回归门：backend `ruff check .` 通过 + `pytest tests/ -v` 343 passed；frontend `lint`（0 errors）、`typecheck`、`test:unit:run`（128 passed）、`build` 全部通过 |
 | 2026-07-21 | ECC 文档工作流 | 确认用户级 `ecc@ecc 2.0.0` 已启用；按 ECC 的最小入口、单一事实来源和生成内容边界重整 `CLAUDE.md`、仓库规则与 docs 索引；将任务流水账收敛为 `ROADMAP.md`，移除失效的旧收尾 skill 依赖。 | `git diff --check`；Markdown 引用扫描；ECC deterministic harness audit |
 | 2026-07-21 | Speech Evaluator 规划 | 确认 Read Aloud 自研评估器 M0–M6 路线、预训练编码器适配策略、显式 provider compare 模式与独立 GPU worker；新增 ADR 0011–0013。尚未创建模型、数据集或运行时实现。 | 文档一致性检查；`git diff --check` |
 | 2026-07-21 | 文档阶段整理 | 删除重复架构 HTML、两个过期 mockup 和已完成的 PTE pivot PRD；重写 docs 索引、项目上下文、任务、部署和 Agent 架构文档；增加 ADR 状态索引。 | 文档引用检查；`git diff --check` |

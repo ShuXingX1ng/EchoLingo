@@ -62,3 +62,9 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# Speech Evaluator (speech/) — training env, real config, and data/artifacts stay out of Git
+speech/.venv/
+speech/configs/speech.yaml
+speech-data/
+speech-artifacts/

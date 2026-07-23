@@ -1,0 +1,12 @@
+# Copy this file to configs/speech.yaml (gitignored) and adjust paths for your machine.
+# See docs/SPEECH_EVALUATOR_ROADMAP.md and ADR-0013 for the directory and process boundaries.
+
+data_root: /home/zhe/echolingo-speech/data
+artifact_root: /home/zhe/echolingo-speech/artifacts
+
+mlflow_tracking_uri: file:///home/zhe/echolingo-speech/artifacts/mlruns
+
+worker_host: localhost
+worker_port: 8100
+
+encoder_config_path: model/wav2vec2-base-960h.yaml
