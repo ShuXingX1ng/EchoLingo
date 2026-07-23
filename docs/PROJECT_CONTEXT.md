@@ -16,7 +16,8 @@ PTE 产品 MVP 和平台架构已完成，当前进入 **Read Aloud Speech Evalu
 
 - 已完成：PTE 练习与 Mock、FastAPI 分离、LangGraph feedback、rubric RAG、Exemplar retrieval、Study Assistant、Onboarding、Supabase 同步、i18n。
 - 当前运行：Azure Pronunciation Assessment 为 Read Aloud 和 Repeat Sentence 提供语音证据。
-- 已确认但未实施：EchoLingo 自研 Read Aloud Speech Evaluator、独立 GPU worker、provider-neutral contract 和显式 compare mode。
+- 已完成：Speech Evaluator M0（WSL2 Ubuntu + RTX 4070 训练环境、`speech/` 包骨架、固定 encoder revision、smoke test）；模型本身尚未训练。
+- 已确认但未实施：EchoLingo 自研 Read Aloud Speech Evaluator 模型训练、独立 GPU worker 服务、provider-neutral contract 和显式 compare mode。
 - 当前权威计划：[`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 与 ADR 0011–0013。
 
 ## Runtime Architecture
