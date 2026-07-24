@@ -1,0 +1,59 @@
+# SpeechOcean762 dataset registration record (M1).
+# Small, git-tracked reproducibility header — the bulky per-utterance manifest JSONL
+# stays under the gitignored data root and is regenerated from the tarball + this
+# file + code. See docs/SPEECH_EVALUATOR_ROADMAP.md SS4.1/SS4.3 and ADR-0011.
+
+schema_version: 1
+
+source:
+  origin: openslr
+  resource_id: 101
+  mirrors:
+    - https://openslr.trmal.net/resources/101/speechocean762.tar.gz
+    - https://openslr.elda.org/resources/101/speechocean762.tar.gz
+    - https://openslr.magicdatatech.com/resources/101/speechocean762.tar.gz
+  license: CC-BY-4.0
+  citation: zhang2021speechocean762
+
+# Frozen after the first real download (uv run python -m echolingo_speech.data.speechocean
+# download/build-manifest). No published upstream checksum exists, so this is
+# trust-on-first-use, same pattern as the pinned encoder revision.
+tarball_sha256: 876c34b828c2ebcc35ba2ff1ba5947d50e6b0162fc4a4af91db0942422b3bdd5
+
+split:
+  # Deterministic random.Random(seed) stratified by (age_group, gender): ~10% of
+  # official-train speakers become validation; official-test speakers are always
+  # sealed as the benchmark partition and never touched by this ratio.
+  validation_ratio: 0.10
+  seed: 20260723
+  # Frozen from the first real split run (2026-07-24) so the assignment is
+  # auditable without re-running randomness. 5000 total records (2560 adult /
+  # 2440 child utterances, 128 adult / 122 child unique speakers), 13 validation
+  # speakers, leakage audit: PASS. Superseded an earlier run whose age-group
+  # parsing bug (spk2age holds numeric ages, not "adult"/"child" labels)
+  # misclassified every speaker as adult.
+  validation_speaker_ids:
+    - "0075"
+    - "1309"
+    - "1372"
+    - "2981"
+    - "3023"
+    - "3068"
+    - "5414"
+    - "6010"
+    - "6401"
+    - "6504"
+    - "9604"
+    - "9624"
+    - "9625"
+
+alignment:
+  tool: montreal-forced-aligner
+  acoustic_model: english_us_arpa
+  dictionary: english_us_arpa
+  conda_env: aligner
+  quality_threshold: 0.95
+
+encoder:
+  model_id: facebook/wav2vec2-base-960h
+  revision: 22aad52d435eb6dbaf354bdad9b0da84ce7d6156
