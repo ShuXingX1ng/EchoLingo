@@ -9,6 +9,7 @@ from pathlib import Path
 from echolingo_speech.alignment.mfa import (
     normalize_text,
     parse_alignment_output,
+    parse_textgrid_spans,
     quality_report,
 )
 from echolingo_speech.data.manifest import AudioInfo, DerivationInfo, ManifestRecord, SourceInfo
@@ -147,3 +148,71 @@ def test_quality_report_aggregates_by_status_and_age_group(tmp_path: Path):
     assert report["by_status"]["failed"] == 1
     assert report["by_age_group"]["adult"]["aligned"] == 1
     assert report["by_age_group"]["adult"]["failed"] == 1
+
+
+_TWO_TIER_TEXTGRID = """File type = "ooTextFile"
+Object class = "TextGrid"
+
+xmin = 0
+xmax = 1.2
+tiers? <exists>
+size = 2
+item []:
+    item [1]:
+        class = "IntervalTier"
+        name = "words"
+        xmin = 0
+        xmax = 1.2
+        intervals: size = 3
+        intervals [1]:
+            xmin = 0.0
+            xmax = 0.1
+            text = ""
+        intervals [2]:
+            xmin = 0.1
+            xmax = 0.6
+            text = "we"
+        intervals [3]:
+            xmin = 0.6
+            xmax = 1.2
+            text = "call"
+    item [2]:
+        class = "IntervalTier"
+        name = "phones"
+        xmin = 0
+        xmax = 1.2
+        intervals: size = 4
+        intervals [1]:
+            xmin = 0.0
+            xmax = 0.1
+            text = ""
+        intervals [2]:
+            xmin = 0.1
+            xmax = 0.35
+            text = "W"
+        intervals [3]:
+            xmin = 0.35
+            xmax = 0.6
+            text = "IY1"
+        intervals [4]:
+            xmin = 0.6
+            xmax = 1.2
+            text = "K"
+"""
+
+
+def test_parse_textgrid_spans_filters_blanks_and_preserves_time_order(tmp_path: Path):
+    path = tmp_path / "sample.TextGrid"
+    path.write_text(_TWO_TIER_TEXTGRID, encoding="utf-8")
+
+    word_spans, phone_spans = parse_textgrid_spans(path)
+
+    assert [span.text for span in word_spans] == ["we", "call"]
+    assert word_spans[0].start == 0.1
+    assert word_spans[0].end == 0.6
+    assert word_spans[1].start == 0.6
+    assert word_spans[1].end == 1.2
+
+    assert [span.text for span in phone_spans] == ["W", "IY1", "K"]
+    assert phone_spans[0].start == 0.1
+    assert phone_spans[-1].end == 1.2

@@ -21,6 +21,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import NamedTuple
 
 from echolingo_speech.data.manifest import AlignmentInfo, ManifestRecord, read_jsonl, write_jsonl
 
@@ -109,6 +110,48 @@ def _parse_textgrid(path: Path) -> tuple[int, int]:
     word_count = sum(len(grid.getTier(name).entries) for name in word_tier_names)
     phone_count = sum(len(grid.getTier(name).entries) for name in phone_tier_names)
     return word_count, phone_count
+
+
+class TextGridSpan(NamedTuple):
+    start: float
+    end: float
+    text: str
+
+
+def _collect_tier_spans(grid, tier_names: list[str]) -> list[TextGridSpan]:
+    spans = [
+        TextGridSpan(entry.start, entry.end, entry.label.strip())
+        for name in tier_names
+        for entry in grid.getTier(name).entries
+        if entry.label.strip()
+    ]
+    spans.sort(key=lambda span: span.start)
+    return spans
+
+
+def parse_textgrid_spans(path: Path) -> tuple[list[TextGridSpan], list[TextGridSpan]]:
+    """Return ordered, non-blank (start, end, text) spans for the words and
+    phones tiers of one MFA TextGrid.
+
+    This is the M2 training-time counterpart to `_parse_textgrid`'s aggregate
+    counts: M1 only needed how many words aligned to compute a quality score,
+    but the scorer's word/phoneme pooling (ADR-0011 SS5.2) needs each span's
+    actual timing to know which encoder frames belong to which word or phone.
+    MFA's phone labels are its own predicted pronunciation (e.g. `AA1`), not
+    SpeechOcean's canonical phone list, and are not grouped per word -- callers
+    match them to canonical phones by time order within each word span, not by
+    label (see `training/labels.py::phone_alignment_is_valid`).
+    """
+    from praatio import textgrid as tg
+
+    grid = tg.openTextgrid(str(path), includeEmptyIntervals=False)
+    word_tier_names = [name for name in grid.tierNames if "word" in name.lower()]
+    phone_tier_names = [name for name in grid.tierNames if "phone" in name.lower()]
+
+    return (
+        _collect_tier_spans(grid, word_tier_names),
+        _collect_tier_spans(grid, phone_tier_names),
+    )
 
 
 def parse_alignment_output(records: list[ManifestRecord], output_dir: Path) -> list[ManifestRecord]:

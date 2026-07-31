@@ -63,7 +63,7 @@ class SpeechConfig(BaseModel):
 
 
 def load_config(config_path: Path) -> SpeechConfig:
-    raw = yaml.safe_load(config_path.read_text())
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if raw is None:
         raise ValueError(f"config file is empty: {config_path}")
 
@@ -75,7 +75,7 @@ def load_config(config_path: Path) -> SpeechConfig:
     if not encoder_path.is_file():
         raise ValueError(f"encoder_config_path does not exist: {encoder_path}")
 
-    raw["encoder"] = yaml.safe_load(encoder_path.read_text())
+    raw["encoder"] = yaml.safe_load(encoder_path.read_text(encoding="utf-8"))
     return SpeechConfig(**raw)
 
 

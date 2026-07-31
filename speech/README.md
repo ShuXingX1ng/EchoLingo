@@ -1,10 +1,10 @@
 # EchoLingo Speech Evaluator (`speech/`)
 
-M0 environment and package skeleton for the Read Aloud Speech Evaluator.
-See `docs/SPEECH_EVALUATOR_ROADMAP.md` and ADR 0011-0013 for the full
-plan; this package is scoped to M0 only (environment, skeleton, config
-validation, smoke tests) — no dataset download, no training, no worker
-HTTP service yet.
+Read Aloud Speech Evaluator package. See `docs/SPEECH_EVALUATOR_ROADMAP.md`
+and ADR 0011-0013 for the full plan. Current status: M0 (environment
+skeleton), M1 (SpeechOcean762 data pipeline), and M2 (A0 frozen-encoder
+baseline -- see `docs/m2-acceptance-report.md`) are complete. No Bundle
+export, Worker, or FastAPI integration (M4/M5) yet.
 
 ## Runtime environment
 
