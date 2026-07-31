@@ -1,0 +1,22 @@
+# A0 frozen-encoder baseline hyperparameters (M2 plan SS7).
+# Two independent runs use this same file with --seed 42 and --seed 1337.
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+# Threshold (on the [0,1]-normalized scale) below which an accuracy score
+# counts as "error" for word/phone error-detection Precision/Recall/Macro F1.
+error_detection_threshold: 0.6
+
+# Score-band width in original-scale points (0-10) for sentence-level
+# score-band error reporting.
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

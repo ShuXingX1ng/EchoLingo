@@ -84,11 +84,11 @@ def test_non_commit_revision_is_rejected(tmp_path):
 
 def test_shipped_example_config_is_structurally_valid():
     example = REPO_ROOT / "configs" / "speech.example.yaml"
-    raw = yaml.safe_load(example.read_text())
+    raw = yaml.safe_load(example.read_text(encoding="utf-8"))
     assert "data_root" in raw
     assert "artifact_root" in raw
     assert "encoder_config_path" in raw
 
     encoder_path = example.parent / raw["encoder_config_path"]
-    encoder_raw = yaml.safe_load(encoder_path.read_text())
+    encoder_raw = yaml.safe_load(encoder_path.read_text(encoding="utf-8"))
     assert len(encoder_raw["revision"]) == 40
