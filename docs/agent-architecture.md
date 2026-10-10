@@ -71,7 +71,7 @@ flowchart LR
 - Azure 只在显式 compare 模式参与对照，不作为静默 fallback。
 - Worker 失败时返回明确的不可用结果，不能伪造分数。
 - Repeat Sentence 保持现有路径，直到拥有独立标签、benchmark 和 calibration。
-- 详细训练、评估和部署计划见 `SPEECH_EVALUATOR_ROADMAP.md` 与 ADR 0011–0013。
+- 详细训练、评估和部署计划见 `SPEECH_EVALUATOR_ROADMAP.md` 与 ADR 0011–0014。
 
 ## Evaluation Notes
 

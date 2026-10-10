@@ -1,6 +1,7 @@
 # EchoLingo Read Aloud Speech Evaluator 路线图
 
-状态：已确认规划，尚未开始模型实现  
+状态：M0–M2 已完成（A0 基线，句子级达标，单词/音素级有已标记缺口）；当前为环境重建与 M2.5 基线修复，见第 18 节  
+更新日期：2026-10-11  
 范围：第一代仅覆盖 PTE Academic Read Aloud  
 优先级：先完成 Speech Evaluator，再启动 PTE Task Calibrator 与 Native Speech Model
 
@@ -271,17 +272,17 @@ Content 同时执行门控：
 
 ## 9. 运行与部署
 
-### 9.1 本地环境
+### 9.1 训练环境
 
-标准语音环境运行在 WSL2 Ubuntu：
+标准语音训练环境是一台 **Linux GPU 机器**（ADR-0014）。当前使用按量租用的云 GPU 实例（Ubuntu，单卡 24 GB 级别）；原 WSL2 Ubuntu + RTX 4070 环境已不可用，仅作为历史记录保留在 ADR-0013 与 `DEVELOPMENT_LOG.md`。
 
-- Windows 安装 NVIDIA 主机驱动；
-- WSL 不安装 Linux 显示驱动；
-- PyTorch CUDA、Transformers、MFA、MLflow 和 Worker 留在独立环境；
-- 数据和特征优先放在 WSL Linux 文件系统；
-- Windows FastAPI 通过配置地址访问 Worker。
+- PyTorch CUDA、Transformers、MFA、MLflow 和 Worker 留在独立于 `backend/` 的环境；
+- `speech.yaml` 的 `data_root` / `artifact_root` 指向实例的持久数据盘，不放系统盘；
+- 实例可能被释放：manifest、MLflow 记录、检查点和基准结果必须在每个阶段结束后备份到实例之外，原始数据与特征缓存可以按 `speech/README.md` 重建；
+- 换机器后先复现上一阶段基线，再继续新实验；
+- 12 GB 显存足够冻结编码器的评分头训练；A1 的 CTC LoRA/Adapter 训练建议 24 GB。
 
-参考：[NVIDIA CUDA on WSL](https://docs.nvidia.com/cuda/wsl-user-guide/)
+第 9.2 节的本机端口布局只描述个人开发时的进程边界；Worker 的最终部署位置在 M4 决定。
 
 ### 9.2 进程边界
 
@@ -457,6 +458,13 @@ LLM 不得：
 - 两次稳定训练；
 - 多指标基准报告。
 
+### M2.5：A0 基线修复
+
+- 在新训练环境复现 A0 两个种子；
+- 单词/音素级诊断与可视化报告；
+- 逐项修复第 18.2 节列出的缺陷，每项单独与 A0 对照；
+- 单词级错误检测超过无学习基线，句子级不回退。
+
 ### M3：候选改进
 
 - 评分者分歧候选；
@@ -497,7 +505,7 @@ LLM 不得：
 - A1 Loquacious 候选完成并与 A0 比较；
 - 达到 Speech Evaluator Acceptance；
 - 通过验收的 Run 导出完整 Checkpoint Bundle；
-- Worker 在 WSL2 使用 RTX 4070运行；
+- Worker 在配置的 GPU 环境上运行；
 - FastAPI 和 Read Aloud V2 接入完成；
 - EchoLingo-only 与显式 Compare 行为正确；
 - 完整单词和流利度标注完成；
@@ -530,6 +538,76 @@ LLM 不得：
 | LLM 发明错误 | 分数与事实先固定，LLM 只组织表达 |
 | 实验不可复现 | MLflow、Manifest、固定 revision、Bundle |
 
-## 18. 已确认但尚未实施
+## 18. 当前进度与执行计划
 
-本文档、`CONTEXT.md` 与 ADR-0011/0012/0013 记录的是已确认方向。目前没有创建 `speech/` 包、下载训练集、安装 WSL2 依赖、训练模型或修改运行时接口。实施必须从 M0 开始，并在每个里程碑完成后记录真实验证结果。
+更新日期：2026-10-11。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
+
+### 18.1 里程碑状态
+
+| 里程碑 | 状态 | 依据 |
+|---|---|---|
+| M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
+| M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `18eb224` |
+| M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31） | `speech/docs/m2-acceptance-report.md` |
+| M2.5 A0 基线修复 | 未开始 | 本节 |
+| M3 候选改进 | 未开始 | — |
+| M4 Bundle 与 Worker | 未开始 | — |
+| M5 FastAPI 与 Read Aloud | 未开始 | — |
+| M6 反馈与诊断 | 未开始 | — |
+
+M0–M2 的数据、特征缓存、MLflow 记录和 A0 检查点都保存在原训练机上，不在 Git 中。原训练机不可用，所以这些产物目前不可访问，M2 的数字只能以验收报告为准，直到在新环境复现。
+
+### 18.2 A0 已知问题
+
+来自 2026-10-11 对 `speech/` 代码的审查。"代码事实"可以直接在源码中看到；"影响"一栏在拿到数据前都是待验证的假设。
+
+| # | 代码事实 | 推测影响 | 验证方式 |
+|---|---|---|---|
+| 1 | 单词头和音素头只对区间内的帧做平均池化（`models/scorer.py`），没有输入"这里应该读哪个单词/音素" | 模型无法比较"实际发音"与"期望发音"，这很可能是单词/音素 Pearson 只有约 0.27–0.29 的主要原因 | 加入规范音素/单词身份嵌入后对照 A0 |
+| 2 | 错误检测对预测和标签使用同一个固定阈值 0.6（`evaluation/metrics.py`、`configs/training/a0.yaml`） | 回归输出向均值收缩，几乎从不低于 0.6，等于从不判"错误"；两个种子的 Macro F1 与常数基线完全相同（0.4801）与此一致 | 输出混淆矩阵和预测分布 |
+| 3 | 单词损失把 Accuracy 的 Huber 与 Stress 的 BCE 等权相加（`training/losses.py`）；标签在 [0,1] 尺度上，Huber(δ=1) 实际等价于 0.5×MSE | BCE 数值远大于 Huber，单词级梯度和早停用的验证损失可能被 Stress 主导 | 分别记录两项损失的数值 |
+| 4 | 特征缓存只保存编码器最后一层（`features/cache.py`） | `wav2vec2-base-960h` 的最后一层为 CTC 字符识别特化，中间层通常保留更多发音信息 | 缓存多层并做加权求和候选 |
+| 5 | 9 个声学特征（Hz、秒、计数）未标准化就与隐藏状态拼接（`features/acoustic.py`） | 句子级输入尺度不一致，训练条件变差 | 用训练集统计量标准化后对照 |
+| 6 | 对齐质量分是"对齐到的单词数 / 参考单词数"（`alignment/mfa.py`），强制对齐下几乎恒为 1.0；音素按数量匹配，不匹配则 Mask | 质量分不能反映边界是否准确；被 Mask 掉的单词/音素比例从未报告 | 统计各分区的 Mask 覆盖率 |
+| 7 | 验收报告只有总体指标 | 第 6、7.1 节要求的成人/儿童分组指标缺失，而成人是主要升级指标 | 评估时按 `speaker_age_group` 分组 |
+| 8 | 检查点只作为 MLflow artifact 保存在训练机本地 | 换机器即丢失，已经发生一次 | 每阶段结束后备份到实例之外 |
+
+### 18.3 执行顺序
+
+**步骤 1：重建训练环境并复现 A0**（需要 GPU 机器）
+
+1. 按 `speech/README.md` 在 Linux GPU 实例上安装环境，`pytest` 与 `ruff` 通过。
+2. 重跑 M1：下载并校验 SpeechOcean762、构建 manifest、MFA 对齐、特征缓存。
+3. 核对可复现性：tarball SHA-256 与 `configs/datasets/speechocean762.yaml` 中冻结值一致，Validation 说话人与冻结列表一致，泄漏审计 PASS。
+4. 重训 A0 种子 42 与 1337，并运行无学习基线。
+5. 完成标准：句子 Accuracy 与 Fluency Pearson 与验收报告相差不超过 0.02；否则先查清差异来源，不继续后续步骤。
+6. 把 manifest、`mlruns`、检查点备份到实例之外。
+
+**步骤 2：M2.5 诊断**（不改模型）
+
+1. 单词/音素级混淆矩阵、预测分布与标签分布。
+2. 句子、单词 Accuracy、单词 Stress、音素四项损失的分项数值。
+3. 各分区单词与音素的 Mask 覆盖率。
+4. 成人/儿童分组指标。
+5. 生成一份可视化诊断报告，作为后续所有对照的参照。
+
+**步骤 3：M2.5 修复**（每项单独对照 A0，只用 Validation 做选择）
+
+1. 评估方式：在 Validation 上选择预测阈值，并增加不依赖阈值的指标（如 PR 曲线下面积）。这只改变度量方式，不改变模型。
+2. 损失平衡：拆开并重新加权 Accuracy 与 Stress。
+3. 声学特征标准化。
+4. 规范音素/单词身份嵌入（针对问题 1，预期收益最大）。
+5. 多层隐藏状态（需要重建特征缓存，存储量随层数增加）。
+
+完成标准：两个种子上单词错误检测 Macro F1 都超过无学习基线，句子 Accuracy 与 Fluency Pearson 不低于 A0，并写出更新后的基线报告。如果做完仍不达标，如实记录并决定是否带着缺口进入 M3。
+
+**步骤 4：M3 候选改进**
+
+按成本从低到高：A0-Rater → A0-Aug → 成人目标域 → A1 Loquacious CTC Adapter 与 A1 Scorer。每个候选都与修复后的基线在同一封存基准上比较。
+
+### 18.4 实验纪律
+
+- 模型、超参数、阈值和早停只使用 Validation；封存 Test 只在一个候选定稿后评估一次，避免反复查看造成间接过拟合。
+- 每个结论至少两个种子。
+- 每次对照只改一个因素。
+- 未达标的结果照实写入报告，不调整门槛使其通过。

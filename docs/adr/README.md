@@ -22,9 +22,10 @@ ADR 记录决策产生时的背景和理由。阶段完成不代表 ADR 失效�
 | [0008](0008-stimulus-exemplar-model.md) | Accepted | Implemented | Exemplar 仅用于检索增强生成 |
 | [0009](0009-hybrid-retrieval-theme-practice.md) | Accepted | Implemented | Theme Practice 使用混合检索 |
 | [0010](0010-study-assistant-tool-using-agent.md) | Accepted | Implemented | Study Assistant 的工具与边界 |
-| [0011](0011-pretrained-speech-encoder-with-echolingo-adaptation.md) | Accepted | Planned | 基于预训练编码器构建 Speech Evaluator |
+| [0011](0011-pretrained-speech-encoder-with-echolingo-adaptation.md) | Accepted | In progress（M0–M2 完成） | 基于预训练编码器构建 Speech Evaluator |
 | [0012](0012-switchable-speech-evaluation-providers.md) | Accepted | Planned | Read Aloud 的 EchoLingo / compare 模式 |
-| [0013](0013-separate-speech-evaluation-worker.md) | Accepted | Planned | 独立私有 GPU speech worker |
+| [0013](0013-separate-speech-evaluation-worker.md) | Accepted（训练环境段落由 ADR-0014 修订） | Planned | 独立私有 GPU speech worker |
+| [0014](0014-train-speech-evaluator-on-rented-linux-gpu.md) | Accepted | In progress | 在租用的 Linux 云 GPU 上训练 Speech Evaluator |
 
 ## 维护约定
 
