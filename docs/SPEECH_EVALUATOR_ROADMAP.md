@@ -547,7 +547,7 @@ LLM 不得：
 | 里程碑 | 状态 | 依据 |
 |---|---|---|
 | M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
-| M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `18eb224` |
+| M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31） | `speech/docs/m2-acceptance-report.md` |
 | M2.5 A0 基线修复 | 未开始 | 本节 |
 | M3 候选改进 | 未开始 | — |
