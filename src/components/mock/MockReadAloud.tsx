@@ -1,39 +1,23 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import CountdownRing from "@/components/CountdownRing"
 import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
-const PREP_TIME = 35
-const RECORD_TIME = 40
-
 export default function MockReadAloud({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
   const {
-    phase, stimulus, seconds, error: errorMsg, savedTask,
-    recSeconds, canStop, startRecording, stopRecording, generate,
-  } = usePracticeTaskRunner({
-    taskType: "read_aloud",
-    responseKind: "audio",
-    prepTime: PREP_TIME,
-    recordTime: RECORD_TIME,
-    withPronunciation: true,
-  })
+    phase, stimulus, seconds, timer, error: errorMsg, savedTask,
+    recSeconds, canStop, stopRecording, generate, emptyTask,
+  } = usePracticeTaskRun("read_aloud", { mode: "mock" })
 
   useEffect(() => {
     if (phase === "done" && savedTask) onComplete(savedTask)
   }, [phase, savedTask, onComplete])
 
-  const skipTask = () => onComplete({
-    id: `mock_${Date.now()}`,
-    taskType: "read_aloud",
-    stimulus: { kind: "text", content: stimulus },
-    response: { kind: "audio", content: "" },
-    durationSeconds: 0,
-    createdAt: new Date().toISOString(),
-  })
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">
@@ -44,12 +28,12 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
         </div>
       )}
 
-      {phase === "ready" && (
+      {phase === "prep" && (
         <div className="space-y-4">
           <div className="border border-slate-900 bg-white p-6 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-between mb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.preparation")}</p>
-              <CountdownRing seconds={seconds} total={PREP_TIME} />
+              <CountdownRing seconds={seconds} total={timer.prepSeconds} />
             </div>
             <p className="text-base leading-8 text-slate-900 dark:text-white font-serif">{stimulus}</p>
           </div>
@@ -65,7 +49,7 @@ export default function MockReadAloud({ onComplete }: { onComplete: (task: Pract
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t("mock.common.recording")}</p>
               </div>
-              <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={64} />
+              <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={64} />
             </div>
             <p className="text-base leading-8 text-slate-900 dark:text-white font-serif">{stimulus}</p>
           </div>

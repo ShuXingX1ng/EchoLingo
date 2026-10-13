@@ -99,22 +99,6 @@ export async function getTasksFromCloud(limit = 100): Promise<PracticeTask[]> {
   return (data || []).map(dbTaskToPracticeTask)
 }
 
-export async function getTaskByIdFromCloud(id: string): Promise<PracticeTask | null> {
-  const userId = await getCurrentUserId()
-  if (!userId) return null
-
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("practice_tasks")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .single()
-
-  if (error || !data) return null
-  return dbTaskToPracticeTask(data)
-}
-
 export async function deleteTaskFromCloud(id: string): Promise<boolean> {
   const userId = await getCurrentUserId()
   if (!userId) return false
@@ -124,6 +108,19 @@ export async function deleteTaskFromCloud(id: string): Promise<boolean> {
     .from("practice_tasks")
     .delete()
     .eq("id", id)
+    .eq("user_id", userId)
+
+  return !error
+}
+
+export async function clearTasksFromCloud(): Promise<boolean> {
+  const userId = await getCurrentUserId()
+  if (!userId) return false
+
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("practice_tasks")
+    .delete()
     .eq("user_id", userId)
 
   return !error

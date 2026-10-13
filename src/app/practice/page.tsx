@@ -30,7 +30,7 @@ import DesktopNav from "@/components/DesktopNav"
 import { useTranslation } from "@/lib/i18n"
 import { getTasks } from "@/lib/unified-task-history"
 import { deriveTaskTypeWeakness, rankWeaknesses } from "@/lib/task-weakness"
-import { PTE_TASK_LABELS } from "@/lib/recommendations"
+import { ALL_TASK_TYPES, TASK_TYPE_REGISTRY, timingSummary } from "@/lib/task-type-registry"
 import type { PteTaskType } from "@/types"
 
 type TaskCard = {
@@ -44,23 +44,20 @@ type TaskCard = {
 
 const slugOf = (href: string) => href.split("/").pop() ?? ""
 
-const TASK_CARDS: TaskCard[] = [
-  { href: "/practice/read-aloud", section: "Speaking", title: "Read Aloud", timer: "35s prep · 40s", azure: true, taskType: "read_aloud" },
-  { href: "/practice/repeat-sentence", section: "Speaking", title: "Repeat Sentence", timer: "15s", azure: true, taskType: "repeat_sentence" },
-  { href: "/practice/answer-short-question", section: "Speaking", title: "Answer Short Question", timer: "10s", azure: false, taskType: "answer_short_question" },
-  { href: "/practice/personal-intro", section: "Speaking", title: "Personal Introduction", timer: "25s prep · 30s", azure: false, taskType: "personal_intro" },
-  { href: "/practice/describe-image", section: "Speaking", title: "Describe Image", timer: "25s prep · 40s", azure: false, taskType: "describe_image" },
-  { href: "/practice/re-tell-lecture", section: "Speaking", title: "Re-tell Lecture", timer: "~60s listen · 10s prep · 40s", azure: false, taskType: "re_tell_lecture" },
-  { href: "/practice/summarize-written-text", section: "Writing", title: "Summarize Written Text", timer: "10 min", azure: false, taskType: "summarize_written_text" },
-  { href: "/practice/write-essay", section: "Writing", title: "Write Essay", timer: "20 min", azure: false, taskType: "write_essay" },
-  { href: "/practice/write-from-dictation", section: "Listening", title: "Write from Dictation", timer: "~30s", azure: false, taskType: "write_from_dictation" },
-  { href: "/practice/summarize-spoken-text", section: "Listening", title: "Summarize Spoken Text", timer: "~60s listen · 10 min write", azure: false, taskType: "summarize_spoken_text" },
-  { href: "/practice/fill-in-the-blanks-listening", section: "Listening", title: "Fill in the Blanks", timer: "~60s listen · 7 min", azure: false, taskType: "fill_in_the_blanks_listening" },
-  { href: "/practice/highlight-correct-summary", section: "Listening", title: "Highlight Correct Summary", timer: "~60s listen · 5 min", azure: false, taskType: "highlight_correct_summary" },
-  { href: "/practice/fill-in-the-blanks", section: "Reading", title: "Fill in the Blanks", timer: "7 min", azure: false, taskType: "fill_in_the_blanks_reading" },
-  { href: "/practice/re-order-paragraphs", section: "Reading", title: "Re-order Paragraphs", timer: "3 min", azure: false, taskType: "re_order_paragraphs" },
-  { href: "/practice/multiple-choice", section: "Reading", title: "Multiple Choice", timer: "4 min", azure: false, taskType: "multiple_choice_reading" },
-]
+const TASK_CARDS: TaskCard[] = ALL_TASK_TYPES.map((taskType) => {
+  const meta = TASK_TYPE_REGISTRY[taskType]
+  return {
+    href: `/practice/${meta.route}`,
+    section: meta.category.charAt(0).toUpperCase() + meta.category.slice(1),
+    // Cards sit under their section heading, so the "(Reading)" /
+    // "(Listening)" disambiguator in the catalogue name is redundant here.
+    title: meta.displayName.replace(/ \((Reading|Listening)\)$/, ""),
+    // A spoken Stimulus adds listening time that depends on its length.
+    timer: [meta.spokenStimulus ? "listen" : null, timingSummary(taskType) || null].filter(Boolean).join(" · "),
+    azure: meta.pronunciationAssessment,
+    taskType,
+  }
+})
 
 const THEME_CHIPS = ["education", "environment", "technology", "health", "society", "science"] as const
 
@@ -153,7 +150,7 @@ export default function PracticeHubPage() {
         const ranked = rankWeaknesses(derived)
         const top3 = ranked.slice(0, 3).map((w) => ({
           taskType: w.taskType,
-          label: PTE_TASK_LABELS[w.taskType],
+          label: TASK_TYPE_REGISTRY[w.taskType].displayName,
           score: w.score,
           recentCount: w.recentCount,
         }))

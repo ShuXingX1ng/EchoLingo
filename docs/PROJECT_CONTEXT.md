@@ -1,6 +1,6 @@
 # EchoLingo Project Context
 
-更新日期：2026-10-11
+更新日期：2026-10-13
 
 ## Product
 
@@ -19,7 +19,8 @@ PTE 产品 MVP 和平台架构已完成，当前进入 **Read Aloud Speech Evalu
 - 已完成：Speech Evaluator M0（`speech/` 包骨架、固定 encoder revision、smoke test）、M1（SpeechOcean762 下载/校验、说话人隔离切分、MFA 对齐、Wav2Vec2 特征缓存）、M2（A0 冻结编码器多任务评分基线，两个种子；结果见 `speech/docs/m2-acceptance-report.md`）。
 - A0 现状：封存测试集句子级 Accuracy/Fluency Pearson 达到 0.60 门槛；单词/音素级相关性约 0.27–0.29，单词错误检测与无学习基线持平。A0 是研究基线，不是已验收模型。
 - 训练环境：原 WSL2 + RTX 4070 机器已不可用，训练迁移到租用的 Linux 云 GPU（ADR-0014）。数据、特征缓存、MLflow 记录和检查点不在 Git 中，需在新环境重建。
-- 已确认但未实施：M3 候选改进、Checkpoint Bundle、独立 GPU worker 服务、provider-neutral contract 和显式 compare mode。
+- 已实施的 seam：`backend/services/speech_evaluation.py` 定义 provider-neutral 的 Speech Evaluation Result，目前只有 Azure 一个 adapter；前端与 Feedback 流程不再接触 Azure 字段名。
+- 已确认但未实施：M3 候选改进、Checkpoint Bundle、独立 GPU worker 服务、EchoLingo provider 和显式 compare mode。
 - 当前权威计划：[`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 与 ADR 0011–0014。
 
 ## Runtime Architecture
@@ -46,15 +47,18 @@ FastAPI 是唯一业务后端。Next.js 中不存在 PTE、LLM、TTS、pronuncia
 - Next.js 16 App Router、React 19、TypeScript、Tailwind CSS 4。
 - 主要页面：home、practice hub、15 个 task pages、mock、history、stats、vocabulary、settings、onboarding、admin。
 - `src/lib/api-client.ts` 统一访问 FastAPI，并包含 timeout/circuit-breaker 行为。
-- `src/lib/task-type-registry.ts` 是前端 Task Type 元数据入口；`src/data/task-types.json` 为 Python backend 提供共享 slug 列表。
-- `usePracticeTaskRunner` 与 `useRecordingSession` 复用练习生命周期和录音状态。
+- `src/data/task-types.json` 是前后端共用的 Task Type Catalogue（Section、路由、标签键、Stimulus 形式、计时、计分维度与满分、Mock Exam 顺序）；前端经 `src/lib/task-type-registry.ts` 读取，backend 经 `backend/services/task_types.py` 读取，两侧各有一致性测试。
+- `usePracticeTaskRun` 是全部 15 个 Task Type 的 Practice Task 运行模块（加载 Stimulus、TTS 播放、准备/作答计时、录音、Feedback 请求、保存；Read Aloud 与 Repeat Sentence 的录音通过一次 `POST /api/pte/spoken-feedback` 请求同时取得 Speech Evaluation Result 与 Feedback）；Task Practice 页面、Mock Exam 屏幕和 onboarding 诊断面板只负责展示（onboarding 传入预置 Stimulus 并只收集 Response，四题合并评估）。结构化 Stimulus 的解析与评分字符串集中在 `src/lib/structured-stimulus.ts`，`useRecordingSession` 负责录音状态。
+- `src/lib/synced-store.ts` 是 learner data store：Practice Tasks 与 Vocabulary List 的保存、列表、删除、按 Task Type 查询和清空都经过同一套“已登录走 Supabase、否则走 localStorage”的策略（登录状态缓存、超时、降级）。首页与设置页的连续天数、今日是否练习、每周目标由 `src/lib/practice-activity.ts` 从 Practice Tasks 计算。
 - Supabase 不可用时，适用的数据层使用本地存储降级；这不代表业务 API 有本地 fallback。
+- 已移除的 IELTS 遗留：会话历史、错误模式、IELTS 话题库及其管理页、band 目标、本地备份导出。对应的 Supabase 表未改动。
 
 ## Backend
 
 - FastAPI 入口：`backend/main.py`。
-- HTTP routers：TTS、pronunciation、PTE stimulus、PTE feedback、word lookup、onboarding、Study Assistant。
-- `feedback_graph.py`：rubric retrieval → pronunciation context → Primary/Judge 并行 → divergence check → optional retry → Coach → finalize。
+- HTTP routers：TTS、PTE stimulus、PTE feedback（含录音作答的 spoken-feedback）、word lookup、onboarding、Study Assistant。
+- `feedback_graph.py`：rubric retrieval → speech evaluation context → Primary/Judge 并行 → divergence check → optional retry → Coach → finalize。
+- `llm_chain.py` 是唯一构造模型 client 的模块，提供纯文本、JSON 解析和有上限的工具调用循环；Feedback coach 与 Study Assistant 都经由它调用模型。
 - `onboarding_graph.py`：并行评估诊断任务，生成 weakness profile 与第一周计划。
 - `study_assistant_graph.py`：最多四轮的工具调用循环；只能返回 allow-listed routes。
 - 外部付费服务不得进入普通 CI/E2E；测试默认 mock LLM、Azure、Supabase 与 embedding 调用。
@@ -100,7 +104,7 @@ Exemplar 默认只作为 few-shot grounding，不向学习者逐字提供。生�
 
 ### Current
 
-- Read Aloud、Repeat Sentence：Azure 提供 word/phoneme 证据。
+- Read Aloud、Repeat Sentence：Azure 提供 word/phoneme 证据，经 Azure adapter 转为 Speech Evaluation Result（不含 10–90 的 Spoken Task Score Estimate）。
 - 其他需要转录的口语任务：使用现有 STT/LLM 路径生成学习反馈。
 
 ### Confirmed target for Read Aloud

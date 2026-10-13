@@ -1,137 +1,17 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-const TIME_LIMIT = 600 // 10 minutes to write summary
-
-type Phase = "idle" | "generating" | "ready" | "listening" | "writing" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function SummarizeSpokenTextPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [passageText, setPassageText] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [summary, setSummary] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
-  const [played, setPlayed] = useState(false)
-
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-  }, [])
-
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    setPhase("generating")
-    setError(""); setFeedback(null); setSummary(""); setPlayed(false); setSeconds(TIME_LIMIT)
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const text = await loadStimulusText({ taskType: "summarize_spoken_text" })
-      setPassageText(text)
-
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      const url = URL.createObjectURL(blob)
-      setAudioUrl(url)
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('practiceTask.read-aloud.errorGenerate'))
-      setPhase("error")
-    }
-  }, [audioUrl, t])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playPassage = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-
-    audio.onended = () => {
-      setPlayed(true)
-      setPhase("writing")
-      startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-    }
-
-    setPhase("listening")
-    requestAnimationFrame(() => {
-      audio.play().catch(() => {
-        setPhase("ready")
-        audioRef.current = null
-      })
-    })
-  }, [audioUrl])
-
-  const handleSubmit = useCallback(async () => {
-    if (!summary.trim()) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "summarize_spoken_text",
-        stimulus: passageText,
-        response: summary.trim(),
-      }, { timeoutMs: 90000 })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "summarize_spoken_text",
-        stimulus: { kind: "audio", content: passageText },
-        response: { kind: "text", content: summary.trim() },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [passageText, summary])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  const {
+    phase, seconds, feedback, error, hasPlayed: played,
+    userText: summary, setText: setSummary, play: playPassage, submit: handleSubmit, generate,
+  } = usePracticeTaskRun("summarize_spoken_text")
 
   const wordCount = summary.trim() ? summary.trim().split(/\s+/).length : 0
   const mins = Math.floor(seconds / 60)
@@ -181,7 +61,7 @@ export default function SummarizeSpokenTextPage() {
           </div>
         )}
 
-        {phase === "ready" && audioUrl && (
+        {phase === "ready" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               {t('practiceTask.common.passageReady')}

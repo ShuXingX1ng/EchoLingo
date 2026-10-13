@@ -106,7 +106,7 @@ Implemented in `backend/services/feedback_graph.py`.
 
 ```mermaid
 flowchart TD
-  A["retrieve_context"] --> B["process_pronunciation"]
+  A["retrieve_context"] --> B["process_speech_evaluation"]
   B --> C["call_primary"]
   B --> D["call_judge"]
   C --> E["check_divergence"]

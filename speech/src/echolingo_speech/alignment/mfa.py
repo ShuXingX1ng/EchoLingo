@@ -28,6 +28,7 @@ from echolingo_speech.data.manifest import AlignmentInfo, ManifestRecord, read_j
 ACOUSTIC_MODEL = "english_us_arpa"
 DICTIONARY = "english_us_arpa"
 CONDA_ENV = "aligner"
+MFA_BIN_ENV_VAR = "ECHOLINGO_MFA_BIN"
 QUALITY_THRESHOLD = 0.95
 
 _PUNCTUATION_RE = re.compile(r"[^\w\s']", flags=re.UNICODE)
@@ -62,18 +63,38 @@ def _resolve_mfa_invocation(conda_env: str) -> tuple[list[str], dict[str, str]]:
     binary path avoids that dependency, but MFA itself shells out to sibling
     OpenFst/Kaldi binaries (e.g. `fstcompile`) assuming they are on PATH — normally
     provided by conda's shell activation — so the env's `bin/` dir must still be
-    prepended to PATH explicitly. Falls back to `conda run` (and an unmodified
-    PATH) if the conda env isn't found at the conventional Miniforge/Miniconda
-    location (e.g. a differently-configured machine).
+    prepended to PATH explicitly.
+
+    Lookup order: the `ECHOLINGO_MFA_BIN` override (an absolute path to the
+    `mfa` binary, for instance images that install conda somewhere unusual),
+    then the `aligner` env under each known conda root. Falls back to
+    `conda run` (and an unmodified PATH) only if none of those exist.
     """
-    for conda_root in (Path.home() / "miniforge3", Path.home() / "miniconda3"):
-        env_bin = conda_root / "envs" / conda_env / "bin"
-        candidate = env_bin / "mfa"
+    for candidate in _mfa_binary_candidates(conda_env):
         if candidate.is_file():
             env = os.environ.copy()
-            env["PATH"] = f"{env_bin}{os.pathsep}{env.get('PATH', '')}"
+            env["PATH"] = f"{candidate.parent}{os.pathsep}{env.get('PATH', '')}"
             return [str(candidate)], env
     return ["conda", "run", "-n", conda_env, "mfa"], os.environ.copy()
+
+
+def _mfa_binary_candidates(conda_env: str) -> list[Path]:
+    candidates: list[Path] = []
+    override = os.environ.get(MFA_BIN_ENV_VAR)
+    if override:
+        candidates.append(Path(override).expanduser())
+
+    conda_roots: list[Path] = []
+    conda_exe = os.environ.get("CONDA_EXE")  # <root>/bin/conda, set by conda's shell hook
+    if conda_exe:
+        conda_roots.append(Path(conda_exe).resolve().parent.parent)
+    conda_roots += [
+        Path.home() / "miniforge3",
+        Path.home() / "miniconda3",
+        Path("/opt/conda"),
+    ]
+    candidates += [root / "envs" / conda_env / "bin" / "mfa" for root in conda_roots]
+    return candidates
 
 
 def run_align(

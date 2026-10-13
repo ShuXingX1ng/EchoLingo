@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
-const TIME_LIMIT = 1200
 const MIN_WORDS = 200
 const MAX_WORDS = 300
 
@@ -13,12 +12,8 @@ export default function MockWriteEssay({ onComplete }: { onComplete: (task: Prac
   const { t } = useTranslation()
   const {
     phase, stimulus, seconds, error, savedTask,
-    userText, setText, submit, generate,
-  } = usePracticeTaskRunner({
-    taskType: "write_essay",
-    responseKind: "text",
-    timeLimit: TIME_LIMIT,
-  })
+    userText, setText, submit, generate, emptyTask,
+  } = usePracticeTaskRun("write_essay", { mode: "mock" })
 
   useEffect(() => {
     if (phase === "done" && savedTask) onComplete(savedTask)
@@ -31,14 +26,7 @@ export default function MockWriteEssay({ onComplete }: { onComplete: (task: Prac
   const wordCount = userText.trim().split(/\s+/).filter(Boolean).length
   const wordStatus = wordCount < MIN_WORDS ? "below" : wordCount > MAX_WORDS ? "over" : "ok"
 
-  const skipTask = () => onComplete({
-    id: `mock_${Date.now()}`,
-    taskType: "write_essay",
-    stimulus: { kind: "text", content: stimulus },
-    response: { kind: "text", content: "" },
-    durationSeconds: 0,
-    createdAt: new Date().toISOString(),
-  })
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">

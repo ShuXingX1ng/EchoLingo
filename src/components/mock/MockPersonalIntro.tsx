@@ -1,126 +1,29 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost } from "@/lib/api-client"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
 import { useTranslation } from "@/lib/i18n"
-import type { PracticeTask, TaskFeedback } from "@/types"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import type { PracticeTask } from "@/types"
 import CountdownRing from "./CountdownRing"
-
-const PREP_TIME = 25
-const RECORD_TIME = 30
-const PROMPT =
-  "Please introduce yourself. Tell us about your background, studies or work, " +
-  "your English learning experience, and your goals. Speak naturally and clearly."
-
-type Phase = "prep" | "recording" | "processing" | "done" | "error"
 
 export default function MockPersonalIntro({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("prep")
-  const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
+  const {
+    phase, stimulus, seconds: prepSec, timer, savedTask: doneTask, recSeconds, emptyTask,
+  } = usePracticeTaskRun("personal_intro", { mode: "mock" })
 
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    let fb: TaskFeedback | null = null
-    try {
-      if (audioBlob.size > 0) {
-        fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "personal_intro", stimulus: PROMPT, response: tx })
-      }
-    } catch { /* best-effort */ }
-
-    const finalFb: TaskFeedback = fb ?? {
-      summary: "Warm-up complete. No score for Personal Introduction.",
-      strengths: [], weaknesses: [], suggestions: [],
-    }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "personal_intro",
-        stimulus: { kind: "text", content: PROMPT },
-        response: { kind: "audio", content: tx },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "personal_intro",
-        stimulus: { kind: "text", content: PROMPT },
-        response: { kind: "audio", content: tx },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    onComplete: processAudio,
-    onError: () => { setPhase("error") },
-  })
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-  }, [])
-
-  // Auto-start prep timer on mount
-  useEffect(() => {
-    prepTimerRef.current = setInterval(() => {
-      setPrepSec(s => {
-        if (s <= 1) {
-          clearInterval(prepTimerRef.current!)
-          setPhase("recording")
-          recording.start()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const skipTask = () => {
-    const emptyTask: PracticeTask = {
-      id: `mock_${Date.now()}`,
-      taskType: "personal_intro",
-      stimulus: { kind: "text", content: PROMPT },
-      response: { kind: "audio", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    }
-    onComplete(emptyTask)
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">
       <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-800/40">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-2">{t("mock.common.taskPrompt")}</p>
-        <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{PROMPT}</p>
+        <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{stimulus}</p>
       </div>
 
       {phase === "prep" && (
         <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-4">{t("mock.common.preparation")}</p>
-          <CountdownRing seconds={prepSec} total={PREP_TIME} size={80} />
+          <CountdownRing seconds={prepSec} total={timer.prepSeconds} size={80} />
           <p className="mt-4 text-xs text-slate-400">{t("mock.common.recordingStartsAuto")}</p>
         </div>
       )}
@@ -133,7 +36,7 @@ export default function MockPersonalIntro({ onComplete }: { onComplete: (task: P
               {t("mock.personalIntro.recordingPhase")}
             </p>
           </div>
-          <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
+          <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={80} />
           <p className="mt-4 text-xs text-slate-400">{t("mock.common.recordingStopsAuto")}</p>
         </div>
       )}

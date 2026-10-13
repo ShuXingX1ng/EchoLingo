@@ -1,5 +1,3 @@
-import { getSessions } from "./history";
-
 export type ReminderSettings = {
   examDate: string | null; // ISO date string (YYYY-MM-DD)
   dailyReminderEnabled: boolean;
@@ -55,56 +53,4 @@ export function getDaysUntilExam(): number | null {
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
   return diffDays;
-}
-
-export function hasPracticedToday(): boolean {
-  const sessions = getSessions();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  return sessions.some((session) => {
-    const sessionDate = new Date(session.createdAt);
-    return sessionDate >= today && sessionDate < tomorrow;
-  });
-}
-
-export function getStreakDays(): number {
-  const sessions = getSessions();
-  if (sessions.length === 0) return 0;
-
-  // Get unique practice dates (YYYY-MM-DD)
-  const practiceDates = new Set<string>();
-  for (const session of sessions) {
-    const d = new Date(session.createdAt);
-    practiceDates.add(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-    );
-  }
-
-  let streak = 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Check if practiced today; if not, start checking from yesterday
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const checkDate = new Date(today);
-
-  if (!practiceDates.has(todayStr)) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  while (true) {
-    const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, "0")}-${String(checkDate.getDate()).padStart(2, "0")}`;
-    if (practiceDates.has(dateStr)) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-
-  return streak;
 }

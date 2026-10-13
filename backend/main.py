@@ -13,7 +13,7 @@ load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from routers import tts, pronunciation, pte_stimulus, pte_feedback, word_lookup, onboarding, study_assistant  # noqa: E402
+from routers import tts, pte_stimulus, pte_feedback, word_lookup, onboarding, study_assistant  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(
@@ -41,7 +41,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(tts.router, prefix="/api", tags=["tts"])
-app.include_router(pronunciation.router, prefix="/api", tags=["pronunciation"])
 app.include_router(pte_stimulus.router, prefix="/api", tags=["pte"])
 app.include_router(pte_feedback.router, prefix="/api", tags=["pte"])
 app.include_router(word_lookup.router, prefix="/api", tags=["word-lookup"])

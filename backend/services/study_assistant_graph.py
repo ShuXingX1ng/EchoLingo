@@ -24,16 +24,17 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import urllib.parse
 from typing import Optional, TypedDict
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
+from services.llm_chain import llm_chain
+
 from tools.study_assistant_tools import (
+    SUPPORTED_PRACTICE_TASK_TYPES,
     filter_links,
     generate_practice,
     navigate_app,
@@ -50,7 +51,6 @@ _RECENCY_CUES = re.compile(
 
 # ── Tools available to the Study Assistant ────────────────────────────────────
 _TOOLS = [navigate_app, generate_practice, pte_knowledge]
-_TOOL_MAP = {t.name: t for t in _TOOLS}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,9 +87,7 @@ for PTE Academic learners.
 You have three tools:
 1. navigate_app — use for questions about how to find features or pages in the app.
 2. generate_practice — use when the learner wants to practise a specific topic. \
-   TEXT TASK TYPES ONLY (read_aloud, summarize_written_text, write_essay, \
-   fill_in_the_blanks_reading, re_order_paragraphs, multiple_choice_reading, \
-   highlight_correct_summary). Call this tool with the learner's topic and their \
+   TEXT TASK TYPES ONLY ({", ".join(SUPPORTED_PRACTICE_TASK_TYPES)}). Call this tool with the learner's topic and their \
    chosen (or best-fitting) task type.
 3. pte_knowledge — use for questions about the PTE Academic exam format, scoring, \
    timing, or study strategies.
@@ -140,28 +138,6 @@ def _lc_messages(messages: list[dict], locale: str) -> list:
     return lc_msgs
 
 
-def _make_llm_with_tools(max_tokens: int = 800, timeout: float = 45.0) -> object:
-    return ChatOpenAI(
-        model=os.getenv("LLM_MODEL", "deepseek-chat"),
-        api_key=os.getenv("LLM_API_KEY"),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
-        temperature=0.5,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    ).bind_tools(_TOOLS)
-
-
-def _make_final_llm(max_tokens: int = 600, timeout: float = 30.0) -> object:
-    return ChatOpenAI(
-        model=os.getenv("LLM_MODEL", "deepseek-chat"),
-        api_key=os.getenv("LLM_API_KEY"),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
-        temperature=0.5,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    )
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Graph nodes
 # ─────────────────────────────────────────────────────────────────────────────
@@ -178,72 +154,51 @@ async def run_tool_loop_node(state: StudyAssistantState) -> dict:
     locale = state["locale"]
     source = _detect_source(messages)
 
-    lc_msgs = _lc_messages(messages, locale)
-    llm_with_tools = _make_llm_with_tools()
-
     practice_result: Optional[dict] = None
     reply_text = ""
 
+    def on_tool_result(name: str, raw_result: str) -> None:
+        nonlocal practice_result
+        # navigate_app and pte_knowledge only add context for the model's
+        # reply; generate_practice also yields the practice deep-link.
+        if name != "generate_practice":
+            return
+        try:
+            parsed = json.loads(raw_result)
+        except Exception:
+            return
+        if "error" in parsed:
+            return
+        # The route carries the graph-determined source (recency gate), not
+        # whatever the tool was called with.
+        route = f"/practice/{parsed['taskSlug']}?mode=theme&topic={urllib.parse.quote(parsed['topic'], safe='')}"
+        if source == "news":
+            route += "&source=news"
+        practice_result = {
+            "taskType": parsed["taskType"],
+            "taskSlug": parsed["taskSlug"],
+            "topic": parsed["topic"],
+            "source": source,
+            "route": route,
+        }
+
     try:
-        for _ in range(4):
-            response = await llm_with_tools.ainvoke(lc_msgs)
-            lc_msgs = lc_msgs + [response]
+        loop = await llm_chain.run_tool_loop(
+            _lc_messages(messages, locale),
+            _TOOLS,
+            temperature=0.5,
+            max_tokens=800,
+            timeout=45.0,
+            on_tool_result=on_tool_result,
+        )
+        reply_text = loop.text.strip()
 
-            if not response.tool_calls:
-                reply_text = (response.content or "").strip()
-                break
-
-            for tc in response.tool_calls:
-                tool = _TOOL_MAP.get(tc["name"])
-                if tool is None:
-                    continue
-
-                raw_result = tool.invoke(tc["args"])
-                lc_msgs = lc_msgs + [
-                    ToolMessage(content=raw_result, tool_call_id=tc["id"])
-                ]
-
-                # Post-process tool results to extract structured data
-                try:
-                    parsed = json.loads(raw_result)
-                except Exception:
-                    parsed = {}
-
-                if tc["name"] == "navigate_app":
-                    # Extract links from the feature/route context
-                    # The model will synthesise the answer text; we accumulate
-                    # links from the allow-list for the response envelope.
-                    # We inject all allowlisted routes as potential links —
-                    # the model's reply text determines which are mentioned.
-                    # The final filter_links call enforces the allow-list.
-                    pass
-
-                elif tc["name"] == "generate_practice":
-                    if "error" not in parsed:
-                        # Inject the graph-determined source (recency gate)
-                        parsed["source"] = source
-                        # Rebuild route with &source=news if needed
-                        base_route = f"/practice/{parsed['taskSlug']}?mode=theme&topic={urllib.parse.quote(parsed['topic'], safe='')}"
-                        if source == "news":
-                            base_route += "&source=news"
-                        parsed["route"] = base_route
-                        practice_result = {
-                            "taskType": parsed["taskType"],
-                            "taskSlug": parsed["taskSlug"],
-                            "topic": parsed["topic"],
-                            "source": source,
-                            "route": base_route,
-                        }
-
-                elif tc["name"] == "pte_knowledge":
-                    # Knowledge context injected into messages; model synthesises reply
-                    pass
-
-        # If loop ended without a clean text reply, force a final answer
+        # If the loop ended without a text reply, force a final answer
         if not reply_text:
-            final_llm = _make_final_llm()
-            final = await final_llm.ainvoke(lc_msgs)
-            reply_text = (final.content or "").strip()
+            final = await llm_chain.ainvoke_messages(
+                loop.messages, temperature=0.5, max_tokens=600, timeout=30.0,
+            )
+            reply_text = final.strip()
 
     except Exception as exc:
         logger.warning("[study-assistant] tool loop failed: %s", exc)

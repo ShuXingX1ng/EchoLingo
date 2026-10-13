@@ -26,12 +26,7 @@ STRESS_CORRECT_RAW = 10
 
 def normalize_sentence_scores(sentence: dict) -> dict[str, float]:
     """Map the four sentence-level regression targets to [0, 1]."""
-    return {
-        "accuracy": sentence["accuracy"] / SENTENCE_SCALE,
-        "fluency": sentence["fluency"] / SENTENCE_SCALE,
-        "prosodic": sentence["prosodic"] / SENTENCE_SCALE,
-        "completeness": sentence["completeness"] / SENTENCE_SCALE,
-    }
+    return {key: sentence[key] / SENTENCE_SCALE for key in SENTENCE_TARGET_KEYS}
 
 
 def normalize_word_score(word: dict) -> dict[str, float]:

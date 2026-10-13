@@ -1,5 +1,5 @@
 import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
-import { ALL_TASK_TYPES } from "@/lib/task-type-registry"
+import { ALL_TASK_TYPES, averageDimensionScore, dimensionEntries } from "@/lib/task-type-registry"
 
 // Overall performance score from a single task (0–100).
 // Uses actual dimension scores when available (Phase 6); falls back to strengths/weaknesses heuristic.
@@ -8,20 +8,8 @@ function scoreFromTask(task: PracticeTask): number | null {
   if (!feedback) return null
 
   const ds = feedback.dimensionScores
-  if (ds) {
-    if (ds.section === "speaking") {
-      return Math.round((ds.fluency + ds.pronunciation + ds.content) / 3)
-    }
-    if (ds.section === "writing") {
-      return Math.round((ds.grammar + ds.vocabulary + ds.form + ds.content) / 4)
-    }
-    if (ds.section === "reading") {
-      return Math.round((ds.vocabulary + ds.comprehension) / 2)
-    }
-    if (ds.section === "listening") {
-      return Math.round((ds.comprehension + ds.accuracy) / 2)
-    }
-  }
+  const average = ds ? averageDimensionScore(ds) : null
+  if (average !== null) return average
 
   // Fallback heuristic: proportion of strengths vs weaknesses
   const strengths = feedback.strengths.length
@@ -55,31 +43,7 @@ function aggregateDimensions(tasks: PracticeTask[]): DimensionWeakness[] | undef
     if (!ds) continue
 
     const weight = recencyWeight(task.createdAt)
-    let entries: Array<[string, number]> = []
-    if (ds.section === "speaking") {
-      entries = [
-        ["fluency", ds.fluency],
-        ["pronunciation", ds.pronunciation],
-        ["content", ds.content],
-      ]
-    } else if (ds.section === "writing") {
-      entries = [
-        ["grammar", ds.grammar],
-        ["vocabulary", ds.vocabulary],
-        ["form", ds.form],
-        ["content", ds.content],
-      ]
-    } else if (ds.section === "reading") {
-      entries = [
-        ["vocabulary", ds.vocabulary],
-        ["comprehension", ds.comprehension],
-      ]
-    } else if (ds.section === "listening") {
-      entries = [
-        ["comprehension", ds.comprehension],
-        ["accuracy", ds.accuracy],
-      ]
-    }
+    const entries = dimensionEntries(ds)
 
     for (const [dim, score] of entries) {
       const entry = dimMap.get(dim) ?? { weightedSum: 0, totalWeight: 0 }

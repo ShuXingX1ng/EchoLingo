@@ -41,10 +41,6 @@ export function getTasks(): PracticeTask[] {
   }
 }
 
-export function getTaskById(id: string): PracticeTask | null {
-  return getTasks().find((t) => t.id === id) || null
-}
-
 export function deleteTask(id: string): boolean {
   const tasks = getTasks()
   const index = tasks.findIndex((t) => t.id === id)

@@ -62,6 +62,16 @@ class SpeechEvaluatorA0(nn.Module):
         dropout: float = 0.3,
     ) -> None:
         super().__init__()
+        # Constructor arguments, recorded so a checkpoint can rebuild this
+        # exact shape (`training/checkpoint.py`) and a run can log it.
+        self.config = {
+            "hidden_dim": hidden_dim,
+            "num_acoustic_features": num_acoustic_features,
+            "sentence_trunk_dim": sentence_trunk_dim,
+            "word_trunk_dim": word_trunk_dim,
+            "phone_trunk_dim": phone_trunk_dim,
+            "dropout": dropout,
+        }
         self.sentence_pooling = AttentiveStatisticsPooling(hidden_dim)
         sentence_input_dim = hidden_dim * 2 + num_acoustic_features
         self.sentence_trunk = nn.Sequential(

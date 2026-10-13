@@ -2,7 +2,7 @@
 
 These tests are skipped (not failed) when a GPU or network is unavailable,
 so `pytest` stays usable offline while still proving the trained-model path
-end to end when the WSL2/RTX 4070 environment is present.
+end to end when a Linux CUDA GPU (ADR-0014) is present.
 """
 
 from __future__ import annotations
@@ -29,11 +29,10 @@ requires_gpu = pytest.mark.skipif(not _cuda_available(), reason="no CUDA GPU ava
 
 @pytest.mark.gpu
 @requires_gpu
-def test_cuda_matmul_on_rtx_4070():
+def test_cuda_matmul():
     import torch
 
-    device_name = torch.cuda.get_device_name(0)
-    assert "4070" in device_name
+    assert torch.cuda.get_device_name(0)
 
     a = torch.randn(256, 256, device="cuda")
     b = torch.randn(256, 256, device="cuda")

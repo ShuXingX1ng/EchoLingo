@@ -17,7 +17,8 @@ from langgraph.graph import END, StateGraph
 
 from models.schemas import PteFeedbackRequest
 from services.feedback_graph import run_feedback_graph
-from services.llm_chain import llm_chain
+from services.llm_chain import llm_chain, parse_json
+from services.task_types import TASK_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -101,20 +102,16 @@ async def diagnose_node(state: OnboardingState) -> dict:
         json_mode=True,
         timeout=30.0,
     )
-    try:
-        profile = json.loads(raw or "{}")
-    except Exception:
-        profile = {}
+    profile = parse_json(raw) or {}
     return {"weakness_profile": profile}
 
 
 # ─── Node 3: plan ─────────────────────────────────────────────────────────────
 
-_TASK_SLUGS = (
-    "read_aloud, repeat_sentence, answer_short_question, summarize_written_text, "
-    "write_essay, describe_image, re_tell_lecture, fill_in_the_blanks_reading, "
-    "re_order_paragraphs, multiple_choice_reading, summarize_spoken_text, "
-    "fill_in_the_blanks_listening, highlight_correct_summary, write_from_dictation"
+# Every Task Type that has a Stimulus to practise against; Personal
+# Introduction has none, so the plan never recommends it.
+_TASK_SLUGS = ", ".join(
+    entry.id for entry in TASK_TYPES.values() if entry.stimulus_format != "none"
 )
 
 _PLAN_SYSTEM = f"""
@@ -149,10 +146,7 @@ async def plan_node(state: OnboardingState) -> dict:
         json_mode=True,
         timeout=30.0,
     )
-    try:
-        plan = json.loads(raw or "{}")
-    except Exception:
-        plan = {}
+    plan = parse_json(raw) or {}
     return {"learning_plan": plan}
 
 

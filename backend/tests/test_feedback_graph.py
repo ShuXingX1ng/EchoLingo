@@ -25,6 +25,8 @@ def _stub_vecs():
 _stub_vecs()
 
 import services.feedback_graph as fg  # noqa: E402
+from services.llm_chain import ToolLoopResult  # noqa: E402
+from tests.scripted_llm import ScriptedChatModel, tool_call  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -36,8 +38,8 @@ def _base_state(**overrides) -> fg.FeedbackState:
         "task_type": "read_aloud",
         "stimulus": "The quick brown fox.",
         "response": "The quick brown fox.",
-        "pron_assessment": None,
-        "pron_context": "",
+        "speech_evaluation": None,
+        "speech_context": "",
         "retrieved_context": "",
         "primary_result": None,
         "judge_result": None,
@@ -93,25 +95,28 @@ async def test_retrieve_context_node_returns_empty_on_error():
 
 
 # ---------------------------------------------------------------------------
-# process_pronunciation_node
+# process_speech_evaluation_node
 # ---------------------------------------------------------------------------
 
-@pytest.mark.anyio
-async def test_process_pronunciation_node_no_assessment():
-    state = _base_state(pron_assessment=None)
-    result = await fg.process_pronunciation_node(state)
-    assert result == {"pron_context": ""}
+_EVALUATION = {"provider": "azure", "overallScore": 85, "pronunciation": 82, "oralFluency": 88, "content": 91}
 
 
 @pytest.mark.anyio
-async def test_process_pronunciation_node_formats_scores():
-    pron = {"score": 85, "accuracyScore": 82, "fluencyScore": 88, "completenessScore": 91}
-    state = _base_state(pron_assessment=pron)
-    result = await fg.process_pronunciation_node(state)
-    ctx = result["pron_context"]
-    assert "85" in ctx
-    assert "82" in ctx
-    assert "Azure Pronunciation scores" in ctx
+async def test_process_speech_evaluation_node_no_evaluation():
+    state = _base_state(speech_evaluation=None)
+    result = await fg.process_speech_evaluation_node(state)
+    assert result == {"speech_context": ""}
+
+
+@pytest.mark.anyio
+async def test_process_speech_evaluation_node_formats_dimension_estimates():
+    state = _base_state(speech_evaluation=_EVALUATION)
+    result = await fg.process_speech_evaluation_node(state)
+    ctx = result["speech_context"]
+    assert "Pronunciation: 82" in ctx
+    assert "Oral fluency: 88" in ctx
+    assert "Content: 91" in ctx
+    assert "Azure" not in ctx
 
 
 # ---------------------------------------------------------------------------
@@ -295,23 +300,34 @@ async def test_retry_primary_node_keeps_original_on_llm_error():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.anyio
-async def test_finalize_node_no_pron_no_divergence():
+async def test_finalize_node_no_evaluation_no_divergence():
     primary = _speaking_primary()
-    state = _base_state(primary_result=primary, pron_assessment=None, diverged=[])
+    state = _base_state(primary_result=primary, speech_evaluation=None, diverged=[])
     result = await fg.finalize_node(state)
 
-    assert "pronunciationAssessment" not in result["final_result"]
+    assert "speechEvaluation" not in result["final_result"]
     assert "judgeLog" not in result["final_result"]
     assert result["final_result"]["dimensionScores"]["section"] == "speaking"
 
 
 @pytest.mark.anyio
-async def test_finalize_node_merges_pron_assessment():
-    pron = {"score": 85, "accuracyScore": 82, "fluencyScore": 88, "completenessScore": 91}
-    state = _base_state(primary_result=_speaking_primary(), pron_assessment=pron, diverged=[])
+async def test_finalize_node_attaches_the_speech_evaluation():
+    state = _base_state(primary_result=_speaking_primary(), speech_evaluation=_EVALUATION, diverged=[])
     result = await fg.finalize_node(state)
 
-    assert result["final_result"]["pronunciationAssessment"] == pron
+    assert result["final_result"]["speechEvaluation"] == _EVALUATION
+
+
+@pytest.mark.anyio
+async def test_finalize_node_caps_content_by_the_evaluated_content_estimate():
+    evaluation = {**_EVALUATION, "content": 40}
+    state = _base_state(
+        primary_result=_speaking_primary(fluency=80, pronunciation=80, content=90),
+        speech_evaluation=evaluation,
+    )
+    result = await fg.finalize_node(state)
+
+    assert result["final_result"]["dimensionScores"]["content"] == 40
 
 
 @pytest.mark.anyio
@@ -333,6 +349,49 @@ async def test_finalize_node_attaches_judge_log_on_divergence():
 # run_feedback_graph (end-to-end with mocked I/O)
 # ---------------------------------------------------------------------------
 
+def _coach_reply(suggestions: list[str]) -> AsyncMock:
+    """`run_tool_loop` stand-in: the coach answers at once, without tool calls."""
+    return AsyncMock(return_value=ToolLoopResult(
+        text=json.dumps({"coachSuggestions": suggestions}), messages=[],
+    ))
+
+
+def _coach_state() -> fg.FeedbackState:
+    return _base_state(primary_result=_speaking_primary(fluency=40))
+
+
+@pytest.mark.anyio
+async def test_coach_looks_up_weaknesses_before_answering(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    model = ScriptedChatModel(
+        tool_call("get_user_weaknesses", {}),
+        json.dumps({"coachSuggestions": ["Slow down.", "Link words."]}),
+    )
+    with patch("services.llm_chain.ChatOpenAI", model):
+        result = await fg.call_coach_node(_coach_state())
+
+    assert result == {"coach_suggestions": ["Slow down.", "Link words."]}
+    assert len(model.conversations) == 2
+    assert "fluency=40" in model.conversations[0][1].content
+
+
+@pytest.mark.anyio
+async def test_coach_forces_a_json_answer_when_the_loop_reply_is_not_json(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    model = ScriptedChatModel("Here are some tips!", json.dumps({"coachSuggestions": ["Pause less."]}))
+    with patch("services.llm_chain.ChatOpenAI", model):
+        result = await fg.call_coach_node(_coach_state())
+
+    assert result == {"coach_suggestions": ["Pause less."]}
+    assert model.constructed[-1]["model_kwargs"] == {"response_format": {"type": "json_object"}}
+
+
+@pytest.mark.anyio
+async def test_coach_failure_leaves_feedback_without_suggestions(monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    assert await fg.call_coach_node(_coach_state()) == {"coach_suggestions": []}
+
+
 @pytest.mark.anyio
 async def test_run_feedback_graph_happy_path():
     primary_json = json.dumps(_speaking_primary())
@@ -342,7 +401,6 @@ async def test_run_feedback_graph_happy_path():
         taskType = "read_aloud"
         stimulus = "The quick brown fox."
         response = "The quick brown fox."
-        pronunciationAssessment = None
         historicalWeaknesses = None
 
     with (
@@ -354,11 +412,17 @@ async def test_run_feedback_graph_happy_path():
         mock_col.query.return_value = []
         mock_factory.return_value = mock_col
         mock_chain.ainvoke = AsyncMock(side_effect=[primary_json, judge_json])
+        mock_chain.run_tool_loop = _coach_reply(["Slow down."])
 
-        result = await fg.run_feedback_graph(FakeRequest())
+        result = await fg.run_feedback_graph(FakeRequest(), speech_evaluation=_EVALUATION)
 
+    assert result["speechEvaluation"] == _EVALUATION
+    # Both scoring steps saw the evaluated dimension estimates.
+    for call in mock_chain.ainvoke.await_args_list:
+        assert "Speech evaluation scores — Pronunciation: 82" in call.kwargs["user"]
     assert result["dimensionScores"]["section"] == "speaking"
     assert "judgeLog" not in result  # no divergence
+    assert result["coachSuggestions"] == ["Slow down."]
 
 
 @pytest.mark.anyio
@@ -371,7 +435,6 @@ async def test_run_feedback_graph_divergence_triggers_retry():
         taskType = "read_aloud"
         stimulus = "Test."
         response = "Test."
-        pronunciationAssessment = None
         historicalWeaknesses = None
 
     with (
@@ -384,6 +447,7 @@ async def test_run_feedback_graph_divergence_triggers_retry():
         mock_factory.return_value = mock_col
         # parallel: primary_v1 + judge_json; then retry: primary_v2
         mock_chain.ainvoke = AsyncMock(side_effect=[primary_v1, judge_json, primary_v2])
+        mock_chain.run_tool_loop = _coach_reply(["Slow down."])
 
         result = await fg.run_feedback_graph(FakeRequest())
 

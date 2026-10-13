@@ -1,107 +1,52 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
+import {
+  fillInTheBlanksFeedbackResponse,
+  fillInTheBlanksFeedbackStimulus,
+  parseFillInTheBlanks,
+  splitPassage,
+  type FillInTheBlanksStimulus,
+} from "@/lib/structured-stimulus"
 
-const TIME_LIMIT = 420 // 7 minutes
-
-type BlankDef = { options: string[]; correct: number }
-type ParsedStimulus = { passage: string; blanks: BlankDef[] }
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as { passage?: unknown; blanks?: unknown }
-    if (typeof parsed.passage !== "string" || !Array.isArray(parsed.blanks)) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-// Split passage into alternating [text, blankIndex, text, blankIndex, ...] segments
-function splitPassage(passage: string): Array<{ type: "text" | "blank"; value: string }> {
-  const parts = passage.split(/(\[BLANK_\d+\])/)
-  return parts.map((p) => {
-    const m = p.match(/^\[BLANK_(\d+)\]$/)
-    return m ? { type: "blank" as const, value: m[1] } : { type: "text" as const, value: p }
-  })
-}
-
-function buildStimulusForFeedback(parsed: ParsedStimulus): string {
-  let passage = parsed.passage
-  parsed.blanks.forEach((b, i) => {
-    passage = passage.replace(`[BLANK_${i}]`, `[${b.options[b.correct]}]`)
-  })
-  const answers = parsed.blanks.map((b, i) => `Blank ${i + 1}: "${b.options[b.correct]}"`).join(", ")
-  return `Passage (with correct answers filled in):\n${passage}\n\nCorrect answers: ${answers}`
-}
-
-function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | null)[]): string {
-  return parsed.blanks
-    .map((b, i) => {
-      const selected = selections[i] ?? "(no answer)"
-      const correct = b.options[b.correct]
-      const isCorrect = selected === correct
-      return `Blank ${i + 1}: selected "${selected}" (correct: "${correct}") ${isCorrect ? "✓" : "✗"}`
-    })
-    .join("\n")
-}
+type ParsedStimulus = FillInTheBlanksStimulus
 
 export default function FillInTheBlanksPage() {
   const { t } = useTranslation()
-  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
-    taskType: "fill_in_the_blanks_reading",
-    responseKind: "text",
-  })
-
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [selections, setSelections] = useState<(string | null)[]>([])
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
 
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectionsRef = useRef<(string | null)[]>([])
-  const [submittedResponse, setSubmittedResponse] = useState("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   useEffect(() => { parsedRef.current = parsed }, [parsed])
   useEffect(() => { selectionsRef.current = selections }, [selections])
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  // Parse JSON stimulus when hook loads it
+  const { phase, stimulus, seconds, feedback, savedTask, error, generate, submit: handleSubmit } =
+    usePracticeTaskRun("fill_in_the_blanks_reading", {
+      buildSubmission: () => {
+        const p = parsedRef.current
+        if (!p || selectionsRef.current.every((s) => s === null)) return null
+        return {
+          feedbackStimulus: fillInTheBlanksFeedbackStimulus(p),
+          feedbackResponse: fillInTheBlanksFeedbackResponse(p, selectionsRef.current),
+        }
+      },
+    })
+  const submittedResponse = savedTask?.response.content ?? ""
+
+  // Parse the structured Stimulus when the run loads it
   useEffect(() => {
     if (!stimulus) return
-    const p = parseStimulus(stimulus)
+    const p = parseFillInTheBlanks(stimulus)
     if (!p) return
     setParsed(p)
     setSelections(new Array(p.blanks.length).fill(null))
-    setSeconds(TIME_LIMIT)
   }, [stimulus])
-
-  const handleSubmit = useCallback(async () => {
-    const p = parsedRef.current
-    if (!p) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    const feedbackStimulus = buildStimulusForFeedback(p)
-    const feedbackResponse = buildResponseForFeedback(p, selectionsRef.current)
-    setSubmittedResponse(feedbackResponse)
-    await submit({ feedbackStimulus, feedbackResponse })
-  }, [submit])
-
-  // Timer while the user is answering
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -192,7 +137,7 @@ export default function FillInTheBlanksPage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulus={buildStimulusForFeedback(parsed)}
+              stimulus={fillInTheBlanksFeedbackStimulus(parsed)}
               stimulusLabel={t('practiceTask.common.passage')}
               responseText={submittedResponse}
               responseLabel={t('practiceTask.fill-in-the-blanks.yourAnswers')}

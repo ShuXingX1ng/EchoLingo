@@ -1,67 +1,65 @@
-"""A0 training loop: AdamW + ReduceLROnPlateau + early stopping over the
-frozen-encoder multi-task scorer, with MLflow tracking (roadmap SS9.4) and a
-CLI entrypoint.
+"""A0 Evaluator Training Run: AdamW + ReduceLROnPlateau + early stopping over
+the frozen-encoder multi-task scorer, with run tracking (roadmap SS9.4),
+resumable checkpoints, and a CLI entrypoint.
 
-`train_one_epoch` / `evaluate` are the two pure, MLflow-free functions worth
-unit testing directly; `run_training` and `_cli` are the orchestration layer
-exercised by the real WSL2 smoke/full runs (task #9/#10), not by fast unit
-tests, since they touch the filesystem, MLflow, and (optionally) a GPU.
+`fit` is the run itself: it takes data loaders and a run definition and
+returns the best model plus a result summary. It reports through a
+`RunTracker` and checkpoints through `training/checkpoint.py`, so it can be
+exercised end to end on CPU with an in-memory tracker and a temp directory.
+`run_training` and `_cli` only add what needs the real filesystem layout:
+building datasets from a manifest and opening the MLflow run.
+
+CLI: `python -m echolingo_speech.training.loop {train,evaluate}`
 """
 
 from __future__ import annotations
 
 import argparse
-import os
+import hashlib
+import json
 import random
 import subprocess
+import time
 from pathlib import Path
 
-import mlflow
 import numpy as np
 import torch
-import yaml
-from pydantic import BaseModel
 from torch.utils.data import DataLoader
 
 from echolingo_speech.config import load_config
 from echolingo_speech.data.manifest import read_jsonl
-from echolingo_speech.evaluation.metrics import (
-    error_detection_metrics,
-    mean_absolute_error,
-    pearson_correlation,
-    score_band_error,
-    spearman_correlation,
-)
+from echolingo_speech.evaluation.report import ScorePairs, assemble_metrics
 from echolingo_speech.models.scorer import SpeechEvaluatorA0
+from echolingo_speech.training.checkpoint import (
+    BEST_CHECKPOINT_NAME,
+    LAST_CHECKPOINT_NAME,
+    TrainingState,
+    load_model,
+    restore_training,
+    save_training_checkpoint,
+)
+from echolingo_speech.training.config import TrainingConfig, load_training_config
 from echolingo_speech.training.dataset import SpeechOceanScoringDataset, collate_fn
 from echolingo_speech.training.labels import SENTENCE_TARGET_KEYS
-from echolingo_speech.training.losses import compute_total_loss
+from echolingo_speech.training.losses import (
+    PHONE_WEIGHT,
+    SENTENCE_WEIGHT,
+    WORD_WEIGHT,
+    compute_total_loss,
+)
+from echolingo_speech.training.tracking import InMemoryTracker, RunTracker, mlflow_run
 
-# ADR-0013 SS9.4 / roadmap SS9.4 intentionally use a local file-based mlruns
-# store; MLflow >=3 disables that backend unless explicitly opted into (see
-# tests/test_smoke.py::test_mlflow_local_tracking_round_trip), so this must be
-# set before any mlflow tracking call, not left to the caller's shell.
-os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
-
-
-class TrainingConfig(BaseModel):
-    seed: int = 42
-    batch_size: int = 32
-    learning_rate: float = 1e-3
-    weight_decay: float = 1e-2
-    dropout: float = 0.3
-    max_epochs: int = 150
-    early_stopping_patience: int = 15
-    lr_scheduler_patience: int = 7
-    lr_scheduler_factor: float = 0.5
-    error_detection_threshold: float = 0.6
-    score_band_width: float = 1.0
-    mlflow_experiment_name: str = "speech-evaluator-a0"
+PARTITIONS = ("train", "validation", "test")
 
 
-def load_training_config(path: Path) -> TrainingConfig:
-    raw = yaml.safe_load(path.read_text())
-    return TrainingConfig(**raw)
+def resolve_device(requested: str | None = None) -> str:
+    return requested or ("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def _gpu_name(device: str) -> str:
+    if not device.startswith("cuda"):
+        return "none"
+    return torch.cuda.get_device_name(torch.device(device))
 
 
 def _set_seed(seed: int) -> None:
@@ -108,13 +106,7 @@ def evaluate(
     model.eval()
     total_loss = 0.0
     num_batches = 0
-
-    sentence_preds: dict[str, list[float]] = {key: [] for key in SENTENCE_TARGET_KEYS}
-    sentence_targets: dict[str, list[float]] = {key: [] for key in SENTENCE_TARGET_KEYS}
-    word_accuracy_preds: list[float] = []
-    word_accuracy_targets: list[float] = []
-    phone_accuracy_preds: list[float] = []
-    phone_accuracy_targets: list[float] = []
+    pairs = ScorePairs()
 
     for batch in loader:
         batch = _move_batch_to_device(batch, device)
@@ -126,64 +118,31 @@ def evaluate(
         scores = predictions["sentence_scores"].cpu()
         targets = batch["sentence_targets"].cpu()
         for i, key in enumerate(SENTENCE_TARGET_KEYS):
-            sentence_preds[key].extend(scores[:, i].tolist())
-            sentence_targets[key].extend(targets[:, i].tolist())
+            pairs.sentence_preds[key].extend(scores[:, i].tolist())
+            pairs.sentence_targets[key].extend(targets[:, i].tolist())
 
         for pred_tensor, examples, is_valid in zip(
             predictions["word_accuracy"], batch["word_examples"], batch["word_alignment_valid"]
         ):
             if not is_valid or not examples:
                 continue
-            word_accuracy_preds.extend(pred_tensor.cpu().tolist())
-            word_accuracy_targets.extend(example.accuracy for example in examples)
+            pairs.word_accuracy_preds.extend(pred_tensor.cpu().tolist())
+            pairs.word_accuracy_targets.extend(example.accuracy for example in examples)
 
         for pred_tensor, examples in zip(predictions["phone_accuracy"], batch["phone_examples"]):
             if not examples:
                 continue
-            phone_accuracy_preds.extend(pred_tensor.cpu().tolist())
-            phone_accuracy_targets.extend(example.accuracy for example in examples)
+            pairs.phone_accuracy_preds.extend(pred_tensor.cpu().tolist())
+            pairs.phone_accuracy_targets.extend(example.accuracy for example in examples)
 
     metrics: dict = {"loss": total_loss / max(1, num_batches)}
-    for key in SENTENCE_TARGET_KEYS:
-        preds_original_scale = [value * 10 for value in sentence_preds[key]]
-        targets_original_scale = [value * 10 for value in sentence_targets[key]]
-        metrics[f"sentence_{key}_pearson"] = pearson_correlation(
-            sentence_preds[key], sentence_targets[key]
+    metrics.update(
+        assemble_metrics(
+            pairs,
+            score_band_width=training_config.score_band_width,
+            error_detection_threshold=training_config.error_detection_threshold,
         )
-        metrics[f"sentence_{key}_spearman"] = spearman_correlation(
-            sentence_preds[key], sentence_targets[key]
-        )
-        metrics[f"sentence_{key}_mae"] = mean_absolute_error(
-            preds_original_scale, targets_original_scale
-        )
-        metrics[f"sentence_{key}_score_band_error"] = score_band_error(
-            preds_original_scale, targets_original_scale, training_config.score_band_width
-        )
-
-    if word_accuracy_preds:
-        metrics["word_accuracy_pearson"] = pearson_correlation(
-            word_accuracy_preds, word_accuracy_targets
-        )
-        metrics["word_accuracy_mae"] = mean_absolute_error(
-            [value * 10 for value in word_accuracy_preds],
-            [value * 10 for value in word_accuracy_targets],
-        )
-        metrics["word_error_detection"] = error_detection_metrics(
-            word_accuracy_preds, word_accuracy_targets, training_config.error_detection_threshold
-        )
-
-    if phone_accuracy_preds:
-        metrics["phone_accuracy_pearson"] = pearson_correlation(
-            phone_accuracy_preds, phone_accuracy_targets
-        )
-        metrics["phone_accuracy_mae"] = mean_absolute_error(
-            [value * 2 for value in phone_accuracy_preds],
-            [value * 2 for value in phone_accuracy_targets],
-        )
-        metrics["phone_error_detection"] = error_detection_metrics(
-            phone_accuracy_preds, phone_accuracy_targets, training_config.error_detection_threshold
-        )
-
+    )
     return metrics
 
 
@@ -198,33 +157,32 @@ def _flatten_metrics(metrics: dict) -> dict[str, float]:
     return flat
 
 
-def run_training(
-    manifest_path: Path,
-    processed_root: Path,
+def fit(
+    train_loader: DataLoader,
+    val_loader: DataLoader,
     training_config: TrainingConfig,
     seed: int,
     *,
+    tracker: RunTracker | None = None,
     device: str | None = None,
     max_epochs: int | None = None,
-    evaluate_test: bool = False,
+    checkpoint_dir: Path | None = None,
+    resume: bool = False,
 ) -> tuple[SpeechEvaluatorA0, dict]:
-    """Assumes an MLflow run is already active (started by `_cli`) and logs
-    per-epoch metrics into it; callers that just want the pure training logic
-    without MLflow side effects should call `train_one_epoch`/`evaluate`
-    directly instead.
+    """Train until `max_epochs` or early stopping and return the model at its
+    best validation loss.
+
+    With a `checkpoint_dir`, the run writes `last.pt` and `best.pt` after
+    every epoch. Calling again with the same directory and `resume=True`
+    continues from `last.pt`; without `resume` an existing run is refused
+    rather than overwritten. Without a `checkpoint_dir` nothing is written
+    and the best weights are only held in memory.
     """
+    tracker = tracker if tracker is not None else InMemoryTracker()
+    resolved_device = resolve_device(device)
+    total_epochs = max_epochs or training_config.max_epochs
+
     _set_seed(seed)
-    resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
-    train_dataset = SpeechOceanScoringDataset(manifest_path, processed_root, partition="train")
-    val_dataset = SpeechOceanScoringDataset(manifest_path, processed_root, partition="validation")
-    train_loader = DataLoader(
-        train_dataset, batch_size=training_config.batch_size, shuffle=True, collate_fn=collate_fn
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=training_config.batch_size, shuffle=False, collate_fn=collate_fn
-    )
-
     model = SpeechEvaluatorA0(dropout=training_config.dropout).to(resolved_device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -238,19 +196,69 @@ def run_training(
         patience=training_config.lr_scheduler_patience,
     )
 
-    best_val_loss = float("inf")
-    best_state: dict | None = None
-    epochs_without_improvement = 0
-    history: list[dict] = []
+    last_path = checkpoint_dir / LAST_CHECKPOINT_NAME if checkpoint_dir else None
+    best_path = checkpoint_dir / BEST_CHECKPOINT_NAME if checkpoint_dir else None
+    state = TrainingState()
+    if last_path is not None and last_path.exists():
+        if not resume:
+            raise FileExistsError(
+                f"{last_path} already exists; pass resume=True to continue that run "
+                "or choose a different checkpoint_dir"
+            )
+        state = restore_training(
+            last_path,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            seed=seed,
+            training_config=training_config.model_dump(),
+            device=resolved_device,
+        )
+    resumed_from_epoch = state.epoch
 
-    total_epochs = max_epochs or training_config.max_epochs
-    for epoch in range(1, total_epochs + 1):
+    tracker.log_params(
+        {
+            **training_config.model_dump(),
+            "max_epochs": total_epochs,
+            "seed": seed,
+            "device": resolved_device,
+            "gpu_name": _gpu_name(resolved_device),
+            "loss_weight_sentence": SENTENCE_WEIGHT,
+            "loss_weight_word": WORD_WEIGHT,
+            "loss_weight_phone": PHONE_WEIGHT,
+            **{f"model_{key}": value for key, value in model.config.items()},
+            "resumed_from_epoch": resumed_from_epoch,
+        }
+    )
+
+    def save(path: Path) -> None:
+        save_training_checkpoint(
+            path,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            state=state,
+            seed=seed,
+            training_config=training_config.model_dump(),
+        )
+
+    uses_cuda = resolved_device.startswith("cuda")
+    if uses_cuda:
+        torch.cuda.reset_peak_memory_stats()
+    started = time.monotonic()
+    best_state: dict | None = None
+
+    for epoch in range(state.epoch + 1, total_epochs + 1):
+        if state.epochs_without_improvement >= training_config.early_stopping_patience:
+            break
+
         train_loss = train_one_epoch(model, train_loader, optimizer, resolved_device)
         val_metrics = evaluate(model, val_loader, resolved_device, training_config)
         scheduler.step(val_metrics["loss"])
 
-        history.append({"epoch": epoch, "train_loss": train_loss, **val_metrics})
-        mlflow.log_metrics({"train_loss": train_loss, **_flatten_metrics(val_metrics)}, step=epoch)
+        state.epoch = epoch
+        state.history.append({"epoch": epoch, "train_loss": train_loss, **val_metrics})
+        tracker.log_metrics({"train_loss": train_loss, **_flatten_metrics(val_metrics)}, step=epoch)
         print(
             f"epoch {epoch:03d} "
             f"train_loss={train_loss:.4f} val_loss={val_metrics['loss']:.4f} "
@@ -259,33 +267,120 @@ def run_training(
             flush=True,
         )
 
-        if val_metrics["loss"] < best_val_loss - 1e-6:
-            best_val_loss = val_metrics["loss"]
+        improved = val_metrics["loss"] < state.best_val_loss - 1e-6
+        if improved:
+            state.best_val_loss = val_metrics["loss"]
+            state.epochs_without_improvement = 0
+        else:
+            state.epochs_without_improvement += 1
+
+        if last_path is not None and best_path is not None:
+            if improved:
+                save(best_path)
+            save(last_path)
+        elif improved:
             best_state = {
                 key: value.detach().cpu().clone() for key, value in model.state_dict().items()
             }
-            epochs_without_improvement = 0
-        else:
-            epochs_without_improvement += 1
-            if epochs_without_improvement >= training_config.early_stopping_patience:
-                break
 
-    if best_state is not None:
+    if best_path is not None and best_path.exists():
+        model = load_model(best_path, resolved_device)
+    elif best_state is not None:
         model.load_state_dict(best_state)
 
-    result: dict = {"history": history, "best_val_loss": best_val_loss}
+    duration_seconds = time.monotonic() - started
+    summary: dict[str, float] = {
+        "best_val_loss": state.best_val_loss,
+        "duration_seconds": duration_seconds,
+    }
+    if uses_cuda:
+        summary["peak_gpu_memory_mb"] = torch.cuda.max_memory_allocated() / 2**20
+    tracker.log_metrics(summary)
+
+    result: dict = {
+        "history": state.history,
+        "best_val_loss": state.best_val_loss,
+        "epochs_run": state.epoch,
+        "resumed_from_epoch": resumed_from_epoch,
+        "device": resolved_device,
+        "duration_seconds": duration_seconds,
+        "best_checkpoint": best_path if best_path is not None and best_path.exists() else None,
+    }
+    return model, result
+
+
+def _partition_loader(
+    manifest_path: Path, processed_root: Path, partition: str, batch_size: int, *, shuffle: bool
+) -> DataLoader:
+    dataset = SpeechOceanScoringDataset(manifest_path, processed_root, partition=partition)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
+
+
+def run_training(
+    manifest_path: Path,
+    processed_root: Path,
+    training_config: TrainingConfig,
+    seed: int,
+    *,
+    tracker: RunTracker | None = None,
+    device: str | None = None,
+    max_epochs: int | None = None,
+    evaluate_test: bool = False,
+    checkpoint_dir: Path | None = None,
+    resume: bool = False,
+) -> tuple[SpeechEvaluatorA0, dict]:
+    """`fit` over the manifest's train/validation partitions, optionally
+    followed by a test-partition evaluation of the best model.
+    """
+    resolved_device = resolve_device(device)
+    batch_size = training_config.batch_size
+    train_loader = _partition_loader(
+        manifest_path, processed_root, "train", batch_size, shuffle=True
+    )
+    val_loader = _partition_loader(
+        manifest_path, processed_root, "validation", batch_size, shuffle=False
+    )
+
+    model, result = fit(
+        train_loader,
+        val_loader,
+        training_config,
+        seed,
+        tracker=tracker,
+        device=resolved_device,
+        max_epochs=max_epochs,
+        checkpoint_dir=checkpoint_dir,
+        resume=resume,
+    )
 
     if evaluate_test:
-        test_dataset = SpeechOceanScoringDataset(manifest_path, processed_root, partition="test")
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=training_config.batch_size,
-            shuffle=False,
-            collate_fn=collate_fn,
+        test_loader = _partition_loader(
+            manifest_path, processed_root, "test", batch_size, shuffle=False
         )
         result["test_metrics"] = evaluate(model, test_loader, resolved_device, training_config)
 
     return model, result
+
+
+def evaluate_checkpoint(
+    checkpoint_path: Path,
+    manifest_path: Path,
+    processed_root: Path,
+    training_config: TrainingConfig,
+    partition: str,
+    *,
+    device: str | None = None,
+) -> dict:
+    """Score a saved checkpoint on one manifest partition without training,
+    so the sealed test partition can be evaluated once a candidate is final
+    (roadmap SS18.4) rather than as a side effect of a training run.
+    """
+    resolved_device = resolve_device(device)
+    model = load_model(checkpoint_path, resolved_device)
+    loader = _partition_loader(
+        manifest_path, processed_root, partition, training_config.batch_size, shuffle=False
+    )
+    return evaluate(model, loader, resolved_device, training_config)
 
 
 def _git_commit_sha(repo_root: Path) -> str:
@@ -295,28 +390,28 @@ def _git_commit_sha(repo_root: Path) -> str:
     return result.stdout.strip()
 
 
-def _cli(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m echolingo_speech.training.loop")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    train_parser = subparsers.add_parser("train", help="Train the A0 scorer")
-    train_parser.add_argument("--config", type=Path, required=True, help="path to speech.yaml")
-    train_parser.add_argument(
-        "--training-config", type=Path, required=True, help="path to a0.yaml"
-    )
-    train_parser.add_argument("--manifest", type=Path, required=True)
-    train_parser.add_argument("--seed", type=int, default=None)
-    train_parser.add_argument("--max-epochs", type=int, default=None)
-    train_parser.add_argument("--evaluate-test", action="store_true")
 
-    args = parser.parse_args(argv)
-    if args.command != "train":
-        return 1
-
+def _cli_train(args: argparse.Namespace) -> int:
     speech_config = load_config(args.config)
     training_config = load_training_config(args.training_config)
     seed = args.seed if args.seed is not None else training_config.seed
     processed_root = speech_config.data_root / "processed" / "speechocean762"
+    run_name = args.run_name or f"a0-seed{seed}"
+    checkpoint_dir = speech_config.artifact_root / "checkpoints" / run_name
+
+    if (checkpoint_dir / LAST_CHECKPOINT_NAME).exists() and not args.resume:
+        print(
+            f"ERROR: {checkpoint_dir} already holds a run. Pass --resume to continue it, "
+            "or --run-name to start a separate one."
+        )
+        return 1
 
     repo_root = Path(__file__).resolve().parents[4]
     try:
@@ -327,54 +422,105 @@ def _cli(argv: list[str] | None = None) -> int:
     manifest_records = read_jsonl(args.manifest)
     dataset_version = manifest_records[0].dataset_version if manifest_records else "unknown"
 
-    mlflow.set_tracking_uri(speech_config.mlflow_tracking_uri)
-    mlflow.set_experiment(training_config.mlflow_experiment_name)
-
-    with mlflow.start_run(run_name=f"a0-seed{seed}"):
-        mlflow.log_params(
+    with mlflow_run(
+        speech_config.mlflow_tracking_uri, training_config.mlflow_experiment_name, run_name
+    ) as tracker:
+        tracker.log_params(
             {
-                "seed": seed,
-                "batch_size": training_config.batch_size,
-                "learning_rate": training_config.learning_rate,
-                "weight_decay": training_config.weight_decay,
-                "dropout": training_config.dropout,
-                "max_epochs": args.max_epochs or training_config.max_epochs,
-                "early_stopping_patience": training_config.early_stopping_patience,
+                "run_name": run_name,
                 "manifest_path": str(args.manifest),
+                "manifest_sha256": _file_sha256(args.manifest),
                 "dataset_version": dataset_version,
                 "encoder_model_id": speech_config.encoder.model_id,
                 "encoder_revision": speech_config.encoder.revision,
                 "git_commit": git_commit,
-                "device": "cuda" if torch.cuda.is_available() else "cpu",
             }
         )
 
-        model, result = run_training(
+        _, result = run_training(
             args.manifest,
             processed_root,
             training_config,
             seed,
+            tracker=tracker,
+            device=args.device,
             max_epochs=args.max_epochs,
             evaluate_test=args.evaluate_test,
+            checkpoint_dir=checkpoint_dir,
+            resume=args.resume,
         )
 
-        mlflow.log_metric("best_val_loss", result["best_val_loss"])
         if "test_metrics" in result:
-            mlflow.log_metrics(
+            tracker.log_metrics(
                 {
                     f"test_{key}": value
                     for key, value in _flatten_metrics(result["test_metrics"]).items()
                 }
             )
+        if result["best_checkpoint"] is not None:
+            tracker.log_artifact(result["best_checkpoint"])
+        tracker.log_artifact(args.training_config)
 
-        checkpoint_path = Path(f"a0-seed{seed}-checkpoint.pt")
-        torch.save(model.state_dict(), checkpoint_path)
-        mlflow.log_artifact(str(checkpoint_path))
-        checkpoint_path.unlink(missing_ok=True)
-        mlflow.log_artifact(str(args.training_config))
-
-    print(f"OK: seed={seed} best_val_loss={result['best_val_loss']:.4f}")
+    print(
+        f"OK: seed={seed} epochs_run={result['epochs_run']} "
+        f"best_val_loss={result['best_val_loss']:.4f} checkpoints={checkpoint_dir}"
+    )
     return 0
+
+
+def _cli_evaluate(args: argparse.Namespace) -> int:
+    speech_config = load_config(args.config)
+    training_config = load_training_config(args.training_config)
+    processed_root = speech_config.data_root / "processed" / "speechocean762"
+
+    metrics = evaluate_checkpoint(
+        args.checkpoint,
+        args.manifest,
+        processed_root,
+        training_config,
+        args.partition,
+        device=args.device,
+    )
+    for key, value in _flatten_metrics(metrics).items():
+        print(f"{key} = {value}")
+    if args.out is not None:
+        args.out.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    return 0
+
+
+def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--config", type=Path, required=True, help="path to speech.yaml")
+    parser.add_argument("--training-config", type=Path, required=True, help="path to a0.yaml")
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--device", default=None, help="e.g. cuda, cuda:0, cpu (default: auto)")
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m echolingo_speech.training.loop")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    train_parser = subparsers.add_parser("train", help="Train the A0 scorer")
+    _add_common_arguments(train_parser)
+    train_parser.add_argument("--seed", type=int, default=None)
+    train_parser.add_argument("--max-epochs", type=int, default=None)
+    train_parser.add_argument("--evaluate-test", action="store_true")
+    train_parser.add_argument(
+        "--run-name", default=None, help="names the MLflow run and checkpoint directory"
+    )
+    train_parser.add_argument(
+        "--resume", action="store_true", help="continue from this run's last checkpoint"
+    )
+
+    evaluate_parser = subparsers.add_parser("evaluate", help="Score a saved checkpoint")
+    _add_common_arguments(evaluate_parser)
+    evaluate_parser.add_argument("--checkpoint", type=Path, required=True)
+    evaluate_parser.add_argument("--partition", choices=PARTITIONS, default="validation")
+    evaluate_parser.add_argument("--out", type=Path, default=None, help="also write metrics JSON")
+
+    args = parser.parse_args(argv)
+    if args.command == "train":
+        return _cli_train(args)
+    return _cli_evaluate(args)
 
 
 if __name__ == "__main__":

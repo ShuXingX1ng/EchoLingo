@@ -19,9 +19,10 @@ import {
   saveReminderSettings,
   clearReminderSettings,
   getDaysUntilExam,
-  hasPracticedToday,
-  getStreakDays,
 } from "@/lib/reminders";
+import { practicedToday as hasPracticedToday, streakDays as countStreakDays } from "@/lib/practice-activity";
+import { getTasks } from "@/lib/unified-task-history";
+import type { PracticeTask } from "@/types";
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -33,7 +34,7 @@ export default function SettingsPage() {
   const [isTestPlaying, setIsTestPlaying] = useState(false);
 
   const [weeklyTarget, setWeeklyTarget] = useState(3);
-  const [targetBand, setTargetBand] = useState(6.5);
+  const [tasks, setTasks] = useState<PracticeTask[]>([]);
   const [goalProgress, setGoalProgress] = useState<GoalProgress | null>(null);
   const [isGoalSaved, setIsGoalSaved] = useState(false);
 
@@ -66,10 +67,7 @@ export default function SettingsPage() {
     const goals = getGoals();
     if (goals) {
       setWeeklyTarget(goals.weeklyTarget);
-      setTargetBand(goals.targetBand);
     }
-
-    setGoalProgress(calculateGoalProgress());
 
     // Load reminder settings
     const reminders = getReminderSettings();
@@ -80,8 +78,19 @@ export default function SettingsPage() {
     }
 
     setDaysUntilExam(getDaysUntilExam());
-    setPracticedToday(hasPracticedToday());
-    setStreakDays(getStreakDays());
+
+    // Goal progress and the streak are counted over the learner's Practice Tasks.
+    let cancelled = false;
+    getTasks()
+      .then((loaded) => {
+        if (cancelled) return;
+        setTasks(loaded);
+        setGoalProgress(calculateGoalProgress(loaded));
+        setPracticedToday(hasPracticedToday(loaded));
+        setStreakDays(countStreakDays(loaded));
+      })
+      .catch(() => { /* keep the empty state */ });
+    return () => { cancelled = true; };
   }, []);
 
   const handleSave = () => {
@@ -124,11 +133,10 @@ export default function SettingsPage() {
   const handleSaveGoals = () => {
     const goal: PracticeGoal = {
       weeklyTarget,
-      targetBand,
       createdAt: new Date().toISOString(),
     };
     saveGoals(goal);
-    setGoalProgress(calculateGoalProgress());
+    setGoalProgress(calculateGoalProgress(tasks));
     setIsGoalSaved(true);
     setTimeout(() => setIsGoalSaved(false), 2000);
   };
@@ -214,32 +222,6 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
-
-              <div className="p-4 bg-[var(--background)] rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-[var(--text-muted)]">
-                    {t("settings.bandScore")}
-                  </span>
-                  <span className="text-sm font-medium text-[var(--foreground)]">
-                    {goalProgress.currentAverageBand} / {goalProgress.targetBand}
-                  </span>
-                </div>
-                <div className="w-full bg-[var(--border)] rounded-full h-2.5">
-                  <div
-                    className={`h-2.5 rounded-full transition-all ${
-                      goalProgress.isBandGoalMet
-                        ? "bg-green-500"
-                        : "bg-[var(--foreground)]"
-                    }`}
-                    style={{ width: `${goalProgress.bandProgress}%` }}
-                  />
-                </div>
-                {goalProgress.isBandGoalMet && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                    {t("settings.bandGoalAchieved")}
-                  </p>
-                )}
-              </div>
             </div>
           )}
 
@@ -260,26 +242,6 @@ export default function SettingsPage() {
               <span>{t("settings.oneSession")}</span>
               <span>{t("settings.sevenSessions")}</span>
               <span>{t("settings.fourteenSessions")}</span>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-              {t("settings.targetBand")}: {targetBand.toFixed(1)}
-            </label>
-            <input
-              type="range"
-              min="4"
-              max="9"
-              step="0.5"
-              value={targetBand}
-              onChange={(e) => setTargetBand(parseFloat(e.target.value))}
-              className="w-full h-2 bg-[var(--border)] rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
-              <span>4.0</span>
-              <span>6.5</span>
-              <span>9.0</span>
             </div>
           </div>
 

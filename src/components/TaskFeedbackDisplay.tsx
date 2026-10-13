@@ -1,6 +1,7 @@
 "use client"
 
-import PronunciationFeedback from "@/components/PronunciationFeedback"
+import SpeechEvaluationDetails from "@/components/SpeechEvaluationDetails"
+import { speechEvaluationOf, speechProviderName, speechScores } from "@/lib/speech-evaluation"
 import { useTranslation } from "@/lib/i18n"
 import type { TaskFeedback, DimensionScores, TaskScoreCard } from "@/types"
 
@@ -20,6 +21,7 @@ export default function TaskFeedbackDisplay({
   responseText,
 }: Props) {
   const { t } = useTranslation()
+  const speechEvaluation = speechEvaluationOf(feedback)
   return (
     <div className="space-y-5">
       {feedback.scoreCard && (
@@ -42,25 +44,20 @@ export default function TaskFeedbackDisplay({
         </div>
       )}
 
-      {feedback.pronunciationAssessment && (
+      {speechEvaluation && (
         <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-            {t("practiceTask.read-aloud.azurePronunciation")}
+            {t("speechEvaluation.title")} · {speechProviderName(speechEvaluation)}
           </p>
           <div className="grid grid-cols-4 gap-3 mb-5">
-            {[
-              { label: t("pronunciation.overall"), score: feedback.pronunciationAssessment.score },
-              { label: t("pronunciation.accuracy"), score: feedback.pronunciationAssessment.accuracyScore },
-              { label: t("pronunciation.fluency"), score: feedback.pronunciationAssessment.fluencyScore },
-              { label: t("pronunciation.completeness"), score: feedback.pronunciationAssessment.completenessScore },
-            ].map(({ label, score }) => (
-              <div key={label} className="text-center">
+            {speechScores(speechEvaluation).map(({ labelKey, score }) => (
+              <div key={labelKey} className="text-center">
                 <ScoreBadge score={score} />
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t(labelKey)}</p>
               </div>
             ))}
           </div>
-          <PronunciationFeedback assessment={feedback.pronunciationAssessment} />
+          <SpeechEvaluationDetails evaluation={speechEvaluation} />
         </div>
       )}
 

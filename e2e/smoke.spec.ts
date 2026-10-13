@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockPteStimulusApi, mockPteFeedbackApi, mockTtsApi } from "./helpers";
+import { mockPteStimulusApi, mockPteFeedbackApi, mockPracticeApis } from "./helpers";
 
 test.describe("P0 — Core path smoke tests", () => {
   test("home page loads with nav and practice CTA", async ({ page }) => {
@@ -23,13 +23,12 @@ test.describe("P0 — Core path smoke tests", () => {
     await expect(page.locator('a[href="/practice/write-essay"]').first()).toBeVisible();
   });
 
-  test("read-aloud page loads with Generate Passage button", async ({ page }) => {
-    // No stimulus mock needed: this test only checks the page renders, it never
-    // clicks Generate. (Read Aloud calls /api/read-aloud/stimulus, not /api/pte/stimulus.)
+  test("read-aloud page loads and shows the passage", async ({ page }) => {
+    await mockPracticeApis(page, "Climate change is one of the most pressing issues of our time.");
     await page.goto("/practice/read-aloud");
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.getByText("Read Aloud").first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole("button", { name: /generate passage/i })).toBeVisible();
+    await expect(page.getByText(/climate change is one of the most pressing/i)).toBeVisible({ timeout: 10000 });
   });
 
   test("history page empty state", async ({ page }) => {
@@ -60,19 +59,19 @@ test.describe("P1 — Key interactions", () => {
   });
 
   test("repeat-sentence page loads", async ({ page }) => {
-    await mockTtsApi(page);
-    await mockPteStimulusApi(page, "Climate change is one of the most pressing issues of our time.");
+    await mockPracticeApis(page, "Climate change is one of the most pressing issues of our time.");
     await page.goto("/practice/repeat-sentence");
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.getByText("Repeat Sentence").first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("write-essay page loads with Generate Prompt button", async ({ page }) => {
-    await mockPteStimulusApi(page, "Some people believe technology improves our quality of life.");
+  test("write-essay page loads and shows the essay question", async ({ page }) => {
+    await mockPracticeApis(page, "Some people believe technology improves our quality of life.");
     await page.goto("/practice/write-essay");
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.getByText("Write Essay").first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole("button", { name: /get essay question/i })).toBeVisible();
+    await expect(page.getByText(/technology improves our quality of life/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("textarea").first()).toBeVisible();
   });
 
   test("fill-in-the-blanks reading page loads", async ({ page }) => {
@@ -86,8 +85,7 @@ test.describe("P1 — Key interactions", () => {
   });
 
   test("summarize-spoken-text page loads", async ({ page }) => {
-    await mockTtsApi(page);
-    await mockPteStimulusApi(page, "Scientists have discovered a new method for carbon capture.");
+    await mockPracticeApis(page, "Scientists have discovered a new method for carbon capture.");
     await page.goto("/practice/summarize-spoken-text");
     await expect(page.locator("nav").first()).toBeVisible();
     await expect(page.getByText(/summarize spoken text/i).first()).toBeVisible({ timeout: 10000 });
@@ -110,12 +108,10 @@ test.describe("P2 — Edge cases", () => {
   });
 
   test("read-aloud page handles stimulus API error", async ({ page }) => {
-    await page.route("**/api/read-aloud/stimulus", (route) =>
+    await page.route("**/api/pte/stimulus", (route) =>
       route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Internal server error" }) })
     );
     await page.goto("/practice/read-aloud");
-    await expect(page.getByRole("button", { name: /generate passage/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: /generate passage/i }).click();
     await expect(page.getByText(/failed|error|try again/i).first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -123,8 +119,6 @@ test.describe("P2 — Edge cases", () => {
     await mockPteStimulusApi(page, "Some people believe technology improves our quality of life. Discuss.");
     await mockPteFeedbackApi(page);
     await page.goto("/practice/write-essay");
-    await expect(page.getByRole("button", { name: /get essay question/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: /get essay question/i }).click();
     await expect(page.locator("textarea").first()).toBeVisible({ timeout: 10000 });
     await page.locator("textarea").first().fill(
       "Technology has dramatically changed modern life. While it offers many benefits such as improved communication and access to information, it also presents challenges like privacy concerns and social isolation. Overall, I believe the advantages outweigh the disadvantages when technology is used responsibly."

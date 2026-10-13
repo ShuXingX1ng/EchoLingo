@@ -13,31 +13,45 @@ from pydantic import BaseModel, Field
 # Core Types
 # =============================================================================
 
-class PhonemeAssessment(BaseModel):
-    """Phoneme-level pronunciation assessment."""
+class PhonemeEvidence(BaseModel):
+    """Phoneme-level evidence inside a word."""
     phoneme: str
     score: int
-    accuracyScore: int
 
 
-class WordAssessment(BaseModel):
-    """Word-level pronunciation assessment."""
+class WordEvidence(BaseModel):
+    """Word-level evidence of a Speech Evaluation Result."""
     word: str
     score: int
-    accuracyScore: int
-    errorType: Optional[str] = None  # Azure: None, Omission, Insertion, Mispronunciation
-    phonemes: Optional[List[PhonemeAssessment]] = None
+    status: Literal["correct", "mispronounced", "omitted", "inserted"] = "correct"
+    phonemes: Optional[List[PhonemeEvidence]] = None
 
 
-class PronunciationAssessmentResult(BaseModel):
-    """Pronunciation assessment result."""
-    score: int
-    accuracyScore: int
-    fluencyScore: int
-    completenessScore: int
-    words: List[WordAssessment]
-    summary: str
+class EvidenceAvailability(BaseModel):
+    """Which parts of a Speech Evaluation Result the provider could supply."""
+    taskScoreEstimate: bool = False
+    words: bool = False
+    phonemes: bool = False
+
+
+class SpeechEvaluationResult(BaseModel):
+    """Provider-neutral result of evaluating one spoken Response (CONTEXT.md).
+
+    Dimension estimates are on a 0–100 scale. `taskScoreEstimate` is the
+    10–90 Spoken Task Score Estimate, which only the EchoLingo Speech
+    Evaluator produces; `overallScore` is a provider's own 0–100 aggregate
+    and is not a substitute for it.
+    """
+    provider: str
+    taskScoreEstimate: Optional[int] = None
+    overallScore: Optional[int] = None
+    pronunciation: int
+    oralFluency: int
+    content: int
     recognizedText: Optional[str] = None
+    words: List[WordEvidence] = []
+    evidence: EvidenceAvailability = EvidenceAvailability()
+    summary: str = ""
 
 
 # =============================================================================
@@ -54,37 +68,13 @@ class TTSRequest(BaseModel):
 
 # TTS Response is WAV audio stream (binary)
 
-# Pronunciation API
-# Request is FormData (audio file + reference text)
-# Response is PronunciationAssessmentResult
-
-
 # =============================================================================
 # PTE API Models
 # =============================================================================
 
-PteTaskType = Literal[
-    "read_aloud",
-    "repeat_sentence",
-    "answer_short_question",
-    "summarize_written_text",
-    "write_essay",
-    "personal_intro",
-    "write_from_dictation",
-    "describe_image",
-    "re_tell_lecture",
-    "fill_in_the_blanks_reading",
-    "re_order_paragraphs",
-    "multiple_choice_reading",
-    "summarize_spoken_text",
-    "fill_in_the_blanks_listening",
-    "highlight_correct_summary",
-]
-
-
 class PteStimulusRequest(BaseModel):
     """Request for POST /api/pte/stimulus."""
-    taskType: str  # validated against PteTaskType in the router
+    taskType: str  # validated against the Task Type catalogue in the router
     # Retrieval strategy (ADR 0009). Mock and plain Task Practice both send "random".
     mode: Literal["random", "targeted", "theme"] = "random"
     topic: Optional[str] = None              # theme query (theme mode only)
@@ -100,8 +90,19 @@ class PteStimulusResponse(BaseModel):
 
 class PteFeedbackRequest(BaseModel):
     """Request for POST /api/pte/feedback."""
-    taskType: str  # validated against PteTaskType in the router
+    taskType: str  # validated against the Task Type catalogue in the router
     stimulus: str = ""
     response: str
-    pronunciationAssessment: Optional[Dict[str, Any]] = None
     historicalWeaknesses: Optional[Dict[str, float]] = None
+
+
+class SpokenFeedbackResponse(BaseModel):
+    """Response from POST /api/pte/spoken-feedback.
+
+    `feedback` already carries `speechEvaluation` when both succeeded. Either
+    part may be missing: the evaluation when the provider failed, the Feedback
+    when it could not be generated for an evaluated Response.
+    """
+    transcript: str
+    feedback: Optional[Dict[str, Any]] = None
+    speechEvaluation: Optional[SpeechEvaluationResult] = None

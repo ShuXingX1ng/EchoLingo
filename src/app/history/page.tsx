@@ -5,49 +5,20 @@ import Link from "next/link"
 import { Clock, Trash2, Search } from "lucide-react"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { getTasks, deleteTask, clearAllTasksLocal } from "@/lib/unified-task-history"
+import { getTasks, deleteTask, clearAllTasks } from "@/lib/unified-task-history"
 import { useTranslation } from "@/lib/i18n"
+import { ALL_TASK_TYPES, TASK_TYPE_REGISTRY, taskTypeLabels } from "@/lib/task-type-registry"
 import type { PracticeTask, PteTaskType } from "@/types"
 
-type TFunc = (key: string) => string
+const getTaskLabels = taskTypeLabels
 
-function getTaskLabels(t: TFunc): Record<PteTaskType, string> {
-  return {
-    read_aloud: t("mock.taskLabel.read_aloud"),
-    repeat_sentence: t("mock.taskLabel.repeat_sentence"),
-    answer_short_question: t("mock.taskLabel.answer_short_question"),
-    summarize_written_text: t("mock.taskLabel.summarize_written_text"),
-    write_essay: t("mock.taskLabel.write_essay"),
-    personal_intro: t("mock.taskLabel.personal_intro"),
-    write_from_dictation: t("mock.taskLabel.write_from_dictation"),
-    describe_image: t("mock.taskLabel.describe_image"),
-    re_tell_lecture: t("mock.taskLabel.re_tell_lecture"),
-    fill_in_the_blanks_reading: t("mock.taskLabel.fill_in_the_blanks"),
-    re_order_paragraphs: t("mock.taskLabel.re_order_paragraphs"),
-    multiple_choice_reading: t("mock.taskLabel.multiple_choice"),
-    summarize_spoken_text: t("mock.taskLabel.summarize_spoken_text"),
-    fill_in_the_blanks_listening: t("mock.taskLabel.fill_in_the_blanks_listening"),
-    highlight_correct_summary: t("mock.taskLabel.highlight_correct_summary"),
-  }
-}
-
-const TASK_SECTION_KEY: Record<PteTaskType, string> = {
-  read_aloud: "Speaking",
-  repeat_sentence: "Speaking",
-  answer_short_question: "Speaking",
-  personal_intro: "Speaking",
-  describe_image: "Speaking",
-  re_tell_lecture: "Speaking",
-  summarize_written_text: "Writing",
-  write_essay: "Writing",
-  write_from_dictation: "Listening",
-  fill_in_the_blanks_reading: "Reading",
-  re_order_paragraphs: "Reading",
-  multiple_choice_reading: "Reading",
-  summarize_spoken_text: "Listening",
-  fill_in_the_blanks_listening: "Listening",
-  highlight_correct_summary: "Listening",
-}
+// The `practiceHub.section.*` locale keys are the capitalised category names.
+const TASK_SECTION_KEY = Object.fromEntries(
+  ALL_TASK_TYPES.map((taskType) => {
+    const category = TASK_TYPE_REGISTRY[taskType].category
+    return [taskType, category.charAt(0).toUpperCase() + category.slice(1)]
+  })
+) as Record<PteTaskType, string>
 
 function parseFillInTheBlanksStimulus(raw: string): string | null {
   try {
@@ -341,8 +312,9 @@ export default function HistoryPage() {
 
   const handleClearAll = async () => {
     if (!confirm(t("history.confirmDeleteAll"))) return
-    clearAllTasksLocal()
-    setTasks([])
+    await clearAllTasks()
+    // Shows what is left if the cloud copy could not be cleared.
+    setTasks(await getTasks())
     setSelectedIds(new Set())
   }
 
@@ -390,16 +362,7 @@ export default function HistoryPage() {
     )
   }
 
-  const typeOptions: Array<PteTaskType | "all"> = [
-    "all",
-    "read_aloud",
-    "repeat_sentence",
-    "answer_short_question",
-    "summarize_written_text",
-    "write_essay",
-    "personal_intro",
-    "write_from_dictation",
-  ]
+  const typeOptions: Array<PteTaskType | "all"> = ["all", ...ALL_TASK_TYPES]
 
   return (
     <div className="min-h-screen">

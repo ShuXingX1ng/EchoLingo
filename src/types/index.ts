@@ -78,6 +78,11 @@ export type TaskFeedback = {
   weaknesses: string[]
   suggestions: string[]
   details?: TaskFeedbackDetails
+  speechEvaluation?: SpeechEvaluationResult
+  /**
+   * Azure's own shape, on Practice Tasks saved before the provider-neutral
+   * result. Read either one through `speechEvaluationOf()`.
+   */
   pronunciationAssessment?: PronunciationAssessmentResult
   dimensionScores?: DimensionScores
   scoreCard?: TaskScoreCard
@@ -205,32 +210,37 @@ export type TaskTypeWeakness = {
   dimensions?: DimensionWeakness[]
 }
 
-// ── Legacy IELTS types (retained for backup compatibility) ────────────────────
+// Speech Evaluation Result — provider-neutral (CONTEXT.md, ADR-0012).
+export type WordEvidence = {
+  word: string
+  score: number
+  status: "correct" | "mispronounced" | "omitted" | "inserted"
+  phonemes?: Array<{ phoneme: string; score: number }> | null
+}
 
-export type ChatMessage = {
-  id: string;
-  role: "examiner" | "user";
-  content: string;
-  createdAt: string;
-};
+export type SpeechEvaluationResult = {
+  provider: string
+  /** 10–90 Spoken Task Score Estimate; only the EchoLingo Speech Evaluator produces one. */
+  taskScoreEstimate: number | null
+  /** The provider's own 0–100 aggregate, not a Spoken Task Score Estimate. */
+  overallScore: number | null
+  pronunciation: number
+  oralFluency: number
+  content: number
+  recognizedText?: string | null
+  words: WordEvidence[]
+  evidence: { taskScoreEstimate: boolean; words: boolean; phonemes: boolean }
+  summary: string
+}
 
-export type SpeakingSession = {
-  id: string;
-  mode: "ielts_part_1" | "ielts_part_2" | "ielts_part_3";
-  messages: ChatMessage[];
-  feedback?: SessionFeedback;
-  createdAt: string;
-  endedAt?: string;
-};
+/** Response of POST /api/pte/spoken-feedback. */
+export type SpokenFeedbackResponse = {
+  transcript: string
+  feedback: TaskFeedback | null
+  speechEvaluation: SpeechEvaluationResult | null
+}
 
-export type ErrorAnnotation = {
-  original: string;
-  corrected: string;
-  type: "grammar" | "vocabulary" | "fluency" | "pronunciation";
-  explanation: string;
-};
-
-// 发音评估相关类型
+// Azure Pronunciation Assessment as stored on older Practice Tasks.
 export type PhonemeAssessment = {
   phoneme: string;
   score: number;
@@ -281,18 +291,4 @@ export type VocabularyEntry = {
   entries: WordLookupEntry[];
   tags: string[];
   createdAt: string; // ISO timestamp
-};
-
-export type SessionFeedback = {
-  estimatedBand: number;
-  fluencyAndCoherence: string;
-  lexicalResource: string;
-  grammarRangeAndAccuracy: string;
-  pronunciation: string;
-  pronunciationAssessment?: PronunciationAssessmentResult; // 详细发音评估
-  strengths: string[];
-  weaknesses: string[];
-  improvementSuggestions: string[];
-  improvedSampleAnswer: string;
-  errorAnnotations?: ErrorAnnotation[];
 };

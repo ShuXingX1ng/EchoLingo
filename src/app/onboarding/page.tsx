@@ -1,10 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import { apiPost, apiPostBlob, apiRequest } from "@/lib/api-client"
+import { usePracticeTaskRun, type CollectedResponse } from "@/hooks/usePracticeTaskRun"
+import { apiPost, apiRequest } from "@/lib/api-client"
+import {
+  fillInTheBlanksFeedbackResponse,
+  fillInTheBlanksFeedbackStimulus,
+  multipleChoiceFeedbackResponse,
+  multipleChoiceFeedbackStimulus,
+  parseFillInTheBlanks,
+  parseMultipleChoice,
+  splitPassage,
+} from "@/lib/structured-stimulus"
+import { practicePath } from "@/lib/task-type-registry"
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -48,81 +58,6 @@ interface OnboardingResult {
   learningPlan: LearningPlan
 }
 
-// ─── FIB Listening helpers (reused from fill-in-the-blanks-listening/page.tsx) ─
-
-type BlankDef = { options: string[]; correct: number }
-type FIBParsed = { passage: string; blanks: BlankDef[] }
-
-function parseFIBStimulus(raw: string): FIBParsed | null {
-  try {
-    const p = JSON.parse(raw) as { passage?: unknown; blanks?: unknown }
-    if (typeof p.passage !== "string" || !Array.isArray(p.blanks)) return null
-    return p as FIBParsed
-  } catch { return null }
-}
-
-function splitPassage(passage: string): Array<{ type: "text" | "blank"; value: string }> {
-  return passage.split(/(\[BLANK_\d+\])/).map((p) => {
-    const m = p.match(/^\[BLANK_(\d+)\]$/)
-    return m ? { type: "blank" as const, value: m[1] } : { type: "text" as const, value: p }
-  })
-}
-
-function fibResponse(parsed: FIBParsed, selections: (string | null)[]): string {
-  return parsed.blanks
-    .map((b, i) => {
-      const sel = selections[i] ?? "(no answer)"
-      const ok = sel === b.options[b.correct]
-      return `Blank ${i + 1}: selected "${sel}" (correct: "${b.options[b.correct]}") ${ok ? "✓" : "✗"}`
-    })
-    .join("\n")
-}
-
-function fibStimulus(parsed: FIBParsed): string {
-  let p = parsed.passage
-  parsed.blanks.forEach((b, i) => { p = p.replace(`[BLANK_${i}]`, `[${b.options[b.correct]}]`) })
-  return `Passage:\n${p}\n\nCorrect: ${parsed.blanks.map((b, i) => `Blank ${i + 1}: "${b.options[b.correct]}"`).join(", ")}`
-}
-
-// ─── Multiple Choice helpers (reused from multiple-choice/page.tsx) ───────────
-
-type MCParsed = { passage: string; question: string; options: string[]; correct: number }
-
-function parseMCStimulus(raw: string): MCParsed | null {
-  try {
-    const p = JSON.parse(raw) as { passage?: unknown; question?: unknown; options?: unknown; correct?: unknown }
-    if (typeof p.passage !== "string" || typeof p.question !== "string" ||
-      !Array.isArray(p.options) || typeof p.correct !== "number") return null
-    return p as MCParsed
-  } catch { return null }
-}
-
-function mcResponse(p: MCParsed, selected: number): string {
-  const ok = selected === p.correct
-  return ok
-    ? `Selected: ${p.options[selected]} ✓ (correct)`
-    : `Selected: ${p.options[selected]} ✗ (incorrect — correct: ${p.options[p.correct]})`
-}
-
-// ─── Task slug → practice path ────────────────────────────────────────────────
-
-const TASK_PATH: Record<string, string> = {
-  read_aloud: "/practice/read-aloud",
-  repeat_sentence: "/practice/repeat-sentence",
-  answer_short_question: "/practice/answer-short-question",
-  summarize_written_text: "/practice/summarize-written-text",
-  write_essay: "/practice/write-essay",
-  describe_image: "/practice/describe-image",
-  re_tell_lecture: "/practice/re-tell-lecture",
-  fill_in_the_blanks_reading: "/practice/fill-in-the-blanks",
-  re_order_paragraphs: "/practice/re-order-paragraphs",
-  multiple_choice_reading: "/practice/multiple-choice",
-  summarize_spoken_text: "/practice/summarize-spoken-text",
-  fill_in_the_blanks_listening: "/practice/fill-in-the-blanks-listening",
-  highlight_correct_summary: "/practice/highlight-correct-summary",
-  write_from_dictation: "/practice/write-from-dictation",
-}
-
 const SECTION_ZH: Record<string, string> = {
   speaking: "口语", writing: "写作", reading: "阅读", listening: "听力",
 }
@@ -151,42 +86,42 @@ function PrimaryBtn({ onClick, disabled, children }: {
   )
 }
 
-// ─── Panel 1: Read Aloud (Speaking) ──────────────────────────────────────────
+// ─── Diagnostic panels ────────────────────────────────────────────────────────
+// Each panel renders one Practice Task run. The run is given the Stimulus the
+// diagnostic already loaded and hands its Response back for the joint
+// evaluation instead of requesting Feedback.
 
-function ReadAloudPanel({ item, onComplete }: {
+interface PanelProps {
   item: StimulusItem
   onComplete: (stimulus: string, response: string) => void
-}) {
-  const [phase, setPhase] = useState<"ready" | "recording" | "done">("ready")
-  const [micError, setMicError] = useState("")
-  const transcriptRef = useRef("")
+}
 
-  const { recSeconds, canStop, start, stop } = useRecordingSession({
-    totalSeconds: item.time_limit,
-    minSeconds: 3,
-    onComplete: (_blob, transcript) => {
-      transcriptRef.current = transcript
-      setPhase("done")
-    },
-    onError: (msg) => {
-      setPhase("ready")
-      setMicError(msg)
-    },
-  })
+function collectInto(onComplete: PanelProps["onComplete"]) {
+  return ({ stimulus, response }: CollectedResponse) => onComplete(stimulus, response)
+}
 
-  const handleStart = async () => {
-    setPhase("recording")
-    await start()
-  }
+function formatClock(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`
+}
 
-  const handleStop = () => {
-    stop()
-  }
+function RunError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="text-center">
+      <p className="mb-3 text-sm text-red-600 dark:text-red-400">{message}</p>
+      <PrimaryBtn onClick={onRetry}>Try again</PrimaryBtn>
+    </div>
+  )
+}
 
-  const handleSubmit = () => {
-    const resp = transcriptRef.current || "[no transcript captured]"
-    onComplete(item.stimulus, resp)
-  }
+// ─── Panel 1: Read Aloud (Speaking) ──────────────────────────────────────────
+
+function ReadAloudPanel({ item, onComplete }: PanelProps) {
+  const { phase, seconds, recSeconds, canStop, error, startNow, stopRecording, generate } =
+    usePracticeTaskRun("read_aloud", {
+      stimulus: item.stimulus,
+      timeLimitSeconds: item.time_limit,
+      onResponse: collectInto(onComplete),
+    })
 
   return (
     <div className="space-y-5">
@@ -194,15 +129,12 @@ function ReadAloudPanel({ item, onComplete }: {
         <p className="text-sm leading-relaxed text-[var(--foreground)]">{item.stimulus}</p>
       </div>
 
-      {phase === "ready" && (
+      {phase === "prep" && (
         <div className="text-center">
           <p className="text-xs text-[var(--text-secondary)] mb-4">
-            Prepare, then press Record and read the passage aloud.
+            Prepare, then read the passage aloud. Recording starts in {seconds}s.
           </p>
-          {micError && (
-            <p className="mb-3 text-xs text-red-600 dark:text-red-400">{micError} — please allow microphone access and try again.</p>
-          )}
-          <PrimaryBtn onClick={handleStart}>● Record ({item.time_limit}s)</PrimaryBtn>
+          <PrimaryBtn onClick={startNow}>● Record now ({item.time_limit}s)</PrimaryBtn>
         </div>
       )}
 
@@ -214,14 +146,14 @@ function ReadAloudPanel({ item, onComplete }: {
               {recSeconds}s remaining
             </span>
           </div>
-          <PrimaryBtn onClick={handleStop} disabled={!canStop}>■ Stop</PrimaryBtn>
+          <PrimaryBtn onClick={stopRecording} disabled={!canStop}>■ Stop</PrimaryBtn>
         </div>
       )}
 
-      {phase === "done" && (
-        <div className="space-y-3">
-          <PrimaryBtn onClick={handleSubmit}>Submit →</PrimaryBtn>
-        </div>
+      {phase === "processing" && <Spinner />}
+
+      {phase === "error" && (
+        <RunError message={`${error} — please allow microphone access and try again.`} onRetry={generate} />
       )}
     </div>
   )
@@ -229,53 +161,24 @@ function ReadAloudPanel({ item, onComplete }: {
 
 // ─── Panel 2: FIB Listening ───────────────────────────────────────────────────
 
-function FIBListeningPanel({ item, onComplete }: {
-  item: StimulusItem
-  onComplete: (stimulus: string, response: string) => void
-}) {
-  const parsed = parseFIBStimulus(item.stimulus)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [audioPhase, setAudioPhase] = useState<"loading" | "ready" | "playing" | "answering">("loading")
+function FIBListeningPanel({ item, onComplete }: PanelProps) {
+  const parsed = useMemo(() => parseFillInTheBlanks(item.stimulus), [item.stimulus])
   const [selections, setSelections] = useState<(string | null)[]>(
     parsed ? new Array(parsed.blanks.length).fill(null) : []
   )
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => {
-    if (!parsed) return
-    let ttsText = parsed.passage
-    parsed.blanks.forEach((b, i) => {
-      ttsText = ttsText.replace(`[BLANK_${i}]`, b.options[b.correct])
+  const { phase, seconds, error, hasPlayed, play, previewStimulus, submit, generate } =
+    usePracticeTaskRun("fill_in_the_blanks_listening", {
+      stimulus: item.stimulus,
+      timeLimitSeconds: item.time_limit,
+      // The passage and its blanks are on screen, so the task survives without audio.
+      audioOptional: true,
+      onResponse: collectInto(onComplete),
+      buildSubmission: () => parsed && {
+        feedbackStimulus: fillInTheBlanksFeedbackStimulus(parsed),
+        feedbackResponse: fillInTheBlanksFeedbackResponse(parsed, selections),
+      },
     })
-    apiPostBlob("/api/tts", { text: ttsText, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      .then((blob) => {
-        setAudioUrl(URL.createObjectURL(blob))
-        setAudioPhase("ready")
-      })
-      .catch(() => setAudioPhase("answering")) // degrade: skip audio, go straight to answering
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => () => {
-    if (audioRef.current) audioRef.current.pause()
-    if (audioUrl) URL.revokeObjectURL(audioUrl)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const playAudio = () => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-    audio.onended = () => setAudioPhase("answering")
-    setAudioPhase("playing")
-    audio.play().catch(() => setAudioPhase("answering"))
-  }
-
-  const handleSubmit = () => {
-    if (!parsed) return
-    onComplete(fibStimulus(parsed), fibResponse(parsed, selections))
-  }
 
   if (!parsed) {
     return <p className="text-sm text-red-500">Invalid stimulus format.</p>
@@ -286,20 +189,20 @@ function FIBListeningPanel({ item, onComplete }: {
 
   return (
     <div className="space-y-5">
-      {audioPhase === "loading" && <Spinner />}
+      {phase === "generating" && <Spinner />}
 
-      {audioPhase === "ready" && (
+      {phase === "ready" && (
         <div className="text-center">
           <p className="text-xs text-[var(--text-secondary)] mb-4">
             Press play to hear the passage, then fill in the blanks.
           </p>
-          <PrimaryBtn onClick={playAudio}>▶ Play Passage</PrimaryBtn>
+          <PrimaryBtn onClick={play}>▶ Play Passage</PrimaryBtn>
         </div>
       )}
 
-      {(audioPhase === "playing" || audioPhase === "answering") && (
+      {(phase === "listening" || phase === "writing") && (
         <div className="space-y-4">
-          {audioPhase === "playing" && (
+          {phase === "listening" && (
             <div className="flex items-center gap-2 py-2">
               {[0,1,2,3,4].map(i => (
                 <span key={i} className="inline-block w-1 rounded-full bg-emerald-500"
@@ -308,6 +211,11 @@ function FIBListeningPanel({ item, onComplete }: {
               <span className="ml-2 text-sm text-emerald-700 dark:text-emerald-400">Playing… listen and fill in the blanks below</span>
               <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
             </div>
+          )}
+          {phase === "writing" && (
+            <p className={`text-xs font-mono ${seconds <= 15 ? "text-red-600 dark:text-red-400 font-medium" : "text-[var(--text-secondary)]"}`}>
+              {formatClock(seconds)}
+            </p>
           )}
           <div className="border border-[var(--border)] bg-[var(--surface)] p-5 leading-9 text-sm text-[var(--foreground)]">
             {segments.map((seg, i) => {
@@ -331,39 +239,30 @@ function FIBListeningPanel({ item, onComplete }: {
             })}
           </div>
           <div className="flex items-center justify-between">
-            {audioUrl && audioPhase === "answering" && (
-              <button onClick={playAudio}
+            {hasPlayed && phase === "writing" && (
+              <button onClick={previewStimulus}
                 className="text-xs text-emerald-600 underline hover:text-emerald-800 dark:text-emerald-400">
                 Replay
               </button>
             )}
-            <PrimaryBtn onClick={handleSubmit} disabled={!allAnswered || audioPhase === "playing"}>Submit →</PrimaryBtn>
+            <PrimaryBtn onClick={submit} disabled={!allAnswered || phase === "listening"}>Submit →</PrimaryBtn>
           </div>
         </div>
       )}
+
+      {phase === "error" && <RunError message={error} onRetry={generate} />}
     </div>
   )
 }
 
 // ─── Panel 3: Summarize Written Text (Writing) ────────────────────────────────
 
-function SummarizePanel({ item, onComplete }: {
-  item: StimulusItem
-  onComplete: (stimulus: string, response: string) => void
-}) {
-  const [text, setText] = useState("")
-  const [timer, setTimer] = useState(item.time_limit)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setTimer(t => { if (t <= 1) { clearInterval(timerRef.current!); return 0 } return t - 1 })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [])
-
-  const mins = Math.floor(timer / 60)
-  const secs = timer % 60
+function SummarizePanel({ item, onComplete }: PanelProps) {
+  const { seconds, userText: text, setText, submit } = usePracticeTaskRun("summarize_written_text", {
+    stimulus: item.stimulus,
+    timeLimitSeconds: item.time_limit,
+    onResponse: collectInto(onComplete),
+  })
 
   return (
     <div className="space-y-4">
@@ -371,8 +270,8 @@ function SummarizePanel({ item, onComplete }: {
         <p className="text-sm leading-relaxed text-[var(--foreground)]">{item.stimulus}</p>
       </div>
       <div className="flex justify-between text-xs text-[var(--text-secondary)]">
-        <span className={timer > 0 && timer <= 15 ? "text-red-600 dark:text-red-400 font-mono font-medium" : "font-mono"}>
-          {timer > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : "Time's up"}
+        <span className={seconds <= 15 ? "text-red-600 dark:text-red-400 font-mono font-medium" : "font-mono"}>
+          {formatClock(seconds)}
         </span>
         <span>{text.trim().split(/\s+/).filter(Boolean).length} words</span>
       </div>
@@ -383,7 +282,7 @@ function SummarizePanel({ item, onComplete }: {
         rows={4}
         className="w-full resize-none border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-slate-400"
       />
-      <PrimaryBtn onClick={() => onComplete(item.stimulus, text.trim())} disabled={!text.trim()}>
+      <PrimaryBtn onClick={submit} disabled={!text.trim()}>
         Submit →
       </PrimaryBtn>
     </div>
@@ -392,23 +291,33 @@ function SummarizePanel({ item, onComplete }: {
 
 // ─── Panel 4: Multiple Choice Reading ────────────────────────────────────────
 
-function MultipleChoicePanel({ item, onComplete }: {
-  item: StimulusItem
-  onComplete: (stimulus: string, response: string) => void
-}) {
-  const parsed = parseMCStimulus(item.stimulus)
+function MultipleChoicePanel({ item, onComplete }: PanelProps) {
+  const parsed = useMemo(() => parseMultipleChoice(item.stimulus), [item.stimulus])
   const [selected, setSelected] = useState<number | null>(null)
 
-  if (!parsed) return <p className="text-sm text-red-500">Invalid stimulus format.</p>
+  const { seconds, submit } = usePracticeTaskRun("multiple_choice_reading", {
+    stimulus: item.stimulus,
+    timeLimitSeconds: item.time_limit,
+    onResponse: collectInto(onComplete),
+    buildSubmission: () => (parsed && selected !== null ? {
+      feedbackStimulus: multipleChoiceFeedbackStimulus(parsed),
+      feedbackResponse: multipleChoiceFeedbackResponse(parsed, selected),
+    } : null),
+  })
 
-  const mcStimulusStr = `Passage:\n${parsed.passage}\n\nQuestion: ${parsed.question}\n\nOptions:\n${parsed.options.map((o, i) => `${o}${i === parsed.correct ? " ✓" : ""}`).join("\n")}`
+  if (!parsed) return <p className="text-sm text-red-500">Invalid stimulus format.</p>
 
   return (
     <div className="space-y-4">
       <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.06)]">
         <p className="text-sm leading-relaxed text-[var(--foreground)]">{parsed.passage}</p>
       </div>
-      <p className="text-sm font-medium text-[var(--foreground)]">{parsed.question}</p>
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm font-medium text-[var(--foreground)]">{parsed.question}</p>
+        <span className={`text-xs font-mono ${seconds <= 15 ? "text-red-600 dark:text-red-400 font-medium" : "text-[var(--text-secondary)]"}`}>
+          {formatClock(seconds)}
+        </span>
+      </div>
       <div className="space-y-2">
         {parsed.options.map((opt, i) => (
           <button key={i} onClick={() => setSelected(i)}
@@ -422,10 +331,7 @@ function MultipleChoicePanel({ item, onComplete }: {
           </button>
         ))}
       </div>
-      <PrimaryBtn
-        onClick={() => selected !== null && onComplete(mcStimulusStr, mcResponse(parsed, selected))}
-        disabled={selected === null}
-      >
+      <PrimaryBtn onClick={submit} disabled={selected === null}>
         Submit →
       </PrimaryBtn>
     </div>
@@ -490,7 +396,7 @@ function Results({ result, onRetry }: { result: OnboardingResult; onRetry: () =>
             {plan.recommended_first_task.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
           </p>
           <Link
-            href={TASK_PATH[plan.recommended_first_task] ?? "/practice"}
+            href={practicePath(plan.recommended_first_task) ?? "/practice"}
             className="mt-4 inline-block rounded-xl bg-slate-950 px-8 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
             开始练习 →
@@ -530,7 +436,7 @@ function Results({ result, onRetry }: { result: OnboardingResult; onRetry: () =>
                 </div>
                 <div className="ml-10 mt-2 flex flex-wrap gap-1.5">
                   {day.tasks.map((slug) => (
-                    <Link key={slug} href={TASK_PATH[slug] ?? "/practice"}
+                    <Link key={slug} href={practicePath(slug) ?? "/practice"}
                       className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)] hover:border-slate-400 hover:text-[var(--foreground)]">
                       {slug.replace(/_/g, " ")}
                     </Link>

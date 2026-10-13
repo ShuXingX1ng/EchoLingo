@@ -1,22 +1,17 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask } from "@/types"
 
-const TIME_LIMIT = 600
 
 export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
   const {
     phase, stimulus, seconds, error, savedTask,
-    userText, setText, submit, generate,
-  } = usePracticeTaskRunner({
-    taskType: "summarize_written_text",
-    responseKind: "text",
-    timeLimit: TIME_LIMIT,
-  })
+    userText, setText, submit, generate, emptyTask,
+  } = usePracticeTaskRun("summarize_written_text", { mode: "mock" })
 
   useEffect(() => {
     if (phase === "done" && savedTask) onComplete(savedTask)
@@ -28,14 +23,7 @@ export default function MockSummarizeWrittenText({ onComplete }: { onComplete: (
   const timeUrgent = seconds <= 60
   const wordCount = userText.trim().split(/\s+/).filter(Boolean).length
 
-  const skipTask = () => onComplete({
-    id: `mock_${Date.now()}`,
-    taskType: "summarize_written_text",
-    stimulus: { kind: "text", content: stimulus },
-    response: { kind: "text", content: "" },
-    durationSeconds: 0,
-    createdAt: new Date().toISOString(),
-  })
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">

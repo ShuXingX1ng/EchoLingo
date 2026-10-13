@@ -1,194 +1,57 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import {
+  fillInTheBlanksFeedbackResponse,
+  fillInTheBlanksFeedbackStimulus,
+  parseFillInTheBlanks,
+  splitPassage,
+  type FillInTheBlanksStimulus,
+} from "@/lib/structured-stimulus"
 
-const TIME_LIMIT = 420 // 7 minutes
-
-type BlankDef = { options: string[]; correct: number }
-type ParsedStimulus = { passage: string; blanks: BlankDef[] }
-type Phase = "idle" | "generating" | "ready" | "listening" | "answering" | "processing" | "done" | "error"
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as { passage?: unknown; blanks?: unknown }
-    if (typeof parsed.passage !== "string" || !Array.isArray(parsed.blanks)) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function splitPassage(passage: string): Array<{ type: "text" | "blank"; value: string }> {
-  const parts = passage.split(/(\[BLANK_\d+\])/)
-  return parts.map((p) => {
-    const m = p.match(/^\[BLANK_(\d+)\]$/)
-    return m ? { type: "blank" as const, value: m[1] } : { type: "text" as const, value: p }
-  })
-}
-
-function buildStimulusForFeedback(parsed: ParsedStimulus): string {
-  let passage = parsed.passage
-  parsed.blanks.forEach((b, i) => {
-    passage = passage.replace(`[BLANK_${i}]`, `[${b.options[b.correct]}]`)
-  })
-  const answers = parsed.blanks.map((b, i) => `Blank ${i + 1}: "${b.options[b.correct]}"`).join(", ")
-  return `Passage (with correct answers):\n${passage}\n\nCorrect answers: ${answers}`
-}
-
-function buildResponseForFeedback(parsed: ParsedStimulus, selections: (string | null)[]): string {
-  return parsed.blanks
-    .map((b, i) => {
-      const selected = selections[i] ?? "(no answer)"
-      const correct = b.options[b.correct]
-      const isCorrect = selected === correct
-      return `Blank ${i + 1}: selected "${selected}" (correct: "${correct}") ${isCorrect ? "✓" : "✗"}`
-    })
-    .join("\n")
-}
+type ParsedStimulus = FillInTheBlanksStimulus
 
 export default function FillInTheBlanksListeningPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [selections, setSelections] = useState<(string | null)[]>([])
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
 
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const parsedRef = useRef<ParsedStimulus | null>(null)
+  const selectionsRef = useRef<(string | null)[]>([])
+  useEffect(() => { selectionsRef.current = selections }, [selections])
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-  }, [])
-
-  useEffect(() => {
-    if (phase !== "answering") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    setPhase("generating")
-    setError(""); setFeedback(null); setSelections([]); setSeconds(TIME_LIMIT)
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const raw = await loadStimulusText({ taskType: "fill_in_the_blanks_listening", timeoutMs: 60000 })
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-
-      // Build the full passage text for TTS (with blanks filled)
-      let ttsText = p.passage
-      p.blanks.forEach((b, i) => {
-        ttsText = ttsText.replace(`[BLANK_${i}]`, b.options[b.correct])
-      })
-
-      const blob = await apiPostBlob("/api/tts", { text: ttsText, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      const url = URL.createObjectURL(blob)
-
-      setRawStimulus(raw)
-      setParsed(p)
-      setAudioUrl(url)
-      setSelections(new Array(p.blanks.length).fill(null))
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [audioUrl])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playPassage = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-    audio.onended = () => {
-      setPhase("answering")
-      startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-    }
-    setPhase("listening")
-    requestAnimationFrame(() => {
-      audio.play().catch(() => {
-        setPhase("ready")
-        audioRef.current = null
-      })
+  const { phase, stimulus, seconds, feedback, error, hasPlayed, play: playPassage, previewStimulus, submit: handleSubmit, generate } =
+    usePracticeTaskRun("fill_in_the_blanks_listening", {
+      buildSubmission: () => {
+        const p = parsedRef.current
+        if (!p || selectionsRef.current.every((s) => s === null)) return null
+        return {
+          feedbackStimulus: fillInTheBlanksFeedbackStimulus(p),
+          feedbackResponse: fillInTheBlanksFeedbackResponse(p, selectionsRef.current),
+        }
+      },
     })
-  }, [audioUrl])
 
-  const handleSubmit = useCallback(async () => {
-    if (!parsed) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
-
-    const stimulusForFeedback = buildStimulusForFeedback(parsed)
-    const responseForFeedback = buildResponseForFeedback(parsed, selections)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "fill_in_the_blanks_listening",
-        stimulus: stimulusForFeedback,
-        response: responseForFeedback,
-      }, { timeoutMs: 90000 })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "fill_in_the_blanks_listening",
-        stimulus: { kind: "audio", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [parsed, selections, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  // Parse the structured Stimulus when the run loads it
+  useEffect(() => {
+    if (!stimulus) return
+    const p = parseFillInTheBlanks(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelections(new Array(p.blanks.length).fill(null))
+  }, [stimulus])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 60
-  const allAnswered = parsed ? selections.every(s => s !== null) : false
+  const allAnswered = parsed ? selections.every((s) => s !== null) : false
   const segments = parsed ? splitPassage(parsed.passage) : []
 
   return (
@@ -229,7 +92,7 @@ export default function FillInTheBlanksListeningPage() {
           </div>
         )}
 
-        {phase === "ready" && audioUrl && (
+        {phase === "ready" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               {t('practiceTask.common.passageReady')}
@@ -249,7 +112,7 @@ export default function FillInTheBlanksListeningPage() {
           </div>
         )}
 
-        {(phase === "listening" || phase === "answering") && parsed && (
+        {(phase === "listening" || phase === "writing") && parsed && (
           <div className="space-y-5">
             {phase === "listening" && (
               <div className="flex items-center justify-between">
@@ -270,7 +133,7 @@ export default function FillInTheBlanksListeningPage() {
                 <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
               </div>
             )}
-            {phase === "answering" && (
+            {phase === "writing" && (
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.fill-in-the-blanks-listening.selectWords')}</p>
                 <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
@@ -307,16 +170,16 @@ export default function FillInTheBlanksListeningPage() {
                 <p className="text-xs text-slate-400">
                   {t("practiceTask.common.answered", { filled: selections.filter(Boolean).length, total: parsed.blanks.length })}
                 </p>
-                {audioUrl && (
+                {hasPlayed && (
                   <button
-                    onClick={playPassage}
+                    onClick={previewStimulus}
                     className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 underline"
                   >
                     {t('practiceTask.highlight-correct-summary.replayPassage')}
                   </button>
                 )}
               </div>
-              {phase === "answering" && (
+              {phase === "writing" && (
                 <button
                   onClick={handleSubmit}
                   disabled={!allAnswered}
@@ -340,9 +203,9 @@ export default function FillInTheBlanksListeningPage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulus={buildStimulusForFeedback(parsed)}
+              stimulus={fillInTheBlanksFeedbackStimulus(parsed)}
               stimulusLabel={t('practiceTask.fill-in-the-blanks-listening.passageWithAnswers')}
-              responseText={buildResponseForFeedback(parsed, selections)}
+              responseText={fillInTheBlanksFeedbackResponse(parsed, selections)}
               responseLabel={t('practiceTask.fill-in-the-blanks-listening.yourAnswers')}
             />
             <div className="flex gap-3 justify-center">

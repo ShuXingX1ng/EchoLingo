@@ -1,146 +1,18 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-const PREP_TIME = 10
-const RECORD_TIME = 40
-const MIN_REC_SECONDS = 5
-
-type Phase =
-  | "idle"
-  | "generating"
-  | "ready"
-  | "listening"
-  | "prep"
-  | "recording"
-  | "processing"
-  | "done"
-  | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function ReTellLecturePage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [lectureText, setLectureText] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [prepSeconds, setPrepSeconds] = useState(PREP_TIME)
-  const [transcript, setTranscript] = useState("")
-
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    setTranscript(tx)
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    let fb: TaskFeedback
-    try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "re_tell_lecture", stimulus: lectureText, response: tx }, { timeoutMs: 90000 })
-    } catch {
-      fb = { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
-    }
-
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "re_tell_lecture",
-        stimulus: { kind: "audio", content: lectureText },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [lectureText])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    minSeconds: MIN_REC_SECONDS,
-    onComplete: processResponse,
-    onError: msg => { setError(msg); setPhase("error") },
-  })
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    audioRef.current?.pause()
-  }, [])
-
-  const generate = useCallback(async () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    setPhase("generating")
-    setError(""); setFeedback(null); setTranscript("")
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const text = await loadStimulusText({ taskType: "re_tell_lecture" })
-      setLectureText(text)
-
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      const url = URL.createObjectURL(blob)
-      setAudioUrl(url)
-      setPrepSeconds(PREP_TIME)
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('practiceTask.re-tell-lecture.errorGenerate'))
-      setPhase("error")
-    }
-  }, [audioUrl, t])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const startPrepTimer = useCallback(() => {
-    setPrepSeconds(PREP_TIME)
-    setPhase("prep")
-    prepTimerRef.current = setInterval(() => {
-      setPrepSeconds(s => {
-        if (s <= 1) {
-          clearInterval(prepTimerRef.current!)
-          setPhase("recording")
-          recording.start()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-  }, [recording.start]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const playLecture = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-
-    audio.onended = () => startPrepTimer()
-    audio.onerror = () => startPrepTimer()
-
-    setPhase("listening")
-    requestAnimationFrame(() => {
-      audio.play().catch(() => {
-        setPhase("ready")
-        audioRef.current = null
-      })
-    })
-  }, [audioUrl, startPrepTimer])
+  const {
+    phase, stimulus: lectureText, seconds: prepSeconds, timer, feedback, error, transcript,
+    recSeconds, canStop, stopRecording, play: playLecture, generate,
+  } = usePracticeTaskRun("re_tell_lecture")
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -158,7 +30,7 @@ export default function ReTellLecturePage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.re-tell-lecture.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            {t('practiceTask.re-tell-lecture.desc', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
+            {t('practiceTask.re-tell-lecture.desc', { prepTime: String(timer.prepSeconds), recordTime: String(timer.recordSeconds) })}
           </p>
         </div>
 
@@ -187,7 +59,7 @@ export default function ReTellLecturePage() {
           </div>
         )}
 
-        {phase === "ready" && audioUrl && (
+        {phase === "ready" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               {t('practiceTask.re-tell-lecture.lectureReady')}
@@ -202,7 +74,7 @@ export default function ReTellLecturePage() {
               {t('practiceTask.re-tell-lecture.playLecture')}
             </button>
             <p className="text-xs text-[var(--text-muted)]">
-              {t('practiceTask.re-tell-lecture.afterLecture', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
+              {t('practiceTask.re-tell-lecture.afterLecture', { prepTime: String(timer.prepSeconds), recordTime: String(timer.recordSeconds) })}
             </p>
           </div>
         )}
@@ -232,7 +104,7 @@ export default function ReTellLecturePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               {t('practiceTask.re-tell-lecture.prepPhase')}
             </p>
-            <CountdownRing seconds={prepSeconds} total={PREP_TIME} size={88} />
+            <CountdownRing seconds={prepSeconds} total={timer.prepSeconds} size={88} />
             <p className="mt-4 text-xs text-[var(--text-muted)]">
               {t('practiceTask.re-tell-lecture.recordingStartsIn', { sec: String(prepSeconds) })}
             </p>
@@ -248,19 +120,19 @@ export default function ReTellLecturePage() {
                   {t('practiceTask.re-tell-lecture.recordingPhase')}
                 </p>
               </div>
-              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
+              <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={80} />
             </div>
             <div className="text-center">
               <button
-                onClick={recording.stop}
-                disabled={!recording.canStop}
+                onClick={stopRecording}
+                disabled={!canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
-                {!recording.canStop
-                  ? t('practiceTask.common.holdOn', { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!canStop
+                  ? t('practiceTask.common.holdOn', { sec: String(recSeconds - (timer.recordSeconds - timer.minRecSeconds)) })
                   : t('practiceTask.common.stopRecording')}
               </button>
             </div>

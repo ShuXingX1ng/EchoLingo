@@ -22,6 +22,7 @@ import urllib.parse
 from langchain_core.tools import tool as lc_tool
 
 from services.prompt_loader import prompts
+from services.task_types import TASK_TYPES, VALID_TASK_TYPES, task_types_where
 
 logger = logging.getLogger(__name__)
 
@@ -35,36 +36,14 @@ _ALLOWED_ROUTES: set[str] = {
 # ── Text-only Task Types (MVP scope) ─────────────────────────────────────────
 # These are the only types supported by the generate_practice tool.
 # Audio-only types are explicitly listed in the reject set below.
-_TEXT_TASK_TYPES: set[str] = {
-    "read_aloud",
-    "summarize_written_text",
-    "write_essay",
-    "fill_in_the_blanks_reading",
-    "re_order_paragraphs",
-    "multiple_choice_reading",
-    "highlight_correct_summary",
-}
+SUPPORTED_PRACTICE_TASK_TYPES: list[str] = task_types_where(assistant_practice=True)
+_TEXT_TASK_TYPES: set[str] = set(SUPPORTED_PRACTICE_TASK_TYPES)
 
-_AUDIO_ONLY_TASK_TYPES: set[str] = {
-    "repeat_sentence",
-    "write_from_dictation",
-    "describe_image",
-    "re_tell_lecture",
-    "answer_short_question",
-    "summarize_spoken_text",
-    "fill_in_the_blanks_listening",
-    "personal_intro",
-}
+_AUDIO_ONLY_TASK_TYPES: set[str] = VALID_TASK_TYPES - _TEXT_TASK_TYPES
 
 # Task type → URL slug mapping
 _TASK_SLUG: dict[str, str] = {
-    "read_aloud": "read-aloud",
-    "summarize_written_text": "summarize-written-text",
-    "write_essay": "write-essay",
-    "fill_in_the_blanks_reading": "fill-in-the-blanks",
-    "re_order_paragraphs": "re-order-paragraphs",
-    "multiple_choice_reading": "multiple-choice",
-    "highlight_correct_summary": "highlight-correct-summary",
+    task_type: TASK_TYPES[task_type].route for task_type in SUPPORTED_PRACTICE_TASK_TYPES
 }
 
 
@@ -153,9 +132,7 @@ def generate_practice(topic: str, task_type: str) -> str:
         return json.dumps({
             "error": (
                 f"'{task_type}' is not a recognised text Task Type. "
-                "Supported types: read_aloud, summarize_written_text, write_essay, "
-                "fill_in_the_blanks_reading, re_order_paragraphs, "
-                "multiple_choice_reading, highlight_correct_summary."
+                f"Supported types: {', '.join(SUPPORTED_PRACTICE_TASK_TYPES)}."
             )
         }, ensure_ascii=False)
 

@@ -1,121 +1,33 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useTranslation } from "@/lib/i18n"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost } from "@/lib/api-client"
-import { getRandomImage } from "@/lib/image-bank"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import type { ImageStimulus } from "@/lib/image-bank"
-import type { PracticeTask, TaskFeedback } from "@/types"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import type { PracticeTask } from "@/types"
 import CountdownRing from "./CountdownRing"
-
-const PREP_TIME = 25
-const RECORD_TIME = 40
-
-type Phase = "prep" | "recording" | "processing" | "done" | "error"
 
 export default function MockDescribeImage({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("prep")
-  const [image] = useState<ImageStimulus>(() => getRandomImage())
+  const {
+    phase, image, seconds: prepSec, timer, error: errorMsg, savedTask: doneTask,
+    recSeconds, emptyTask,
+  } = usePracticeTaskRun("describe_image", { mode: "mock" })
+
   const [imageError, setImageError] = useState(false)
-  const [prepSec, setPrepSec] = useState(PREP_TIME)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
-  const [errorMsg, setErrorMsg] = useState("")
+  const imageUrl = image?.url
+  useEffect(() => { setImageError(false) }, [imageUrl])
 
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const processAudio = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-    const stimulusText = `Image type: ${image.topic}\n\nImage content: ${image.description}`
-
-    let fb: TaskFeedback
-    try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx })
-    } catch {
-      fb = { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-    }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "describe_image",
-        stimulus: { kind: "image", content: image.url },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "describe_image",
-        stimulus: { kind: "image", content: image.url },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [image])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    onComplete: processAudio,
-    onError: msg => { setErrorMsg(msg); setPhase("error") },
-  })
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-  }, [])
-
-  // Auto-start prep timer on mount
-  useEffect(() => {
-    prepTimerRef.current = setInterval(() => {
-      setPrepSec(s => {
-        if (s <= 1) {
-          clearInterval(prepTimerRef.current!)
-          setPhase("recording")
-          recording.start()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const skipTask = () => {
-    const emptyTask: PracticeTask = {
-      id: `mock_${Date.now()}`,
-      taskType: "describe_image",
-      stimulus: { kind: "image", content: image.url },
-      response: { kind: "audio", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    }
-    onComplete(emptyTask)
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">
-      {phase === "prep" && (
+      {phase === "prep" && image && (
         <div className="space-y-4">
           <div className="border border-slate-900 bg-white p-5 dark:border-white/15 dark:bg-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-between mb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("mock.common.preparation")}</p>
-              <CountdownRing seconds={prepSec} total={PREP_TIME} />
+              <CountdownRing seconds={prepSec} total={timer.prepSeconds} />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{image.topic}</p>
             {imageError ? (
@@ -133,7 +45,7 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
         </div>
       )}
 
-      {phase === "recording" && (
+      {phase === "recording" && image && (
         <div className="space-y-4">
           <div className="border-2 border-red-400 bg-white p-5 dark:bg-slate-900">
             <div className="flex items-center justify-between mb-4">
@@ -141,7 +53,7 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t("mock.common.recording")}</p>
               </div>
-              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={64} />
+              <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={64} />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{image.topic}</p>
             {imageError ? (
@@ -166,7 +78,7 @@ export default function MockDescribeImage({ onComplete }: { onComplete: (task: P
         </div>
       )}
 
-      {phase === "done" && doneTask && (
+      {phase === "done" && doneTask && image && (
         <div className="space-y-4">
           <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-800/40">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-2">{t("mock.common.image")}</p>

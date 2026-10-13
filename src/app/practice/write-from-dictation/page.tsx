@@ -1,103 +1,17 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-type Phase = "idle" | "generating" | "ready" | "listening" | "typing" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function WriteFromDictationPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [sentence, setSentence] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [userText, setUserText] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [hasPlayed, setHasPlayed] = useState(false)
-
-  const startedAtRef = useRef("")
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-  }, [])
-
-  const generate = useCallback(async () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    setPhase("generating")
-    setError(""); setFeedback(null); setUserText(""); setHasPlayed(false)
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const text = await loadStimulusText({ taskType: "write_from_dictation" })
-      setSentence(text)
-
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      setAudioUrl(URL.createObjectURL(blob))
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed")
-      setPhase("error")
-    }
-  }, [audioUrl])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playAudio = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-    audio.onended = () => {
-      setHasPlayed(true)
-      if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
-      setPhase("typing")
-    }
-    setPhase("listening")
-    requestAnimationFrame(() => {
-      audio.play().catch(() => {
-        setHasPlayed(true)
-        setPhase("typing")
-        audioRef.current = null
-      })
-    })
-  }, [audioUrl])
-
-  const handleSubmit = useCallback(async () => {
-    if (!userText.trim()) return
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAtRef.current || endedAt).getTime()) / 1000)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "write_from_dictation", stimulus: sentence, response: userText }, { timeoutMs: 90000 })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "write_from_dictation",
-        stimulus: { kind: "audio", content: sentence },
-        response: { kind: "text", content: userText },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current || new Date().toISOString(),
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [sentence, userText])
+  const {
+    phase, stimulus: sentence, feedback, error, hasPlayed,
+    userText, setText: setUserText, play: playAudio, submit: handleSubmit, generate,
+  } = usePracticeTaskRun("write_from_dictation")
 
   const wordCount = userText.trim().split(/\s+/).filter(Boolean).length
 
@@ -172,7 +86,7 @@ export default function WriteFromDictationPage() {
           </div>
         )}
 
-        {phase === "typing" && (
+        {phase === "writing" && (
           <div className="space-y-5">
             <div className="border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300 mb-1">{t('practiceTask.write-from-dictation.typeWhatYouHeard')}</p>

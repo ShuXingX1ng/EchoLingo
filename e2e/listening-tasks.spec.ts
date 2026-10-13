@@ -4,6 +4,7 @@ import {
   mockPteStimulusApi,
   mockPteFeedbackApi,
   mockAudioAutoEnd,
+  mockPracticeApis,
 } from "./helpers";
 
 const PLAIN_STIMULUS =
@@ -31,19 +32,17 @@ const HCS_STIMULUS = JSON.stringify({
 });
 
 test.describe("PTE Listening — Summarize Spoken Text", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/summarize-spoken-text");
     await expect(
       page.getByRole("heading", { name: /summarize spoken text/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte listening/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /generate passage/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → play → write → submit shows feedback", async ({ page }) => {
+  test("play → write → submit shows feedback", async ({ page }) => {
     test.setTimeout(30_000);
     await mockAudioAutoEnd(page);
     await mockPteStimulusApi(page, PLAIN_STIMULUS);
@@ -51,7 +50,6 @@ test.describe("PTE Listening — Summarize Spoken Text", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/summarize-spoken-text");
-    await page.getByRole("button", { name: /generate passage/i }).click();
 
     await expect(
       page.getByRole("button", { name: /play passage/i })
@@ -79,7 +77,6 @@ test.describe("PTE Listening — Summarize Spoken Text", () => {
     await mockTtsApi(page);
 
     await page.goto("/practice/summarize-spoken-text");
-    await page.getByRole("button", { name: /generate passage/i }).click();
     await expect(
       page.getByRole("button", { name: /play passage/i })
     ).toBeVisible({ timeout: 10000 });
@@ -96,7 +93,6 @@ test.describe("PTE Listening — Summarize Spoken Text", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/summarize-spoken-text");
-    await page.getByRole("button", { name: /generate passage/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });
@@ -104,19 +100,17 @@ test.describe("PTE Listening — Summarize Spoken Text", () => {
 });
 
 test.describe("PTE Listening — Fill in the Blanks (Listening)", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/fill-in-the-blanks-listening");
     await expect(
       page.getByRole("heading", { name: /fill in the blanks/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte listening/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /get passage/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → play → select dropdowns → submit shows feedback", async ({
+  test("play → select dropdowns → submit shows feedback", async ({
     page,
   }) => {
     test.setTimeout(30_000);
@@ -126,7 +120,6 @@ test.describe("PTE Listening — Fill in the Blanks (Listening)", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/fill-in-the-blanks-listening");
-    await page.getByRole("button", { name: /get passage/i }).click();
 
     await expect(
       page.getByRole("button", { name: /play passage/i })
@@ -156,7 +149,6 @@ test.describe("PTE Listening — Fill in the Blanks (Listening)", () => {
     await mockTtsApi(page);
 
     await page.goto("/practice/fill-in-the-blanks-listening");
-    await page.getByRole("button", { name: /get passage/i }).click();
     await expect(
       page.getByRole("button", { name: /play passage/i })
     ).toBeVisible({ timeout: 10000 });
@@ -176,7 +168,6 @@ test.describe("PTE Listening — Fill in the Blanks (Listening)", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/fill-in-the-blanks-listening");
-    await page.getByRole("button", { name: /get passage/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });
@@ -184,19 +175,17 @@ test.describe("PTE Listening — Fill in the Blanks (Listening)", () => {
 });
 
 test.describe("PTE Listening — Highlight Correct Summary", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/highlight-correct-summary");
     await expect(
       page.getByRole("heading", { name: /highlight correct summary/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte listening/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /get question/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → play → select radio → submit shows feedback", async ({
+  test("play → select radio → submit shows feedback", async ({
     page,
   }) => {
     test.setTimeout(30_000);
@@ -206,7 +195,6 @@ test.describe("PTE Listening — Highlight Correct Summary", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/highlight-correct-summary");
-    await page.getByRole("button", { name: /get question/i }).click();
 
     await expect(
       page.getByRole("button", { name: /play passage/i })
@@ -241,7 +229,6 @@ test.describe("PTE Listening — Highlight Correct Summary", () => {
     await mockTtsApi(page);
 
     await page.goto("/practice/highlight-correct-summary");
-    await page.getByRole("button", { name: /get question/i }).click();
     await expect(
       page.getByRole("button", { name: /play passage/i })
     ).toBeVisible({ timeout: 10000 });
@@ -262,7 +249,6 @@ test.describe("PTE Listening — Highlight Correct Summary", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/highlight-correct-summary");
-    await page.getByRole("button", { name: /get question/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });

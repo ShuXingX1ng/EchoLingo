@@ -6,7 +6,6 @@ import ErrorBoundary from "./ErrorBoundary";
 import NetworkStatus from "./NetworkStatus";
 import PWAInstallPrompt from "./PWAInstallPrompt";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
-import DataMigration from "./DataMigration";
 import MobileNav from "./MobileNav";
 import StudyAssistant from "./StudyAssistant";
 import { setupGlobalErrorHandlers } from "@/lib/error-logger";
@@ -34,7 +33,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <NetworkStatus />
           <PWAInstallPrompt />
           <ServiceWorkerRegistration />
-          <DataMigration />
           <MobileNav />
           {!isMockExam && <StudyAssistant />}
         </ErrorBoundary>

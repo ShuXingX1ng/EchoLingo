@@ -3,21 +3,15 @@
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
-
-const TIME_LIMIT = 600
 
 export default function SummarizeWrittenTextPage() {
   const { t } = useTranslation()
   const {
     phase, stimulus, seconds, error, feedback,
     userText, setText, submit, generate,
-  } = usePracticeTaskRunner({
-    taskType: "summarize_written_text",
-    responseKind: "text",
-    timeLimit: TIME_LIMIT,
-  })
+  } = usePracticeTaskRun("summarize_written_text")
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60

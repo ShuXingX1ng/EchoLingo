@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockPteStimulusApi, mockPteFeedbackApi } from "./helpers";
+import { mockPteStimulusApi, mockPteFeedbackApi, mockPracticeApis } from "./helpers";
 
 const FIB_R_STIMULUS = JSON.stringify({
   passage:
@@ -43,19 +43,17 @@ const MC_STIMULUS = JSON.stringify({
 // ─── Fill in the Blanks (Reading) ────────────────────────────────────────────
 
 test.describe("PTE Reading — Fill in the Blanks", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/fill-in-the-blanks");
     await expect(
       page.getByRole("heading", { name: /fill in the blanks/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte reading/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /get passage/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → select dropdowns → submit shows feedback", async ({
+  test("select dropdowns → submit shows feedback", async ({
     page,
   }) => {
     test.setTimeout(30_000);
@@ -63,7 +61,6 @@ test.describe("PTE Reading — Fill in the Blanks", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/fill-in-the-blanks");
-    await page.getByRole("button", { name: /get passage/i }).click();
 
     // Dropdowns appear inline in the passage once generated
     await expect(page.locator("main select").first()).toBeVisible({
@@ -90,7 +87,6 @@ test.describe("PTE Reading — Fill in the Blanks", () => {
     await mockPteStimulusApi(page, FIB_R_STIMULUS);
 
     await page.goto("/practice/fill-in-the-blanks");
-    await page.getByRole("button", { name: /get passage/i }).click();
 
     await expect(page.locator("main select").first()).toBeVisible({
       timeout: 10000,
@@ -108,7 +104,6 @@ test.describe("PTE Reading — Fill in the Blanks", () => {
     await mockPteStimulusApi(page, FIB_R_STIMULUS);
 
     await page.goto("/practice/fill-in-the-blanks");
-    await page.getByRole("button", { name: /get passage/i }).click();
 
     await expect(page.locator("main select").first()).toBeVisible({
       timeout: 10000,
@@ -124,7 +119,6 @@ test.describe("PTE Reading — Fill in the Blanks", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/fill-in-the-blanks");
-    await page.getByRole("button", { name: /get passage/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });
@@ -134,19 +128,17 @@ test.describe("PTE Reading — Fill in the Blanks", () => {
 // ─── Re-order Paragraphs ─────────────────────────────────────────────────────
 
 test.describe("PTE Reading — Re-order Paragraphs", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/re-order-paragraphs");
     await expect(
       page.getByRole("heading", { name: /re-order paragraphs/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte reading/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /get paragraphs/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → paragraph tiles appear → submit shows feedback", async ({
+  test("paragraph tiles appear → submit shows feedback", async ({
     page,
   }) => {
     test.setTimeout(30_000);
@@ -154,7 +146,6 @@ test.describe("PTE Reading — Re-order Paragraphs", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/re-order-paragraphs");
-    await page.getByRole("button", { name: /get paragraphs/i }).click();
 
     // Paragraph tiles appear and submit button becomes available
     await expect(
@@ -178,7 +169,6 @@ test.describe("PTE Reading — Re-order Paragraphs", () => {
     await mockPteStimulusApi(page, REORDER_STIMULUS);
 
     await page.goto("/practice/re-order-paragraphs");
-    await page.getByRole("button", { name: /get paragraphs/i }).click();
 
     await expect(
       page.getByRole("button", { name: /submit order/i })
@@ -200,7 +190,6 @@ test.describe("PTE Reading — Re-order Paragraphs", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/re-order-paragraphs");
-    await page.getByRole("button", { name: /get paragraphs/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });
@@ -210,19 +199,17 @@ test.describe("PTE Reading — Re-order Paragraphs", () => {
 // ─── Multiple Choice (Reading) ───────────────────────────────────────────────
 
 test.describe("PTE Reading — Multiple Choice", () => {
-  test("page loads with correct heading, label, and CTA", async ({ page }) => {
+  test("page loads with correct heading and label", async ({ page }) => {
+    await mockPracticeApis(page);
     await page.goto("/practice/multiple-choice");
     await expect(
       page.getByRole("heading", { name: /multiple choice/i })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/pte reading/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /get question/i })
-    ).toBeVisible();
     await expect(page.locator("nav").first()).toBeVisible();
   });
 
-  test("generate → 5 radio options appear → select → submit shows feedback", async ({
+  test("5 radio options appear → select → submit shows feedback", async ({
     page,
   }) => {
     test.setTimeout(30_000);
@@ -230,7 +217,6 @@ test.describe("PTE Reading — Multiple Choice", () => {
     await mockPteFeedbackApi(page);
 
     await page.goto("/practice/multiple-choice");
-    await page.getByRole("button", { name: /get question/i }).click();
 
     await expect(
       page.locator('input[type="radio"]').first()
@@ -258,7 +244,6 @@ test.describe("PTE Reading — Multiple Choice", () => {
     await mockPteStimulusApi(page, MC_STIMULUS);
 
     await page.goto("/practice/multiple-choice");
-    await page.getByRole("button", { name: /get question/i }).click();
 
     await expect(
       page.locator('input[type="radio"]').first()
@@ -275,7 +260,6 @@ test.describe("PTE Reading — Multiple Choice", () => {
     await mockPteStimulusApi(page, MC_STIMULUS);
 
     await page.goto("/practice/multiple-choice");
-    await page.getByRole("button", { name: /get question/i }).click();
 
     await expect(page.getByText(/photosynthesis/i).first()).toBeVisible({
       timeout: 10000,
@@ -288,7 +272,6 @@ test.describe("PTE Reading — Multiple Choice", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" })
     );
     await page.goto("/practice/multiple-choice");
-    await page.getByRole("button", { name: /get question/i }).click();
     await expect(
       page.getByText(/failed|error/i).first()
     ).toBeVisible({ timeout: 10000 });

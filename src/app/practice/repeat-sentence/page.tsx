@@ -1,141 +1,19 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
 import MicrophoneMonitor from "@/components/MicrophoneMonitor"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { blobToWav } from "@/lib/wav-encoder"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import { apiPost, apiPostBlob, apiPostForm } from "@/lib/api-client"
-import type { TaskFeedback, PronunciationAssessmentResult } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-const RECORD_TIME = 15
-const MIN_REC_SECONDS = 5
-
-type Phase = "idle" | "generating" | "ready" | "recording" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function RepeatSentencePage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [sentence, setSentence] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [transcript, setTranscript] = useState("")
-
-  const sentenceRef = useRef("")
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const isGeneratingRef = useRef(false)
-
-  useEffect(() => () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-  }, [])
-
-  const processAudio = useCallback(async (audioBlob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    setTranscript(tx)
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    let wavBlob: Blob | null = null
-    if (audioBlob.size > 0) {
-      try { wavBlob = await blobToWav(audioBlob) } catch { /* optional */ }
-    }
-
-    // Step 1: Azure pronunciation first so its recognized text feeds the LLM.
-    let pronunciationResult: PronunciationAssessmentResult | null = null
-    if (wavBlob) {
-      try {
-        const form = new FormData()
-        form.append("audio", wavBlob, "recording.wav")
-        form.append("referenceText", sentenceRef.current)
-        pronunciationResult = await apiPostForm<PronunciationAssessmentResult>("/api/pronunciation", form)
-      } catch { /* optional */ }
-    }
-
-    const effectiveTranscript = pronunciationResult?.recognizedText || tx
-    setTranscript(effectiveTranscript)
-
-    // Step 2: LLM feedback with the best available transcript
-    let feedbackResult: TaskFeedback | null = null
-    try {
-      feedbackResult = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "repeat_sentence",
-        stimulus: sentenceRef.current,
-        response: effectiveTranscript,
-      }, { timeoutMs: 90000 })
-    } catch { /* null */ }
-
-    const fb: TaskFeedback = feedbackResult ?? {
-      summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [],
-    }
-    if (pronunciationResult) {
-      fb.pronunciationAssessment = pronunciationResult
-    }
-
-    setFeedback(fb)
-    setPhase("done")
-
-    saveTask({
-      taskType: "repeat_sentence",
-      stimulus: { kind: "audio", content: sentenceRef.current },
-      response: { kind: "audio", content: tx },
-      feedback: fb,
-      durationSeconds,
-      createdAt: startedAt,
-      endedAt,
-    }).catch(e => console.warn("saveTask failed:", e))
-  }, [])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    minSeconds: MIN_REC_SECONDS,
-    onComplete: processAudio,
-    onError: msg => { setError(msg); setPhase("error") },
-  })
-
-  const generate = useCallback(async () => {
-    if (isGeneratingRef.current) return
-    isGeneratingRef.current = true
-
-    setError(""); setFeedback(null); setTranscript("")
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-    setPhase("generating")
-
-    try {
-      const text = await loadStimulusText({ taskType: "repeat_sentence" })
-      setSentence(text)
-      sentenceRef.current = text
-
-      const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.9 }, { timeoutMs: 30000 })
-      setAudioUrl(URL.createObjectURL(blob))
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("practiceTask.repeat-sentence.errorGenerate"))
-      setPhase("error")
-    } finally {
-      isGeneratingRef.current = false
-    }
-  }, [audioUrl, t])
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playAudio = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-    audio.play().catch(() => {})
-  }, [audioUrl])
+  const {
+    phase, stimulus: sentence, timer, feedback, error, transcript,
+    recSeconds, canStop, stopRecording, startNow, previewStimulus: playAudio, generate,
+  } = usePracticeTaskRun("repeat_sentence")
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -152,7 +30,7 @@ export default function RepeatSentencePage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.repeat-sentence.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            {t("practiceTask.repeat-sentence.desc", { recordTime: String(RECORD_TIME) })}
+            {t("practiceTask.repeat-sentence.desc", { recordTime: String(timer.recordSeconds) })}
           </p>
           <div className="mt-3"><MicrophoneMonitor /></div>
         </div>
@@ -176,7 +54,7 @@ export default function RepeatSentencePage() {
           </div>
         )}
 
-        {phase === "ready" && audioUrl && (
+        {phase === "ready" && (
           <div className="space-y-6">
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
@@ -191,11 +69,7 @@ export default function RepeatSentencePage() {
               </button>
               <p className="text-xs text-slate-400 mb-6">{t("practiceTask.repeat-sentence.playThenRecord")}</p>
               <button
-                onClick={() => {
-                  if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-                  setPhase("recording")
-                  recording.start()
-                }}
+                onClick={startNow}
                 className="rounded-xl border-2 border-emerald-500 px-8 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
                 {t("practiceTask.repeat-sentence.recordMyAnswer")}
               </button>
@@ -212,14 +86,14 @@ export default function RepeatSentencePage() {
                   {t("practiceTask.repeat-sentence.recordingRepeat")}
                 </p>
               </div>
-              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={80} />
+              <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={80} />
             </div>
             <div className="text-center">
-              <button onClick={recording.stop}
-                disabled={!recording.canStop}
+              <button onClick={stopRecording}
+                disabled={!canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent">
-                {!recording.canStop
-                  ? t("practiceTask.common.holdOn", { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!canStop
+                  ? t("practiceTask.common.holdOn", { sec: String(recSeconds - (timer.recordSeconds - timer.minRecSeconds)) })
                   : t("practiceTask.common.stopRecording")}
               </button>
             </div>

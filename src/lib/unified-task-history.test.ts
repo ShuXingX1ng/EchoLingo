@@ -3,7 +3,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 vi.mock("./task-history", () => ({
   saveTask: vi.fn(),
   getTasks: vi.fn(() => []),
-  getTaskById: vi.fn(() => null),
   deleteTask: vi.fn(() => false),
   getTasksByType: vi.fn(() => []),
   clearAllTasks: vi.fn(),
@@ -13,7 +12,7 @@ vi.mock("./supabase-task-history", () => ({
   isUserLoggedIn: vi.fn(),
   saveTaskToCloud: vi.fn(),
   getTasksFromCloud: vi.fn(() => []),
-  getTaskByIdFromCloud: vi.fn(() => null),
+  clearTasksFromCloud: vi.fn(async () => true),
   deleteTaskFromCloud: vi.fn(() => false),
   getTasksByTypeFromCloud: vi.fn(() => []),
 }))
@@ -126,41 +125,6 @@ describe("unified-task-history", () => {
     })
   })
 
-  // ── getTaskById ───────────────────────────────────────────────────────────────
-
-  describe("getTaskById", () => {
-    it("returns cloud task when found in cloud", async () => {
-      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
-      vi.mocked(cloud.getTaskByIdFromCloud).mockResolvedValue(CLOUD_TASK)
-
-      const result = await unified.getTaskById("cloud-1")
-
-      expect(cloud.getTaskByIdFromCloud).toHaveBeenCalledWith("cloud-1")
-      expect(result).toEqual(CLOUD_TASK)
-    })
-
-    it("falls back to local when not found in cloud", async () => {
-      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
-      vi.mocked(cloud.getTaskByIdFromCloud).mockResolvedValue(null)
-      vi.mocked(local.getTaskById).mockReturnValue(LOCAL_TASK)
-
-      const result = await unified.getTaskById("local-1")
-
-      expect(local.getTaskById).toHaveBeenCalledWith("local-1")
-      expect(result).toEqual(LOCAL_TASK)
-    })
-
-    it("looks up local only when not authenticated", async () => {
-      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(false)
-      vi.mocked(local.getTaskById).mockReturnValue(LOCAL_TASK)
-
-      const result = await unified.getTaskById("local-1")
-
-      expect(cloud.getTaskByIdFromCloud).not.toHaveBeenCalled()
-      expect(result).toEqual(LOCAL_TASK)
-    })
-  })
-
   // ── deleteTask ────────────────────────────────────────────────────────────────
 
   describe("deleteTask", () => {
@@ -220,6 +184,69 @@ describe("unified-task-history", () => {
 
       expect(cloud.getTasksByTypeFromCloud).not.toHaveBeenCalled()
       expect(result).toEqual([LOCAL_TASK])
+    })
+  })
+
+  // ── clearAllTasks ────────────────────────────────────────────────────────────
+
+  describe("clearAllTasks", () => {
+    it("clears the cloud copy and this device when authenticated", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
+
+      expect(await unified.clearAllTasks()).toBe(true)
+
+      expect(cloud.clearTasksFromCloud).toHaveBeenCalledTimes(1)
+      expect(local.clearAllTasks).toHaveBeenCalledTimes(1)
+    })
+
+    it("clears this device only when not authenticated", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(false)
+
+      expect(await unified.clearAllTasks()).toBe(true)
+
+      expect(cloud.clearTasksFromCloud).not.toHaveBeenCalled()
+      expect(local.clearAllTasks).toHaveBeenCalledTimes(1)
+    })
+
+    it("still clears this device and reports it when the cloud fails", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
+      vi.mocked(cloud.clearTasksFromCloud).mockRejectedValueOnce(new Error("offline"))
+
+      expect(await unified.clearAllTasks()).toBe(false)
+
+      expect(local.clearAllTasks).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not serve the cleared list from cache", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
+      vi.mocked(cloud.getTasksFromCloud).mockResolvedValueOnce([CLOUD_TASK])
+      expect(await unified.getTasks()).toEqual([CLOUD_TASK])
+
+      await unified.clearAllTasks()
+      vi.mocked(cloud.getTasksFromCloud).mockResolvedValueOnce([])
+      vi.mocked(local.getTasks).mockReturnValue([])
+
+      expect(await unified.getTasks()).toEqual([])
+    })
+  })
+
+  describe("getTasksByType under the store policy", () => {
+    it("falls back to local when the cloud query fails", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
+      vi.mocked(cloud.getTasksByTypeFromCloud).mockRejectedValueOnce(new Error("offline"))
+      vi.mocked(local.getTasksByType).mockReturnValue([LOCAL_TASK])
+
+      expect(await unified.getTasksByType("read_aloud")).toEqual([LOCAL_TASK])
+    })
+
+    it("checks the login once across queries", async () => {
+      vi.mocked(cloud.isUserLoggedIn).mockResolvedValue(true)
+      vi.mocked(cloud.getTasksByTypeFromCloud).mockResolvedValue([CLOUD_TASK])
+
+      await unified.getTasksByType("read_aloud")
+      await unified.getTasksByType("write_essay")
+
+      expect(cloud.isUserLoggedIn).toHaveBeenCalledTimes(1)
     })
   })
 })

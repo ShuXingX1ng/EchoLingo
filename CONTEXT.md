@@ -14,6 +14,10 @@ _Avoid_: PTE, Pearson test
 A named exercise format within PTE Academic (e.g. Read Aloud, Write Essay, Write from Dictation). Each Task Type has fixed input stimulus, response format, and feedback dimensions.
 _Avoid_: question type, exercise type, mode
 
+**Task Type Catalogue**:
+The single shared record of per-**Task Type** facts — **Section**, practice route, label, **Stimulus** format, timings, scored dimensions, maximum score, and **Mock Exam** order — read by both the frontend and the FastAPI backend. A fact about a Task Type is stated there once and nowhere else.
+_Avoid_: registry (the name of the frontend module that reads it), task config, task list
+
 **Section**:
 One of the three top-level PTE Academic divisions: Speaking & Writing, Reading, Listening.
 _Avoid_: part (reserved for IELTS, which this app no longer covers)
@@ -217,7 +221,7 @@ _Avoid_: learning plan, daily tasks, targeted practice (use only as the UI label
 - A **Practice Task** has one **Stimulus** and one **Response**
 - A **Practice Task** produces one **Feedback**
 - A **Feedback** has one **Feedback Envelope** and one **Feedback Details**
-- A **Pronunciation Assessment** may be attached to the **Feedback Details** when the task retains its Azure flow or Read Aloud explicitly runs comparison
+- A spoken **Practice Task** whose Task Type has a speech evaluation flow carries one **Speech Evaluation Result** on its **Feedback**; a **Pronunciation Assessment** reaches the learner only as that result, when the task retains its Azure flow or Read Aloud explicitly runs comparison
 - A **Speech Evaluator** consumes **Speech Evidence** but remains distinct from the speech encoder and recognition/alignment capabilities that produce that evidence
 - Read Aloud **Speech Evidence** combines free transcription, reference-conditioned word and phoneme alignment, and acoustic representations; no single evidence path independently determines its evaluation
 - The **Speech Evaluator** may use a **Pronunciation Assessment** as a baseline feature but remains responsible for its own calibrated judgment

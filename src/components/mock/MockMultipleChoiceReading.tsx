@@ -1,114 +1,56 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useState, useRef, useEffect } from "react"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
+import {
+  multipleChoiceFeedbackResponse,
+  multipleChoiceFeedbackStimulus,
+  parseMultipleChoice,
+  type MultipleChoiceStimulus,
+} from "@/lib/structured-stimulus"
 import type { PracticeTask } from "@/types"
 
-const TIME_LIMIT = 240 // 4 min
-
-type ParsedStimulus = {
-  passage: string
-  question: string
-  options: string[]
-  correct: number
-}
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as { passage?: unknown; question?: unknown; options?: unknown; correct?: unknown }
-    if (
-      typeof parsed.passage !== "string" ||
-      typeof parsed.question !== "string" ||
-      !Array.isArray(parsed.options) ||
-      parsed.options.length !== 5 ||
-      typeof parsed.correct !== "number"
-    ) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function buildStimulusForFeedback(p: ParsedStimulus): string {
-  const opts = p.options.map((o, i) => `${o}${i === p.correct ? " ✓" : ""}`).join("\n")
-  return `Passage:\n${p.passage}\n\nQuestion: ${p.question}\n\nOptions:\n${opts}`
-}
-
-function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
-  const selectedText = p.options[selected]
-  const correctText = p.options[p.correct]
-  if (selected === p.correct) return `Selected: ${selectedText} ✓ (correct)`
-  return `Selected: ${selectedText} ✗ (incorrect — correct answer: ${correctText})`
-}
+type ParsedStimulus = MultipleChoiceStimulus
 
 export default function MockMultipleChoiceReading({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
-    taskType: "multiple_choice_reading",
-    responseKind: "text",
-  })
-
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
 
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectedRef = useRef<number | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   useEffect(() => { parsedRef.current = parsed }, [parsed])
   useEffect(() => { selectedRef.current = selected }, [selected])
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  // Parse JSON stimulus when hook loads it
+  const { phase, stimulus, seconds, savedTask, error, submit: handleSubmit, emptyTask } =
+    usePracticeTaskRun("multiple_choice_reading", {
+      mode: "mock",
+      buildSubmission: () => {
+        const p = parsedRef.current
+        if (!p) return null
+        return {
+          feedbackStimulus: multipleChoiceFeedbackStimulus(p),
+          feedbackResponse: multipleChoiceFeedbackResponse(p, selectedRef.current),
+        }
+      },
+    })
+
+  // Parse the structured Stimulus when the run loads it
   useEffect(() => {
     if (!stimulus) return
-    const p = parseStimulus(stimulus)
+    const p = parseMultipleChoice(stimulus)
     if (!p) return
     setParsed(p)
     setSelected(null)
-    setSeconds(TIME_LIMIT)
   }, [stimulus])
-
-  const handleSubmit = useCallback(async () => {
-    const p = parsedRef.current
-    if (!p) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    const finalSelected = selectedRef.current ?? 0
-    await submit({
-      feedbackStimulus: buildStimulusForFeedback(p),
-      feedbackResponse: buildResponseForFeedback(p, finalSelected),
-    })
-  }, [submit])
-
-  // Timer while the user is answering
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 60
 
-  const skipTask = (): void => {
-    onComplete({
-      id: `mock_${Date.now()}`,
-      taskType: "multiple_choice_reading",
-      stimulus: { kind: "text", content: stimulus },
-      response: { kind: "text", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    })
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">

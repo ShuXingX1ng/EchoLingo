@@ -1,104 +1,52 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
+import {
+  multipleChoiceFeedbackResponse,
+  multipleChoiceFeedbackStimulus,
+  parseMultipleChoice,
+  type MultipleChoiceStimulus,
+} from "@/lib/structured-stimulus"
 
-const TIME_LIMIT = 240 // 4 minutes
-
-type ParsedStimulus = {
-  passage: string
-  question: string
-  options: string[]
-  correct: number
-}
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as {
-      passage?: unknown; question?: unknown; options?: unknown; correct?: unknown
-    }
-    if (
-      typeof parsed.passage !== "string" ||
-      typeof parsed.question !== "string" ||
-      !Array.isArray(parsed.options) ||
-      parsed.options.length !== 5 ||
-      typeof parsed.correct !== "number"
-    ) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function buildStimulusForFeedback(p: ParsedStimulus): string {
-  const opts = p.options.map((o, i) => `${o}${i === p.correct ? " ✓" : ""}`).join("\n")
-  return `Passage:\n${p.passage}\n\nQuestion: ${p.question}\n\nOptions:\n${opts}`
-}
-
-function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
-  const selectedText = p.options[selected]
-  const correctText = p.options[p.correct]
-  const isCorrect = selected === p.correct
-  if (isCorrect) return `Selected: ${selectedText} ✓ (correct)`
-  return `Selected: ${selectedText} ✗ (incorrect — correct answer: ${correctText})`
-}
+type ParsedStimulus = MultipleChoiceStimulus
 
 export default function MultipleChoicePage() {
   const { t } = useTranslation()
-  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
-    taskType: "multiple_choice_reading",
-    responseKind: "text",
-  })
-
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
 
   const parsedRef = useRef<ParsedStimulus | null>(null)
   const selectedRef = useRef<number | null>(null)
-  const [submittedResponse, setSubmittedResponse] = useState("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   useEffect(() => { parsedRef.current = parsed }, [parsed])
   useEffect(() => { selectedRef.current = selected }, [selected])
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  // Parse JSON stimulus when hook loads it
+  const { phase, stimulus, seconds, feedback, savedTask, error, generate, submit: handleSubmit } =
+    usePracticeTaskRun("multiple_choice_reading", {
+      buildSubmission: () => {
+        const p = parsedRef.current
+        if (!p) return null
+        if (selectedRef.current === null) return null
+        return {
+          feedbackStimulus: multipleChoiceFeedbackStimulus(p),
+          feedbackResponse: multipleChoiceFeedbackResponse(p, selectedRef.current),
+        }
+      },
+    })
+  const submittedResponse = savedTask?.response.content ?? ""
+
+  // Parse the structured Stimulus when the run loads it
   useEffect(() => {
     if (!stimulus) return
-    const p = parseStimulus(stimulus)
+    const p = parseMultipleChoice(stimulus)
     if (!p) return
     setParsed(p)
     setSelected(null)
-    setSeconds(TIME_LIMIT)
   }, [stimulus])
-
-  const handleSubmit = useCallback(async () => {
-    const p = parsedRef.current
-    if (!p) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    const finalSelected = selectedRef.current ?? 0
-    const feedbackStimulus = buildStimulusForFeedback(p)
-    const feedbackResponse = buildResponseForFeedback(p, finalSelected)
-    setSubmittedResponse(feedbackResponse)
-    await submit({ feedbackStimulus, feedbackResponse })
-  }, [submit])
-
-  // Timer while the user is answering
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase, handleSubmit])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -190,7 +138,7 @@ export default function MultipleChoicePage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulus={buildStimulusForFeedback(parsed)}
+              stimulus={multipleChoiceFeedbackStimulus(parsed)}
               stimulusLabel={t('practiceTask.multiple-choice.passageQuestion')}
               responseText={submittedResponse}
               responseLabel={t('practiceTask.multiple-choice.yourAnswer')}

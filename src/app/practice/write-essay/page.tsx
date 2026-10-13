@@ -3,10 +3,9 @@
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
 
-const TIME_LIMIT = 1200
 const MIN_WORDS = 200
 const MAX_WORDS = 300
 
@@ -15,11 +14,7 @@ export default function WriteEssayPage() {
   const {
     phase, stimulus, seconds, error, feedback,
     userText, setText, submit, generate,
-  } = usePracticeTaskRunner({
-    taskType: "write_essay",
-    responseKind: "text",
-    timeLimit: TIME_LIMIT,
-  })
+  } = usePracticeTaskRun("write_essay")
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60

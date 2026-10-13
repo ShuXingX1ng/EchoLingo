@@ -1,178 +1,55 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import {
+  highlightCorrectSummaryFeedbackResponse,
+  highlightCorrectSummaryFeedbackStimulus,
+  parseHighlightCorrectSummary,
+  type HighlightCorrectSummaryStimulus,
+} from "@/lib/structured-stimulus"
 
-const TIME_LIMIT = 300 // 5 minutes
-
-type ParsedStimulus = {
-  passage: string
-  summaries: string[]
-  correct: number
-}
-type Phase = "idle" | "generating" | "ready" | "listening" | "selecting" | "processing" | "done" | "error"
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as {
-      passage?: unknown; summaries?: unknown; correct?: unknown
-    }
-    if (
-      typeof parsed.passage !== "string" ||
-      !Array.isArray(parsed.summaries) ||
-      parsed.summaries.length !== 5 ||
-      typeof parsed.correct !== "number"
-    ) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function buildStimulusForFeedback(p: ParsedStimulus): string {
-  const opts = p.summaries.map((s, i) => `${String.fromCharCode(65 + i)}. ${s}${i === p.correct ? " ✓" : ""}`).join("\n")
-  return `Passage:\n${p.passage}\n\nSummary options:\n${opts}`
-}
-
-function buildResponseForFeedback(p: ParsedStimulus, selected: number): string {
-  const letter = String.fromCharCode(65 + selected)
-  const correctLetter = String.fromCharCode(65 + p.correct)
-  const isCorrect = selected === p.correct
-  if (isCorrect) {
-    return `Selected: ${letter}. ${p.summaries[selected]} ✓ (correct)`
-  }
-  return `Selected: ${letter}. ${p.summaries[selected]} ✗ (incorrect — correct answer: ${correctLetter}. ${p.summaries[p.correct]})`
-}
+type ParsedStimulus = HighlightCorrectSummaryStimulus
 
 export default function HighlightCorrectSummaryPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
   const [parsed, setParsed] = useState<ParsedStimulus | null>(null)
-  const [rawStimulus, setRawStimulus] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
 
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const parsedRef = useRef<ParsedStimulus | null>(null)
+  const selectedRef = useRef<number | null>(null)
+  useEffect(() => { selectedRef.current = selected }, [selected])
+  useEffect(() => { parsedRef.current = parsed }, [parsed])
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-  }, [])
-
-  useEffect(() => {
-    if (phase !== "selecting") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) { clearInterval(timerRef.current!); submitRef.current(); return 0 }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  const generate = useCallback(async () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    setPhase("generating")
-    setError(""); setFeedback(null); setSelected(null); setSeconds(TIME_LIMIT)
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null) }
-
-    try {
-      const raw = await loadStimulusText({ taskType: "highlight_correct_summary", timeoutMs: 60000 })
-      const p = parseStimulus(raw)
-      if (!p) throw new Error("Invalid stimulus format from server")
-
-      const blob = await apiPostBlob("/api/tts", { text: p.passage, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-      const url = URL.createObjectURL(blob)
-
-      setRawStimulus(raw)
-      setParsed(p)
-      setAudioUrl(url)
-      setPhase("ready")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate")
-      setPhase("error")
-    }
-  }, [audioUrl])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { generate() }, [])
-
-  const playPassage = useCallback(() => {
-    if (!audioUrl) return
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(audioUrl)
-    audioRef.current = audio
-    audio.onended = () => {
-      setPhase("selecting")
-      startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-    }
-    setPhase("listening")
-    requestAnimationFrame(() => {
-      audio.play().catch(() => {
-        setPhase("ready")
-        audioRef.current = null
-      })
+  const { phase, stimulus, seconds, feedback, error, hasPlayed, play: playPassage, previewStimulus, submit, generate } =
+    usePracticeTaskRun("highlight_correct_summary", {
+      buildSubmission: () => {
+        const p = parsedRef.current
+        if (!p || selectedRef.current === null) return null
+        return {
+          feedbackStimulus: highlightCorrectSummaryFeedbackStimulus(p),
+          feedbackResponse: highlightCorrectSummaryFeedbackResponse(p, selectedRef.current),
+        }
+      },
     })
-  }, [audioUrl])
 
-  const handleSubmit = useCallback(async () => {
-    if (parsed === null || selected === null) return
-    if (timerRef.current) clearInterval(timerRef.current)
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAtRef.current).getTime()) / 1000,
-    )
+  // The learner submits a choice; only the time limit submits without one.
+  const handleSubmit = () => {
+    if (selected !== null) void submit()
+  }
 
-    const stimulusForFeedback = buildStimulusForFeedback(parsed)
-    const responseForFeedback = buildResponseForFeedback(parsed, selected)
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", {
-        taskType: "highlight_correct_summary",
-        stimulus: stimulusForFeedback,
-        response: responseForFeedback,
-      }, { timeoutMs: 90000 })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? {
-      summary: "Feedback unavailable.",
-      strengths: [],
-      weaknesses: [],
-      suggestions: [],
-    }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "highlight_correct_summary",
-        stimulus: { kind: "audio", content: rawStimulus },
-        response: { kind: "text", content: responseForFeedback },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAtRef.current,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [parsed, selected, rawStimulus])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
+  // Parse the structured Stimulus when the run loads it
+  useEffect(() => {
+    if (!stimulus) return
+    const p = parseHighlightCorrectSummary(stimulus)
+    if (!p) return
+    setParsed(p)
+    setSelected(null)
+  }, [stimulus])
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -217,7 +94,7 @@ export default function HighlightCorrectSummaryPage() {
           </div>
         )}
 
-        {phase === "ready" && audioUrl && (
+        {phase === "ready" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">
               {t('practiceTask.common.passageReady')}
@@ -237,7 +114,7 @@ export default function HighlightCorrectSummaryPage() {
           </div>
         )}
 
-        {(phase === "listening" || phase === "selecting") && parsed && (
+        {(phase === "listening" || phase === "writing") && parsed && (
           <div className="space-y-5">
             {phase === "listening" && (
               <div className="flex items-center justify-between">
@@ -258,7 +135,7 @@ export default function HighlightCorrectSummaryPage() {
                 <style>{`@keyframes pulse { from { transform: scaleY(0.5); } to { transform: scaleY(1); } }`}</style>
               </div>
             )}
-            {phase === "selecting" && (
+            {phase === "writing" && (
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.highlight-correct-summary.selectSummary')}</p>
                 <span className={`text-sm font-mono font-semibold tabular-nums ${timeUrgent ? "text-red-600 dark:text-red-400" : "text-[var(--text-secondary)]"}`}>
@@ -285,7 +162,7 @@ export default function HighlightCorrectSummaryPage() {
                     name="hcs-option"
                     value={i}
                     checked={selected === i}
-                    onChange={() => phase === "selecting" && setSelected(i)}
+                    onChange={() => phase === "writing" && setSelected(i)}
                     disabled={phase === "listening"}
                     className="mt-0.5 shrink-0 accent-emerald-600"
                   />
@@ -297,15 +174,15 @@ export default function HighlightCorrectSummaryPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              {audioUrl && (
+              {hasPlayed && (
                 <button
-                  onClick={playPassage}
+                  onClick={previewStimulus}
                   className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 underline"
                 >
                   {t('practiceTask.highlight-correct-summary.replayPassage')}
                 </button>
               )}
-              {phase === "selecting" && (
+              {phase === "writing" && (
                 <button
                   onClick={handleSubmit}
                   disabled={selected === null}
@@ -329,9 +206,9 @@ export default function HighlightCorrectSummaryPage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulus={buildStimulusForFeedback(parsed)}
+              stimulus={highlightCorrectSummaryFeedbackStimulus(parsed)}
               stimulusLabel={t('practiceTask.highlight-correct-summary.passageSummaries')}
-              responseText={buildResponseForFeedback(parsed, selected)}
+              responseText={highlightCorrectSummaryFeedbackResponse(parsed, selected)}
               responseLabel={t('practiceTask.highlight-correct-summary.yourAnswer')}
             />
             <div className="flex gap-3 justify-center">

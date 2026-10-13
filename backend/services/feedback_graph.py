@@ -6,50 +6,37 @@ Nodes: retrieve_context → (call_primary ‖ call_judge) → check_divergence
        → retry_primary (if diverged) → finalize
 """
 
-import json
 import logging
-import os
-import re
 from datetime import datetime, timezone
 from typing import Optional, TypedDict
 
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
-from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 
-from services.llm_chain import llm_chain
+from services.llm_chain import llm_chain, parse_json
 from services.prompt_loader import prompts
 from services.rag import retrieve_context as rag_retrieve
+from services.task_types import (
+    max_score as task_max_score,
+    scoring_dimensions,
+    scoring_section,
+    task_types_scored_as,
+)
 from tools.rubric import get_rubric
 from tools.weakness import make_weakness_tool
 
 logger = logging.getLogger(__name__)
 
-SCORED_SPEAKING  = {"read_aloud", "repeat_sentence", "answer_short_question", "describe_image", "re_tell_lecture"}
-SCORED_WRITING   = {"summarize_written_text", "write_essay"}
-SCORED_READING   = {"fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading"}
-SCORED_LISTENING = {"summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary"}
-
-# Official PTE point maximums for each task type (fixed-max tasks only)
-_TASK_SCORE_MAX: dict[str, int] = {
-    "read_aloud": 15,
-    "repeat_sentence": 13,
-    "answer_short_question": 1,
-    "describe_image": 15,
-    "re_tell_lecture": 15,
-    "summarize_written_text": 14,
-    "write_essay": 15,
-    "summarize_spoken_text": 14,
-    "highlight_correct_summary": 1,
-}
+# Reading Task Types are scored deterministically and never enter the graph.
+SCORED_READING = task_types_scored_as("reading")
 
 
 class FeedbackState(TypedDict):
     task_type: str
     stimulus: str
     response: str
-    pron_assessment: Optional[dict]
-    pron_context: str
+    speech_evaluation: Optional[dict]
+    speech_context: str
     retrieved_context: str
     primary_result: Optional[dict]
     judge_result: Optional[dict]
@@ -65,15 +52,7 @@ class FeedbackState(TypedDict):
 # ---------------------------------------------------------------------------
 
 def _section(task_type: str) -> str:
-    if task_type in SCORED_SPEAKING:
-        return "speaking"
-    if task_type in SCORED_WRITING:
-        return "writing"
-    if task_type in SCORED_READING:
-        return "reading"
-    if task_type in SCORED_LISTENING:
-        return "listening"
-    return "unscored"
+    return scoring_section(task_type)
 
 
 _LANGUAGE_INSTRUCTION = (
@@ -96,43 +75,20 @@ def _build_primary_system(task_type: str, retrieved_context: str) -> str:
 
 
 def _judge_system(task_type: str) -> Optional[str]:
-    if task_type in SCORED_SPEAKING:
-        return prompts.judge_speaking
-    if task_type in SCORED_WRITING:
-        return prompts.judge_writing
-    if task_type in SCORED_READING:
-        return prompts.judge_reading
-    if task_type in SCORED_LISTENING:
-        return prompts.judge_listening
-    return None
-
-
-def _try_parse(raw: str) -> Optional[dict]:
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
-    match = re.search(r'\{[\s\S]*\}', raw)
-    if match:
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            pass
-    return None
+    return {
+        "speaking": prompts.judge_speaking,
+        "writing": prompts.judge_writing,
+        "reading": prompts.judge_reading,
+        "listening": prompts.judge_listening,
+    }.get(_section(task_type))
 
 
 def _extract_scores(parsed: dict) -> Optional[dict]:
     ds = parsed.get("dimensionScores")
     if not isinstance(ds, dict):
         return None
-    s = ds.get("section")
-    if s == "speaking"  and all(isinstance(ds.get(k), (int, float)) for k in ["fluency", "pronunciation", "content"]):
-        return ds
-    if s == "writing"   and all(isinstance(ds.get(k), (int, float)) for k in ["grammar", "vocabulary", "form", "content"]):
-        return ds
-    if s == "reading"   and all(isinstance(ds.get(k), (int, float)) for k in ["vocabulary", "comprehension"]):
-        return ds
-    if s == "listening" and all(isinstance(ds.get(k), (int, float)) for k in ["comprehension", "accuracy"]):
+    dims = scoring_dimensions(ds.get("section"))
+    if dims and all(isinstance(ds.get(k), (int, float)) for k in dims):
         return ds
     return None
 
@@ -140,13 +96,7 @@ def _extract_scores(parsed: dict) -> Optional[dict]:
 def _find_divergences(primary: dict, judge: dict) -> list:
     if primary.get("section") != judge.get("section"):
         return []
-    dims_map = {
-        "speaking":  ["fluency", "pronunciation", "content"],
-        "writing":   ["grammar", "vocabulary", "form", "content"],
-        "reading":   ["vocabulary", "comprehension"],
-        "listening": ["comprehension", "accuracy"],
-    }
-    dims = dims_map.get(primary["section"], [])
+    dims = scoring_dimensions(primary["section"])
     return [
         {"dimension": d, "primaryScore": primary.get(d, 0), "judgeScore": judge.get(d, 0)}
         for d in dims
@@ -154,21 +104,20 @@ def _find_divergences(primary: dict, judge: dict) -> list:
     ]
 
 
-def _format_pron_context(pron: Optional[dict]) -> str:
-    if not pron:
+def _format_speech_context(evaluation: Optional[dict]) -> str:
+    if not evaluation:
         return ""
     return (
-        f"\n\nAzure Pronunciation scores — Overall: {pron.get('score')}, "
-        f"Accuracy: {pron.get('accuracyScore')}, Fluency: {pron.get('fluencyScore')}, "
-        f"Completeness: {pron.get('completenessScore')}"
+        f"\n\nSpeech evaluation scores — Pronunciation: {evaluation.get('pronunciation')}, "
+        f"Oral fluency: {evaluation.get('oralFluency')}, Content: {evaluation.get('content')}"
     )
 
 
 def _build_user_content(state: FeedbackState) -> str:
-    pron_ctx = state.get("pron_context", "")
+    speech_ctx = state.get("speech_context", "")
     if state.get("stimulus"):
-        return f"Stimulus:\n{state['stimulus']}\n\nCandidate response:\n{state['response'].strip()}{pron_ctx}"
-    return f"Candidate response:\n{state['response'].strip()}{pron_ctx}"
+        return f"Stimulus:\n{state['stimulus']}\n\nCandidate response:\n{state['response'].strip()}{speech_ctx}"
+    return f"Candidate response:\n{state['response'].strip()}{speech_ctx}"
 
 
 # ---------------------------------------------------------------------------
@@ -180,9 +129,9 @@ async def retrieve_context_node(state: FeedbackState) -> dict:
     return {"retrieved_context": ctx}
 
 
-async def process_pronunciation_node(state: FeedbackState) -> dict:
-    """Format the pronunciation assessment dict into a context string for the LLM nodes."""
-    return {"pron_context": _format_pron_context(state.get("pron_assessment"))}
+async def process_speech_evaluation_node(state: FeedbackState) -> dict:
+    """Format the Speech Evaluation Result into a context string for the LLM nodes."""
+    return {"speech_context": _format_speech_context(state.get("speech_evaluation"))}
 
 
 async def call_primary_node(state: FeedbackState) -> dict:
@@ -196,7 +145,7 @@ async def call_primary_node(state: FeedbackState) -> dict:
         json_mode=True,
         timeout=60.0,
     )
-    return {"primary_result": _try_parse(raw or "")}
+    return {"primary_result": parse_json(raw or "")}
 
 
 async def call_judge_node(state: FeedbackState) -> dict:
@@ -213,7 +162,7 @@ async def call_judge_node(state: FeedbackState) -> dict:
             json_mode=True,
             timeout=30.0,
         )
-        return {"judge_result": _try_parse(raw or "")}
+        return {"judge_result": parse_json(raw or "")}
     except Exception:
         return {"judge_result": None}
 
@@ -247,20 +196,13 @@ async def retry_primary_node(state: FeedbackState) -> dict:
             json_mode=True,
             timeout=60.0,
         )
-        parsed = _try_parse(raw or "")
+        parsed = parse_json(raw or "")
         if parsed:
             return {"primary_result": parsed, "retry_count": state.get("retry_count", 0) + 1}
     except Exception:
         pass
     return {"retry_count": state.get("retry_count", 0) + 1}
 
-
-_DIM_KEYS: dict[str, list[str]] = {
-    "speaking":  ["fluency", "pronunciation", "content"],
-    "writing":   ["grammar", "vocabulary", "form", "content"],
-    "reading":   ["vocabulary", "comprehension"],
-    "listening": ["comprehension", "accuracy"],
-}
 
 _COACH_SYSTEM = (
     "You are a PTE Academic coach. "
@@ -275,7 +217,7 @@ async def call_coach_node(state: FeedbackState) -> dict:
     primary = state.get("primary_result") or {}
     ds = primary.get("dimensionScores") or {}
     section = ds.get("section", "")
-    dim_keys = _DIM_KEYS.get(section, [])
+    dim_keys = scoring_dimensions(section)
 
     if not dim_keys:
         return {"coach_suggestions": []}
@@ -290,15 +232,6 @@ async def call_coach_node(state: FeedbackState) -> dict:
     weakness_tool = make_weakness_tool(historical_weaknesses)
     tools = [weakness_tool, get_rubric]
 
-    llm_with_tools = ChatOpenAI(
-        model=os.getenv("LLM_MODEL", "deepseek-chat"),
-        api_key=os.getenv("LLM_API_KEY"),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
-        temperature=0.3,
-        max_tokens=600,
-        timeout=45.0,
-    ).bind_tools(tools)
-
     messages = [
         SystemMessage(content=_COACH_SYSTEM),
         HumanMessage(content=(
@@ -308,39 +241,19 @@ async def call_coach_node(state: FeedbackState) -> dict:
         )),
     ]
 
-    tool_map = {t.name: t for t in tools}
-
     try:
-        # Agentic loop: process tool calls until the model returns a final answer
-        for _ in range(4):
-            response = await llm_with_tools.ainvoke(messages)
-            messages = messages + [response]
-
-            if not response.tool_calls:
-                parsed = _try_parse(response.content or "")
-                if parsed and isinstance(parsed.get("coachSuggestions"), list):
-                    return {"coach_suggestions": parsed["coachSuggestions"]}
-                break
-
-            for tc in response.tool_calls:
-                t = tool_map.get(tc["name"])
-                if t is None:
-                    continue
-                result = t.invoke(tc["args"])
-                messages = messages + [ToolMessage(content=result, tool_call_id=tc["id"])]
-
-        # Final forced-JSON call if the loop ended without a clean answer
-        final_llm = ChatOpenAI(
-            model=os.getenv("LLM_MODEL", "deepseek-chat"),
-            api_key=os.getenv("LLM_API_KEY"),
-            base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
-            temperature=0.3,
-            max_tokens=400,
-            timeout=30.0,
-            model_kwargs={"response_format": {"type": "json_object"}},
+        loop = await llm_chain.run_tool_loop(
+            messages, tools, temperature=0.3, max_tokens=600, timeout=45.0,
         )
-        final = await final_llm.ainvoke(messages)
-        parsed = _try_parse(final.content or "")
+        parsed = parse_json(loop.text)
+        if parsed and isinstance(parsed.get("coachSuggestions"), list):
+            return {"coach_suggestions": parsed["coachSuggestions"]}
+
+        # Forced-JSON call if the loop ended without a clean answer
+        final = await llm_chain.ainvoke_messages(
+            loop.messages, temperature=0.3, max_tokens=400, json_mode=True, timeout=30.0,
+        )
+        parsed = parse_json(final)
         if parsed and isinstance(parsed.get("coachSuggestions"), list):
             return {"coach_suggestions": parsed["coachSuggestions"]}
 
@@ -374,10 +287,10 @@ def _apply_content_coverage(task_type: str, state: FeedbackState, result: dict) 
     if not stimulus or not response:
         return result
 
-    # Azure completenessScore is most accurate (word-level alignment)
-    pron = state.get("pron_assessment")
-    if pron and isinstance(pron.get("completenessScore"), (int, float)):
-        coverage = pron["completenessScore"] / 100
+    # The evaluated content estimate is most accurate (word-level alignment)
+    evaluation = state.get("speech_evaluation")
+    if evaluation and isinstance(evaluation.get("content"), (int, float)):
+        coverage = evaluation["content"] / 100
     else:
         coverage = _word_coverage_ratio(stimulus, response)
 
@@ -398,27 +311,21 @@ def _apply_content_coverage(task_type: str, state: FeedbackState, result: dict) 
     )
 
     # Recompute scoreCard with corrected content
-    max_score = _TASK_SCORE_MAX.get(task_type)
-    if max_score:
-        avg = (ds.get("fluency", 0) + ds.get("pronunciation", 0) + capped_content) / 3
-        result["scoreCard"] = {"earned": round(avg / 100 * max_score), "max": max_score}
+    score_card = _compute_score_card_from_dims(task_type, result)
+    if score_card:
+        result["scoreCard"] = score_card
 
     return result
 
 
 def _compute_score_card_from_dims(task_type: str, result: dict) -> Optional[dict]:
-    max_score = _TASK_SCORE_MAX.get(task_type)
+    max_score = task_max_score(task_type)
     if max_score is None:
         return None
     ds = result.get("dimensionScores")
     if not isinstance(ds, dict):
         return None
-    section = ds.get("section")
-    dim_keys = {
-        "speaking":  ["fluency", "pronunciation", "content"],
-        "writing":   ["grammar", "vocabulary", "form", "content"],
-        "listening": ["comprehension", "accuracy"],
-    }.get(section, [])
+    dim_keys = scoring_dimensions(ds.get("section"))
     values = [ds[k] for k in dim_keys if isinstance(ds.get(k), (int, float))]
     if not values:
         return None
@@ -428,9 +335,9 @@ def _compute_score_card_from_dims(task_type: str, result: dict) -> Optional[dict
 
 async def finalize_node(state: FeedbackState) -> dict:
     result = dict(state.get("primary_result") or {})
-    pron = state.get("pron_assessment")
-    if pron:
-        result["pronunciationAssessment"] = pron
+    evaluation = state.get("speech_evaluation")
+    if evaluation:
+        result["speechEvaluation"] = evaluation
     score_card = _compute_score_card_from_dims(state["task_type"], result)
     if score_card:
         result["scoreCard"] = score_card
@@ -468,7 +375,7 @@ def _build_graph():
     builder = StateGraph(FeedbackState)
 
     builder.add_node("retrieve_context", retrieve_context_node)
-    builder.add_node("process_pronunciation", process_pronunciation_node)
+    builder.add_node("process_speech_evaluation", process_speech_evaluation_node)
     builder.add_node("call_primary", call_primary_node)
     builder.add_node("call_judge", call_judge_node)
     builder.add_node("check_divergence", check_divergence_node)
@@ -477,9 +384,9 @@ def _build_graph():
     builder.add_node("finalize", finalize_node)
 
     builder.set_entry_point("retrieve_context")
-    builder.add_edge("retrieve_context", "process_pronunciation")
-    builder.add_edge("process_pronunciation", "call_primary")
-    builder.add_edge("process_pronunciation", "call_judge")
+    builder.add_edge("retrieve_context", "process_speech_evaluation")
+    builder.add_edge("process_speech_evaluation", "call_primary")
+    builder.add_edge("process_speech_evaluation", "call_judge")
     builder.add_edge("call_primary", "check_divergence")
     builder.add_edge("call_judge", "check_divergence")
     builder.add_conditional_edges(
@@ -566,8 +473,13 @@ def _compute_reading_feedback(task_type: str, response: str) -> dict:
     return {}
 
 
-async def run_feedback_graph(request) -> dict:
-    """Run the feedback pipeline and return the merged final result dict."""
+async def run_feedback_graph(request, speech_evaluation: Optional[dict] = None) -> dict:
+    """Run the feedback pipeline and return the merged final result dict.
+
+    `speech_evaluation` is the Speech Evaluation Result of a spoken Response,
+    as a dict. Its scores are given to the scoring steps and it is attached
+    to the result as `speechEvaluation`.
+    """
     if request.taskType in SCORED_READING:
         return _compute_reading_feedback(request.taskType, request.response.strip())
 
@@ -575,8 +487,8 @@ async def run_feedback_graph(request) -> dict:
         "task_type": request.taskType,
         "stimulus": request.stimulus or "",
         "response": request.response.strip(),
-        "pron_assessment": request.pronunciationAssessment,
-        "pron_context": "",
+        "speech_evaluation": speech_evaluation,
+        "speech_context": "",
         "retrieved_context": "",
         "primary_result": None,
         "judge_result": None,

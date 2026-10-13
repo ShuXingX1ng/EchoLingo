@@ -3,13 +3,10 @@
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
-import PronunciationFeedback from "@/components/PronunciationFeedback"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import SpeechEvaluationDetails from "@/components/SpeechEvaluationDetails"
+import { speechEvaluationOf, speechProviderName, speechScores } from "@/lib/speech-evaluation"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
-
-const PREP_TIME = 35
-const RECORD_TIME = 40
-const MIN_REC_SECONDS = 5
 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 80
@@ -27,16 +24,10 @@ function ScoreBadge({ score }: { score: number }) {
 export default function ReadAloudPage() {
   const { t } = useTranslation()
   const {
-    phase, stimulus, seconds, error: errorMsg, feedback, transcript,
-    recSeconds, canStop, startRecording, stopRecording, generate,
-  } = usePracticeTaskRunner({
-    taskType: "read_aloud",
-    responseKind: "audio",
-    prepTime: PREP_TIME,
-    recordTime: RECORD_TIME,
-    minRecSeconds: MIN_REC_SECONDS,
-    withPronunciation: true,
-  })
+    phase, stimulus, seconds, timer, error: errorMsg, feedback, transcript,
+    recSeconds, canStop, startNow, stopRecording, generate,
+  } = usePracticeTaskRun("read_aloud")
+  const speechEvaluation = speechEvaluationOf(feedback)
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -55,7 +46,7 @@ export default function ReadAloudPage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.read-aloud.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            {t("practiceTask.read-aloud.desc", { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
+            {t("practiceTask.read-aloud.desc", { prepTime: String(timer.prepSeconds), recordTime: String(timer.recordSeconds) })}
           </p>
         </div>
 
@@ -83,21 +74,21 @@ export default function ReadAloudPage() {
           </div>
         )}
 
-        {phase === "ready" && (
+        {phase === "prep" && (
           <div className="space-y-6">
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {t("practiceTask.common.preparation")}
                 </p>
-                <CountdownRing seconds={seconds} total={PREP_TIME} />
+                <CountdownRing seconds={seconds} total={timer.prepSeconds} />
               </div>
               <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">{stimulus}</p>
             </div>
             <div className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <p>{t("practiceTask.common.recordingStartsAuto")}</p>
               <button
-                onClick={startRecording}
+                onClick={startNow}
                 className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
               >
                 {t("practiceTask.common.startNow")}
@@ -116,7 +107,7 @@ export default function ReadAloudPage() {
                     {t("practiceTask.common.recording")}
                   </p>
                 </div>
-                <CountdownRing seconds={recSeconds} total={RECORD_TIME} size={72} />
+                <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={72} />
               </div>
               <p className="text-base sm:text-lg leading-8 text-[var(--foreground)] font-serif">{stimulus}</p>
             </div>
@@ -130,7 +121,7 @@ export default function ReadAloudPage() {
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
                 {!canStop
-                  ? t("practiceTask.common.holdOn", { sec: String(recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                  ? t("practiceTask.common.holdOn", { sec: String(recSeconds - (timer.recordSeconds - timer.minRecSeconds)) })
                   : t("practiceTask.common.stopRecording")}
               </button>
             </div>
@@ -163,25 +154,20 @@ export default function ReadAloudPage() {
               </div>
             )}
 
-            {feedback.pronunciationAssessment && (
+            {speechEvaluation && (
               <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 mb-4">
-                  {t("practiceTask.read-aloud.azurePronunciation")}
+                  {t("speechEvaluation.title")} · {speechProviderName(speechEvaluation)}
                 </p>
                 <div className="grid grid-cols-4 gap-3 mb-5">
-                  {[
-                    { label: t("pronunciation.overall"), score: feedback.pronunciationAssessment.score },
-                    { label: t("pronunciation.accuracy"), score: feedback.pronunciationAssessment.accuracyScore },
-                    { label: t("pronunciation.fluency"), score: feedback.pronunciationAssessment.fluencyScore },
-                    { label: t("pronunciation.completeness"), score: feedback.pronunciationAssessment.completenessScore },
-                  ].map(({ label, score }) => (
-                    <div key={label} className="text-center">
+                  {speechScores(speechEvaluation).map(({ labelKey, score }) => (
+                    <div key={labelKey} className="text-center">
                       <ScoreBadge score={score} />
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">{label}</p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">{t(labelKey)}</p>
                     </div>
                   ))}
                 </div>
-                <PronunciationFeedback assessment={feedback.pronunciationAssessment} />
+                <SpeechEvaluationDetails evaluation={speechEvaluation} />
               </div>
             )}
 

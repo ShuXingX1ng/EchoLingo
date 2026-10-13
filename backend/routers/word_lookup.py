@@ -8,13 +8,12 @@ Routing after cleaning the input:
     phrase / short sentence -> DeepSeek
 """
 
-import json
 import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.ecdict import lookup as ecdict_lookup
-from services.llm_chain import llm_chain
+from services.llm_chain import llm_chain, parse_json
 from services.prompt_loader import prompts
 
 router = APIRouter()
@@ -52,16 +51,9 @@ async def _deepseek_fallback(query: str) -> dict:
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to look up word")
 
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        match = re.search(r"\{[\s\S]*\}", content)
-        if not match:
-            raise HTTPException(status_code=502, detail="Invalid lookup format from LLM")
-        try:
-            parsed = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=502, detail="Invalid lookup format from LLM")
+    parsed = parse_json(content)
+    if parsed is None:
+        raise HTTPException(status_code=502, detail="Invalid lookup format from LLM")
 
     # Normalise to the unified schema regardless of what the model returned.
     entries = parsed.get("entries")

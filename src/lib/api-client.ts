@@ -148,20 +148,21 @@ export async function apiPost<T>(
 export async function apiPostForm<T>(
   endpoint: string,
   formData: FormData,
-  options: RequestInit = {}
+  options: RequestInit & { timeoutMs?: number } = {}
 ): Promise<T> {
+  const { timeoutMs = 15000, ...fetchOptions } = options
   circuitBreaker.checkState();
   const url = getApiUrl(endpoint)
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     const response = await fetch(url, {
       method: "POST",
       body: formData,
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
     })
     clearTimeout(timeoutId)
 

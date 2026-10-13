@@ -57,12 +57,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {t("admin.title")}
             </Link>
             <Link
-              href="/admin/topics"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              {t("admin.topics")}
-            </Link>
-            <Link
               href="/admin/users"
               className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >

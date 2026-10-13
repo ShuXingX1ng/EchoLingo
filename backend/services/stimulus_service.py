@@ -25,6 +25,7 @@ from services.gnews import fetch_news_anchors
 from services.llm_chain import llm_chain
 from services.originality import is_too_similar
 from services.prompt_loader import prompts
+from services.task_types import task_types_where
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,7 @@ logger = logging.getLogger(__name__)
 # (Phase Data-4): exemplars are the plain passage anchor; the LLM still outputs
 # full JSON (blanks, choices, order, summaries). Few-shot injection is identical
 # to text task types — `json_mode=True` is preserved in `_generate`.
-JSON_TASK_TYPES = {
-    "fill_in_the_blanks_reading", "re_order_paragraphs", "multiple_choice_reading",
-    "fill_in_the_blanks_listening", "highlight_correct_summary",
-}
+JSON_TASK_TYPES = set(task_types_where(stimulus_format="json"))
 
 # Number of few-shot anchors injected per generation.
 FEWSHOT_N = 3

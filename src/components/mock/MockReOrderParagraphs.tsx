@@ -1,99 +1,50 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { useState, useRef, useEffect } from "react"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
+import {
+  parseReOrderParagraphs,
+  reOrderParagraphsFeedbackResponse,
+  reOrderParagraphsFeedbackStimulus,
+  shuffleArray,
+  type Paragraph,
+} from "@/lib/structured-stimulus"
 import type { PracticeTask } from "@/types"
-
-const TIME_LIMIT = 180 // 3 min
-
-type Paragraph = { label: string; text: string }
-type ParsedStimulus = { paragraphs: Paragraph[] }
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as { paragraphs?: unknown }
-    if (!Array.isArray(parsed.paragraphs) || parsed.paragraphs.length < 2) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-function buildStimulusForFeedback(correctOrder: Paragraph[]): string {
-  return "Paragraphs in correct order:\n" + correctOrder.map((p) => `[${p.label}] ${p.text}`).join("\n\n")
-}
-
-function buildResponseForFeedback(userOrder: Paragraph[], correctOrder: Paragraph[]): string {
-  const userLabels = userOrder.map((p) => p.label).join(" → ")
-  const correctLabels = correctOrder.map((p) => p.label).join(" → ")
-  const correctCount = userOrder.filter((p, i) => p.label === correctOrder[i].label).length
-  return (
-    `Submitted order: ${userLabels}\n` +
-    `Correct order:   ${correctLabels}\n` +
-    `${correctCount} of ${correctOrder.length} paragraphs in the correct position.`
-  )
-}
 
 export default function MockReOrderParagraphs({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const { phase, stimulus, savedTask, error, submit } = usePracticeTaskRunner({
-    taskType: "re_order_paragraphs",
-    responseKind: "text",
-  })
-
   const [correctOrder, setCorrectOrder] = useState<Paragraph[]>([])
   const [displayOrder, setDisplayOrder] = useState<Paragraph[]>([])
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   const correctOrderRef = useRef<Paragraph[]>([])
   const displayOrderRef = useRef<Paragraph[]>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   useEffect(() => { correctOrderRef.current = correctOrder }, [correctOrder])
   useEffect(() => { displayOrderRef.current = displayOrder }, [displayOrder])
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  // Parse JSON stimulus when hook loads it
+  const { phase, stimulus, seconds, savedTask, error, submit: handleSubmit, emptyTask } =
+    usePracticeTaskRun("re_order_paragraphs", {
+      mode: "mock",
+      buildSubmission: () => {
+        const correct = correctOrderRef.current
+        if (correct.length === 0) return null
+        return {
+          feedbackStimulus: reOrderParagraphsFeedbackStimulus(correct),
+          feedbackResponse: reOrderParagraphsFeedbackResponse(displayOrderRef.current, correct),
+        }
+      },
+    })
+
+  // Parse the structured Stimulus when the run loads it
   useEffect(() => {
     if (!stimulus) return
-    const p = parseStimulus(stimulus)
+    const p = parseReOrderParagraphs(stimulus)
     if (!p) return
     setCorrectOrder(p.paragraphs)
     setDisplayOrder(shuffleArray(p.paragraphs))
-    setSeconds(TIME_LIMIT)
   }, [stimulus])
-
-  const handleSubmit = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    await submit({
-      feedbackStimulus: buildStimulusForFeedback(correctOrderRef.current),
-      feedbackResponse: buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current),
-    })
-  }, [submit])
-
-  // Timer while the user is reordering
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase, handleSubmit])
 
   const moveUp = (idx: number) => {
     if (idx === 0) return
@@ -124,16 +75,7 @@ export default function MockReOrderParagraphs({ onComplete }: { onComplete: (tas
   const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`
   const timeUrgent = seconds <= 30
 
-  const skipTask = (): void => {
-    onComplete({
-      id: `mock_${Date.now()}`,
-      taskType: "re_order_paragraphs",
-      stimulus: { kind: "text", content: stimulus },
-      response: { kind: "text", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    })
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">

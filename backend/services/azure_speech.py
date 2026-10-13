@@ -7,14 +7,41 @@ Encapsulates Azure Speech SDK for TTS and Pronunciation Assessment.
 import asyncio
 import os
 import tempfile
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 import azure.cognitiveservices.speech as speechsdk
-from models.schemas import (
-    WordAssessment,
-    PhonemeAssessment,
-    PronunciationAssessmentResult,
-)
+from pydantic import BaseModel
+
+
+class PhonemeAssessment(BaseModel):
+    """Azure phoneme-level assessment."""
+    phoneme: str
+    score: int
+    accuracyScore: int
+
+
+class WordAssessment(BaseModel):
+    """Azure word-level assessment."""
+    word: str
+    score: int
+    accuracyScore: int
+    errorType: Optional[str] = None  # Azure: None, Omission, Insertion, Mispronunciation
+    phonemes: Optional[List[PhonemeAssessment]] = None
+
+
+class PronunciationAssessmentResult(BaseModel):
+    """Azure Pronunciation Assessment, in Azure's own terms.
+
+    Only `services/speech_evaluation.py` reads this; everything else sees the
+    provider-neutral Speech Evaluation Result.
+    """
+    score: int
+    accuracyScore: int
+    fluencyScore: int
+    completenessScore: int
+    words: List[WordAssessment]
+    summary: str
+    recognizedText: Optional[str] = None
 
 
 @dataclass

@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { PronunciationAssessmentResult, WordAssessment } from "@/types";
+import type { SpeechEvaluationResult, WordEvidence } from "@/types";
 import { useTranslation } from "@/lib/i18n";
 
-interface PronunciationFeedbackProps {
-  assessment: PronunciationAssessmentResult;
+interface SpeechEvaluationDetailsProps {
+  evaluation: SpeechEvaluationResult;
 }
 
-export default function PronunciationFeedback({
-  assessment,
-}: PronunciationFeedbackProps) {
+export default function SpeechEvaluationDetails({
+  evaluation,
+}: SpeechEvaluationDetailsProps) {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
+  const overall = evaluation.overallScore;
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600 dark:text-green-400";
@@ -28,11 +29,11 @@ export default function PronunciationFeedback({
     return "bg-red-100 dark:bg-red-900/30";
   };
 
-  const getWordStyle = (word: WordAssessment) => {
-    if (word.errorType === "Mispronunciation" && word.score < 70) {
+  const getWordStyle = (word: WordEvidence) => {
+    if (needsPractice(word)) {
       return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 line-through";
     }
-    if (word.errorType === "Omission") {
+    if (word.status === "omitted") {
       return "bg-gray-100 dark:bg-gray-800 text-gray-500 italic";
     }
     if (word.score >= 90) {
@@ -48,32 +49,34 @@ export default function PronunciationFeedback({
     <div className="space-y-4">
       {/* Overall Score */}
       <div className="flex items-center gap-4">
-        <div
-          className={`w-20 h-20 rounded-full flex items-center justify-center ${getScoreBgColor(assessment.score)}`}
-        >
-          <span className={`text-2xl font-bold ${getScoreColor(assessment.score)}`}>
-            {assessment.score}
-          </span>
-        </div>
+        {overall !== null && (
+          <div
+            className={`w-20 h-20 rounded-full flex items-center justify-center ${getScoreBgColor(overall)}`}
+          >
+            <span className={`text-2xl font-bold ${getScoreColor(overall)}`}>
+              {overall}
+            </span>
+          </div>
+        )}
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-900 dark:text-white">
-            {t("pronunciation.overall")}
+            {t("speechEvaluation.overall")}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {assessment.summary}
+            {evaluation.summary}
           </p>
         </div>
       </div>
 
       {/* Sub-scores */}
       <div className="grid grid-cols-3 gap-3">
-        <ScoreCard label={t("pronunciation.accuracy")} score={assessment.accuracyScore} />
-        <ScoreCard label={t("pronunciation.fluency")} score={assessment.fluencyScore} />
-        <ScoreCard label={t("pronunciation.completeness")} score={assessment.completenessScore} />
+        <ScoreCard label={t("speechEvaluation.pronunciation")} score={evaluation.pronunciation} />
+        <ScoreCard label={t("speechEvaluation.oralFluency")} score={evaluation.oralFluency} />
+        <ScoreCard label={t("speechEvaluation.content")} score={evaluation.content} />
       </div>
 
       {/* Word-level Analysis */}
-      {assessment.words.length > 0 && (
+      {evaluation.words.length > 0 && (
         <div>
           <button
             onClick={() => setShowDetails(!showDetails)}
@@ -94,11 +97,11 @@ export default function PronunciationFeedback({
             <div className="mt-3 space-y-3">
               {/* Word scores */}
               <div className="flex flex-wrap gap-2">
-                {assessment.words.map((word, index) => (
+                {evaluation.words.map((word, index) => (
                   <div
                     key={index}
                     className={`px-2 py-1 rounded text-sm font-medium ${getWordStyle(word)}`}
-                    title={`Score: ${word.score}${word.errorType !== "None" ? ` (${word.errorType})` : ""}`}
+                    title={`Score: ${word.score}${word.status !== "correct" ? ` (${word.status})` : ""}`}
                   >
                     {word.word}
                     <span className="text-xs ml-1 opacity-70">{word.score}</span>
@@ -127,14 +130,14 @@ export default function PronunciationFeedback({
               </div>
 
               {/* Mispronounced words details */}
-              {assessment.words.filter((w) => w.errorType === "Mispronunciation" && w.score < 70).length > 0 && (
+              {evaluation.words.filter(needsPractice).length > 0 && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                   <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">
                     {t("pronunciation.wordsToPractice")}:
                   </p>
                   <ul className="space-y-1">
-                    {assessment.words
-                      .filter((w) => w.errorType === "Mispronunciation" && w.score < 70)
+                    {evaluation.words
+                      .filter(needsPractice)
                       .map((word, index) => (
                         <li
                           key={index}
@@ -153,6 +156,10 @@ export default function PronunciationFeedback({
       )}
     </div>
   );
+}
+
+function needsPractice(word: WordEvidence) {
+  return word.status === "mispronounced" && word.score < 70;
 }
 
 function ScoreCard({ label, score }: { label: string; score: number }) {

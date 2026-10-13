@@ -16,10 +16,10 @@ import { useTranslation } from "@/lib/i18n";
 import {
   getDaysUntilExam,
   getReminderSettings,
-  getStreakDays,
-  hasPracticedToday,
   type ReminderSettings,
 } from "@/lib/reminders";
+import { practicedToday as hasPracticedToday, streakDays as countStreakDays } from "@/lib/practice-activity";
+import { getTasks } from "@/lib/unified-task-history";
 
 type HomeStudyState = {
   reminderSettings: ReminderSettings | null;
@@ -47,15 +47,28 @@ export default function Home() {
   const [studyState, setStudyState] = useState<HomeStudyState>(EMPTY_STUDY_STATE);
 
   useEffect(() => {
+    let cancelled = false;
     const id = window.setTimeout(() => {
-      setStudyState({
+      setStudyState((state) => ({
+        ...state,
         reminderSettings: getReminderSettings(),
         daysUntilExam: getDaysUntilExam(),
-        practicedToday: hasPracticedToday(),
-        streakDays: getStreakDays(),
-      });
+      }));
     }, 0);
-    return () => window.clearTimeout(id);
+    getTasks()
+      .then((tasks) => {
+        if (cancelled) return;
+        setStudyState((state) => ({
+          ...state,
+          practicedToday: hasPracticedToday(tasks),
+          streakDays: countStreakDays(tasks),
+        }));
+      })
+      .catch(() => { /* the study card keeps its empty state */ });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
   }, []);
 
   const { daysUntilExam, practicedToday, streakDays } = studyState;

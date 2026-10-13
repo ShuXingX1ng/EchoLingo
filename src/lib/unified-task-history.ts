@@ -29,28 +29,27 @@ export async function getTasks(): Promise<PracticeTask[]> {
   return store.listAll()
 }
 
-export async function getTaskById(id: string): Promise<PracticeTask | null> {
-  if (await cloudHistory.isUserLoggedIn()) {
-    const cloudTask = await cloudHistory.getTaskByIdFromCloud(id)
-    if (cloudTask) return cloudTask
-  }
-  return localHistory.getTaskById(id)
-}
-
 export async function deleteTask(id: string): Promise<boolean> {
   return store.delete(id)
 }
 
 export async function getTasksByType(taskType: PracticeTask["taskType"]): Promise<PracticeTask[]> {
-  if (await cloudHistory.isUserLoggedIn()) {
-    const cloudTasks = await cloudHistory.getTasksByTypeFromCloud(taskType)
-    if (cloudTasks.length > 0) return cloudTasks
-  }
-  return localHistory.getTasksByType(taskType)
+  return store.read(
+    () => cloudHistory.getTasksByTypeFromCloud(taskType),
+    () => localHistory.getTasksByType(taskType),
+    (tasks) => tasks.length === 0,
+  )
 }
 
-export function clearAllTasksLocal(): void {
-  localHistory.clearAllTasks()
+/**
+ * Delete every Practice Task of the learner, in the cloud as well as on this
+ * device. Resolves false when the cloud copy could not be cleared.
+ */
+export async function clearAllTasks(): Promise<boolean> {
+  return store.change(
+    () => cloudHistory.clearTasksFromCloud(),
+    () => localHistory.clearAllTasks(),
+  )
 }
 
 export function _resetCacheForTesting(): void {

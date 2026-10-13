@@ -20,26 +20,68 @@ import MockReOrderParagraphs from "@/components/mock/MockReOrderParagraphs"
 import MockMultipleChoiceReading from "@/components/mock/MockMultipleChoiceReading"
 import MockDescribeImage from "@/components/mock/MockDescribeImage"
 import MockReTellLecture from "@/components/mock/MockReTellLecture"
-import type { PracticeTask } from "@/types"
+import {
+  MOCK_EXAM_SEQUENCE,
+  TASK_TYPE_REGISTRY,
+  taskTypeLabel,
+  timingSummary,
+  type ExamSection,
+} from "@/lib/task-type-registry"
+import type { PracticeTask, PteTaskType } from "@/types"
+
+// Intro-screen instruction for each task. Order, Section, label and timings
+// come from the Task Type catalogue.
+const TASK_INSTRUCTIONS: Record<PteTaskType, string> = {
+  personal_intro: "Introduce yourself.",
+  read_aloud: "Read the passage aloud.",
+  repeat_sentence: "Listen, then repeat the sentence exactly.",
+  describe_image: "Study the image, then describe it in detail.",
+  re_tell_lecture: "Listen to a short lecture, then re-tell it.",
+  answer_short_question: "Answer the question with one or a few words.",
+  summarize_written_text: "Write a one-sentence summary of the passage.",
+  write_essay: "Write a 200–300 word essay.",
+  fill_in_the_blanks_reading: "Read the passage and select the correct word for each blank.",
+  re_order_paragraphs: "Drag the paragraph tiles into the correct logical order.",
+  multiple_choice_reading: "Read the passage and select the one correct answer.",
+  write_from_dictation: "Listen to the sentence, then type exactly what you heard.",
+  summarize_spoken_text: "Listen to a passage, then write a 50–70 word summary.",
+  fill_in_the_blanks_listening: "Listen to a passage, then select the missing words.",
+  highlight_correct_summary: "Listen to a passage, then choose the best summary.",
+}
+
+const SECTION_LABEL_KEY: Record<ExamSection, string> = {
+  speaking_writing: "mock.section.speakingWriting",
+  reading: "mock.section.reading",
+  listening: "mock.section.listening",
+}
 
 // PTE Academic task order
-const TASK_SEQUENCE = [
-  { type: "personal_intro" as const, label: "Personal Introduction", section: "Speaking & Writing", description: "Introduce yourself. 25s prep, 30s to speak." },
-  { type: "read_aloud" as const, label: "Read Aloud", section: "Speaking & Writing", description: "Read the passage aloud. 35s prep, 40s to read." },
-  { type: "repeat_sentence" as const, label: "Repeat Sentence", section: "Speaking & Writing", description: "Listen, then repeat the sentence exactly. 15s to respond." },
-  { type: "describe_image" as const, label: "Describe Image", section: "Speaking & Writing", description: "Study the image for 25s, then describe it in detail. 40s to speak." },
-  { type: "re_tell_lecture" as const, label: "Re-tell Lecture", section: "Speaking & Writing", description: "Listen to a short lecture, prepare for 10s, then re-tell it. 40s to speak." },
-  { type: "answer_short_question" as const, label: "Answer Short Question", section: "Speaking & Writing", description: "Answer the question with one or a few words. 10s to respond." },
-  { type: "summarize_written_text" as const, label: "Summarize Written Text", section: "Writing", description: "Write a one-sentence summary of the passage. 10 minutes." },
-  { type: "write_essay" as const, label: "Write Essay", section: "Writing", description: "Write a 200–300 word essay. 20 minutes." },
-  { type: "fill_in_the_blanks_reading" as const, label: "Fill in the Blanks (Reading)", section: "Reading", description: "Read the passage and select the correct word for each blank. 7 minutes." },
-  { type: "re_order_paragraphs" as const, label: "Re-order Paragraphs", section: "Reading", description: "Drag the paragraph tiles into the correct logical order. 3 minutes." },
-  { type: "multiple_choice_reading" as const, label: "Multiple Choice (Reading)", section: "Reading", description: "Read the passage and select the one correct answer. 4 minutes." },
-  { type: "write_from_dictation" as const, label: "Write from Dictation", section: "Listening", description: "Listen to the sentence, then type exactly what you heard." },
-  { type: "summarize_spoken_text" as const, label: "Summarize Spoken Text", section: "Listening", description: "Listen to a passage, then write a 50–70 word summary. 10 minutes." },
-  { type: "fill_in_the_blanks_listening" as const, label: "Fill in the Blanks (Listening)", section: "Listening", description: "Listen to a passage, then select the missing words. 7 minutes." },
-  { type: "highlight_correct_summary" as const, label: "Highlight Correct Summary", section: "Listening", description: "Listen to a passage, then choose the best summary. 5 minutes." },
-]
+const TASK_SEQUENCE = MOCK_EXAM_SEQUENCE.map((type) => ({
+  type,
+  sectionLabelKey: SECTION_LABEL_KEY[TASK_TYPE_REGISTRY[type].section],
+  description: `${TASK_INSTRUCTIONS[type]} ${timingSummary(type, "mock")}`,
+}))
+
+const MOCK_SCREENS: Record<
+  PteTaskType,
+  React.ComponentType<{ onComplete: (task: PracticeTask) => void }>
+> = {
+  personal_intro: MockPersonalIntro,
+  read_aloud: MockReadAloud,
+  repeat_sentence: MockRepeatSentence,
+  describe_image: MockDescribeImage,
+  re_tell_lecture: MockReTellLecture,
+  answer_short_question: MockAnswerShortQuestion,
+  summarize_written_text: MockSummarizeWrittenText,
+  write_essay: MockWriteEssay,
+  fill_in_the_blanks_reading: MockFillInTheBlanksReading,
+  re_order_paragraphs: MockReOrderParagraphs,
+  multiple_choice_reading: MockMultipleChoiceReading,
+  write_from_dictation: MockWriteFromDictation,
+  summarize_spoken_text: MockSummarizeSpokenText,
+  fill_in_the_blanks_listening: MockFillInTheBlanksListening,
+  highlight_correct_summary: MockHighlightCorrectSummary,
+}
 
 type ExamPhase = "intro" | "running" | "finished"
 
@@ -77,6 +119,7 @@ export default function MockExamPage() {
   }, [results, taskIndex, startedAt, router])
 
   const currentTask = TASK_SEQUENCE[taskIndex]
+  const CurrentScreen = MOCK_SCREENS[currentTask.type]
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -108,10 +151,10 @@ export default function MockExamPage() {
                       {i + 1}
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{t("mock.taskLabel." + task.type)}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{taskTypeLabel(t, task.type)}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{task.description}</p>
                     </div>
-                    <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">{t("mock.section." + (task.section === "Speaking & Writing" ? "speakingWriting" : task.section === "Reading" ? "reading" : "listening"))}</span>
+                    <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">{t(task.sectionLabelKey)}</span>
                   </li>
                 ))}
               </ol>
@@ -149,9 +192,9 @@ export default function MockExamPage() {
                     {t("mock.taskProgress", { current: taskIndex + 1, total: TASK_SEQUENCE.length })}
                   </p>
                   <h2 className="mt-1 text-xl font-semibold text-slate-950 dark:text-white">
-                    {t("mock.taskLabel." + currentTask.type)}
+                    {taskTypeLabel(t, currentTask.type)}
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t("mock.section." + (currentTask.section === "Speaking & Writing" ? "speakingWriting" : currentTask.section === "Reading" ? "reading" : "listening"))}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t(currentTask.sectionLabelKey)}</p>
                 </div>
               </div>
               {/* Progress bar */}
@@ -173,21 +216,7 @@ export default function MockExamPage() {
 
             {/* Task component — key forces remount on task change */}
             <div key={`task-${taskIndex}`}>
-              {currentTask.type === "personal_intro" && <MockPersonalIntro onComplete={handleTaskComplete} />}
-              {currentTask.type === "read_aloud" && <MockReadAloud onComplete={handleTaskComplete} />}
-              {currentTask.type === "repeat_sentence" && <MockRepeatSentence onComplete={handleTaskComplete} />}
-              {currentTask.type === "describe_image" && <MockDescribeImage onComplete={handleTaskComplete} />}
-              {currentTask.type === "re_tell_lecture" && <MockReTellLecture onComplete={handleTaskComplete} />}
-              {currentTask.type === "answer_short_question" && <MockAnswerShortQuestion onComplete={handleTaskComplete} />}
-              {currentTask.type === "summarize_written_text" && <MockSummarizeWrittenText onComplete={handleTaskComplete} />}
-              {currentTask.type === "write_essay" && <MockWriteEssay onComplete={handleTaskComplete} />}
-              {currentTask.type === "fill_in_the_blanks_reading" && <MockFillInTheBlanksReading onComplete={handleTaskComplete} />}
-              {currentTask.type === "re_order_paragraphs" && <MockReOrderParagraphs onComplete={handleTaskComplete} />}
-              {currentTask.type === "multiple_choice_reading" && <MockMultipleChoiceReading onComplete={handleTaskComplete} />}
-              {currentTask.type === "write_from_dictation" && <MockWriteFromDictation onComplete={handleTaskComplete} />}
-              {currentTask.type === "summarize_spoken_text" && <MockSummarizeSpokenText onComplete={handleTaskComplete} />}
-              {currentTask.type === "fill_in_the_blanks_listening" && <MockFillInTheBlanksListening onComplete={handleTaskComplete} />}
-              {currentTask.type === "highlight_correct_summary" && <MockHighlightCorrectSummary onComplete={handleTaskComplete} />}
+              <CurrentScreen onComplete={handleTaskComplete} />
             </div>
           </div>
         )}

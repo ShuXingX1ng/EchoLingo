@@ -1,127 +1,18 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost } from "@/lib/api-client"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import type { PracticeTask, TaskFeedback } from "@/types"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import type { PracticeTask } from "@/types"
 import CountdownRing from "./CountdownRing"
-
-const PAUSE_TIME = 3
-const RECORD_TIME = 10
-
-type Phase = "generating" | "countdown" | "recording" | "processing" | "done" | "error"
 
 export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("generating")
-  const [question, setQuestion] = useState("")
-  const [correctAnswer, setCorrectAnswer] = useState("")
-  const [countSec, setCountSec] = useState(PAUSE_TIME)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
-  const [errorMsg, setErrorMsg] = useState("")
+  const {
+    phase, stimulus: question, answer: correctAnswer, seconds: countSec, timer,
+    error: errorMsg, savedTask: doneTask, recSeconds, emptyTask,
+  } = usePracticeTaskRun("answer_short_question", { mode: "mock" })
 
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-    const stimulusWithAnswer = `Question: ${question}\nCorrect answer: ${correctAnswer}`
-
-    let fb: TaskFeedback | null = null
-    try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx })
-    } catch { /* best-effort */ }
-
-    const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "answer_short_question",
-        stimulus: { kind: "text", content: question },
-        response: { kind: "audio", content: tx },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "answer_short_question",
-        stimulus: { kind: "text", content: question },
-        response: { kind: "audio", content: tx },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [question, correctAnswer])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    onComplete: processResponse,
-    onError: msg => { setErrorMsg(msg); setPhase("error") },
-  })
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-  }, [])
-
-  // Auto-generate on mount
-  useEffect(() => {
-    const generate = async () => {
-      try {
-        const text = await loadStimulusText({ taskType: "answer_short_question" })
-        const [q, a] = text.split("\n")
-        const qText = q?.trim() ?? text
-        const aText = a?.trim() ?? ""
-        setQuestion(qText)
-        setCorrectAnswer(aText)
-        setCountSec(PAUSE_TIME)
-        setPhase("countdown")
-
-        prepTimerRef.current = setInterval(() => {
-          setCountSec(s => {
-            if (s <= 1) {
-              clearInterval(prepTimerRef.current!)
-              setPhase("recording")
-              recording.start()
-              return 0
-            }
-            return s - 1
-          })
-        }, 1000)
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : "Failed to generate question")
-        setPhase("error")
-      }
-    }
-    generate()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const skipTask = () => {
-    const emptyTask: PracticeTask = {
-      id: `mock_${Date.now()}`,
-      taskType: "answer_short_question",
-      stimulus: { kind: "text", content: question },
-      response: { kind: "audio", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    }
-    onComplete(emptyTask)
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">
@@ -132,11 +23,11 @@ export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (t
         </div>
       )}
 
-      {phase === "countdown" && (
+      {(phase === "listening" || phase === "prep") && (
         <div className="border border-slate-900 bg-white p-8 dark:border-white/15 dark:bg-slate-900 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-4">{t("mock.common.question")}</p>
           <p className="text-lg font-medium text-slate-900 dark:text-white mb-6">{question}</p>
-          <CountdownRing seconds={countSec} total={PAUSE_TIME} size={64} />
+          <CountdownRing seconds={countSec} total={timer.prepSeconds} size={64} />
           <p className="mt-4 text-xs text-slate-400">{t("mock.common.recordingStartsAuto")}</p>
         </div>
       )}
@@ -153,7 +44,7 @@ export default function MockAnswerShortQuestion({ onComplete }: { onComplete: (t
                 {t("mock.answerShortQuestion.recordingPhase")}
               </p>
             </div>
-            <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={72} />
+            <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={72} />
             <p className="mt-4 text-xs text-slate-400">{t("mock.common.recordingStopsAuto")}</p>
           </div>
         </div>

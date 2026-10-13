@@ -1,121 +1,24 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost } from "@/lib/api-client"
-import { getRandomImage } from "@/lib/image-bank"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import type { ImageStimulus } from "@/lib/image-bank"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-const PREP_TIME = 25
-const RECORD_TIME = 40
-const MIN_REC_SECONDS = 5
-
-type Phase = "idle" | "ready" | "recording" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function DescribeImagePage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [image, setImage] = useState<ImageStimulus | null>(null)
+  const {
+    phase, image, seconds: prepSeconds, timer, feedback, error: errorMsg, transcript,
+    recSeconds, canStop, stopRecording, startNow: handleStartNow, generate: loadImage,
+  } = usePracticeTaskRun("describe_image")
+
   const [imageError, setImageError] = useState(false)
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [errorMsg, setErrorMsg] = useState("")
-  const [prepSeconds, setPrepSeconds] = useState(PREP_TIME)
-  const [transcript, setTranscript] = useState("")
-
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    setTranscript(tx)
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    const currentImage = image
-    if (!currentImage) { setErrorMsg("No image loaded."); setPhase("error"); return }
-
-    const stimulusText = `Image type: ${currentImage.topic}\n\nImage content: ${currentImage.description}`
-
-    let fb: TaskFeedback
-    try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "describe_image", stimulus: stimulusText, response: tx }, { timeoutMs: 90000 })
-    } catch {
-      fb = { summary: "Feedback unavailable. Please try again.", strengths: [], weaknesses: [], suggestions: [] }
-    }
-
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "describe_image",
-        stimulus: { kind: "image", content: currentImage.url },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [image])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    minSeconds: MIN_REC_SECONDS,
-    onComplete: processResponse,
-    onError: msg => { setErrorMsg(msg); setPhase("error") },
-  })
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-  }, [])
-
-  const loadImage = useCallback(() => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    setFeedback(null)
-    setErrorMsg("")
-    setTranscript("")
-    setImageError(false)
-    setPrepSeconds(PREP_TIME)
-    setImage(prev => getRandomImage(prev?.url))
-    setPhase("ready")
-  }, [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadImage() }, [])
-
-  // Auto-start prep timer when ready
-  useEffect(() => {
-    if (phase !== "ready") return
-    prepTimerRef.current = setInterval(() => {
-      setPrepSeconds(s => {
-        if (s <= 1) {
-          clearInterval(prepTimerRef.current!)
-          setPhase("recording")
-          recording.start()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (prepTimerRef.current) clearInterval(prepTimerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
-
-  const handleStartNow = () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    setPhase("recording")
-    recording.start()
-  }
+  const imageUrl = image?.url
+  useEffect(() => { setImageError(false) }, [imageUrl])
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -133,7 +36,7 @@ export default function DescribeImagePage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.describe-image.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            {t('practiceTask.describe-image.desc', { prepTime: String(PREP_TIME), recordTime: String(RECORD_TIME) })}
+            {t('practiceTask.describe-image.desc', { prepTime: String(timer.prepSeconds), recordTime: String(timer.recordSeconds) })}
           </p>
         </div>
 
@@ -154,12 +57,12 @@ export default function DescribeImagePage() {
           </div>
         )}
 
-        {phase === "ready" && image && (
+        {phase === "prep" && image && (
           <div className="space-y-6">
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('practiceTask.common.preparation')}</p>
-                <CountdownRing seconds={prepSeconds} total={PREP_TIME} />
+                <CountdownRing seconds={prepSeconds} total={timer.prepSeconds} />
               </div>
               <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
@@ -193,7 +96,7 @@ export default function DescribeImagePage() {
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t('practiceTask.common.recording')}</p>
                 </div>
-                <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} />
+                <CountdownRing seconds={recSeconds} total={timer.recordSeconds} />
               </div>
               <p className="text-xs text-[var(--text-secondary)] mb-3">{image.topic}</p>
               {imageError ? (
@@ -209,15 +112,15 @@ export default function DescribeImagePage() {
             </div>
             <div className="text-center">
               <button
-                onClick={recording.stop}
-                disabled={!recording.canStop}
+                onClick={stopRecording}
+                disabled={!canStop}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
                 </svg>
-                {!recording.canStop
-                  ? t('practiceTask.common.holdOn', { sec: String(recording.recSeconds - (RECORD_TIME - MIN_REC_SECONDS)) })
+                {!canStop
+                  ? t('practiceTask.common.holdOn', { sec: String(recSeconds - (timer.recordSeconds - timer.minRecSeconds)) })
                   : t('practiceTask.common.stopRecording')}
               </button>
             </div>

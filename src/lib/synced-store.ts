@@ -1,8 +1,11 @@
-// Generic factory that encapsulates the local-read / cloud-write / local-fallback
-// pattern shared by unified-task-history.ts and unified-vocabulary.ts.
+// The learner data store: one place for the "cloud when logged in, local
+// otherwise" policy behind Practice Tasks and the Vocabulary List — the cached
+// login check, cloud timeouts, the list cache and the local fallback.
 //
-// Only the three operations both modules actually share are modelled here.
-// Module-specific queries (getTaskById, getTasksByType, …) stay in their own file.
+// save / listAll / delete are the operations both stores share. A store's own
+// queries and bulk changes (Practice Tasks by Task Type, clear all) go through
+// `read` and `change`, so they follow the same policy without this module
+// knowing what they are.
 
 export interface LocalAdapter<T, TInput> {
   save(item: TInput): T
@@ -23,6 +26,17 @@ export interface SyncedStore<T, TInput> {
   save(item: TInput): Promise<T>
   listAll(): Promise<T[]>
   delete(id: string): Promise<boolean>
+  /**
+   * A store-specific query: the cloud's answer when logged in and it has one,
+   * otherwise the local answer.
+   */
+  read<R>(fromCloud: () => Promise<R>, fromLocal: () => R, isEmpty: (result: R) => boolean): Promise<R>
+  /**
+   * A store-specific change, applied to the cloud when logged in and always
+   * locally. Resolves false when the cloud part was attempted and failed, in
+   * which case the cloud copy still holds the data.
+   */
+  change(inCloud: () => Promise<boolean>, locally: () => void): Promise<boolean>
   /** Clears the login and list caches. Only call this in tests. */
   _resetCache(): void
 }
@@ -101,6 +115,30 @@ export function createSyncedStore<T, TInput>(
         // fall through to local-only delete
       }
       return local.delete(id)
+    },
+
+    async read(fromCloud, fromLocal, isEmpty) {
+      try {
+        if (await isLoggedIn()) {
+          const result = await withTimeout(fromCloud(), 8000)
+          if (!isEmpty(result)) return result
+        }
+      } catch {
+        // cloud unreachable or timed out — fall through to local
+      }
+      return fromLocal()
+    },
+
+    async change(inCloud, locally) {
+      listCache = null
+      let cloudOk = true
+      try {
+        if (await isLoggedIn()) cloudOk = await withTimeout(inCloud(), 8000)
+      } catch {
+        cloudOk = false
+      }
+      locally()
+      return cloudOk
     },
 
     _resetCache() {

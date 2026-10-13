@@ -35,6 +35,7 @@ _stub_vecs()
 import services.study_assistant_graph as sag  # noqa: E402
 import tools.study_assistant_tools as sat      # noqa: E402
 import services.stimulus_service as ss         # noqa: E402
+from tests.scripted_llm import ScriptedChatModel, tool_call  # noqa: E402
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -451,3 +452,72 @@ class TestGNewsAdapter:
             result = await fetch_news_anchors("unknown_topic")
 
         assert result == []
+
+
+# ── Tool loop, driven through a scripted model ────────────────────────────────
+
+class TestToolLoop:
+    """run_study_assistant_graph() end to end; only the model is substituted."""
+
+    @pytest.fixture(autouse=True)
+    def configured(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "test-key")
+
+    async def _run(self, model, text: str, locale: str = "en") -> dict:
+        with patch("services.llm_chain.ChatOpenAI", model):
+            return await sag.run_study_assistant_graph([_user_msg(text)], locale=locale)
+
+    @pytest.mark.anyio
+    async def test_practice_request_returns_a_theme_deep_link(self):
+        model = ScriptedChatModel(
+            tool_call("generate_practice", {"topic": "urban farming", "task_type": "write_essay"}),
+            "Here is an essay task on urban farming.",
+        )
+        result = await self._run(model, "Give me an essay about urban farming")
+
+        assert result["reply"] == "Here is an essay task on urban farming."
+        assert result["practice"] == {
+            "taskType": "write_essay",
+            "taskSlug": "write-essay",
+            "topic": "urban farming",
+            "source": "exemplars",
+            "route": "/practice/write-essay?mode=theme&topic=urban%20farming",
+        }
+
+    @pytest.mark.anyio
+    async def test_recency_cue_marks_the_practice_route_as_news(self):
+        model = ScriptedChatModel(
+            tool_call("generate_practice", {"topic": "AI", "task_type": "read_aloud"}),
+            "Done.",
+        )
+        result = await self._run(model, "Practise read aloud with the latest news about AI")
+
+        assert result["practice"]["source"] == "news"
+        assert result["practice"]["route"].endswith("&source=news")
+
+    @pytest.mark.anyio
+    async def test_audio_task_type_yields_no_practice_link(self):
+        model = ScriptedChatModel(
+            tool_call("generate_practice", {"topic": "travel", "task_type": "repeat_sentence"}),
+            "Repeat Sentence is not available for topic practice yet.",
+        )
+        result = await self._run(model, "Repeat sentence practice about travel")
+
+        assert result["practice"] is None
+
+    @pytest.mark.anyio
+    async def test_a_final_answer_is_forced_when_the_loop_only_calls_tools(self):
+        calls = [tool_call("pte_knowledge", {"query": "scoring"}, f"call-{i}") for i in range(4)]
+        model = ScriptedChatModel(*calls, "PTE is scored from 10 to 90.")
+        result = await self._run(model, "How is PTE scored?")
+
+        assert result["reply"] == "PTE is scored from 10 to 90."
+        assert len(model.conversations) == 5
+
+    @pytest.mark.anyio
+    async def test_model_failure_becomes_an_apology_in_the_request_locale(self, monkeypatch):
+        monkeypatch.delenv("LLM_API_KEY")
+        result = await self._run(ScriptedChatModel(), "你好", locale="zh")
+
+        assert result == {"reply": "抱歉，发生了错误，请重试。", "links": [], "practice": None}
+

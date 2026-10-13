@@ -365,7 +365,7 @@ speech/
 }
 ```
 
-旧 Azure `/api/pronunciation` 契约仅承担迁移兼容，前端迁移后可删除。
+旧 Azure `/api/pronunciation` 契约已于 2026-10-13 删除：前端改用 `POST /api/pte/spoken-feedback`，由 `backend/services/speech_evaluation.py` 把 Azure 结果转换为 provider-neutral 的 Speech Evaluation Result。EchoLingo provider、`compare` 模式与 10–90 分数估计仍属 M5，尚未实现。
 
 ### 10.3 Read Aloud 模式
 

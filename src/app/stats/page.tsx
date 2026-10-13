@@ -7,60 +7,31 @@ import DesktopNav from "@/components/DesktopNav"
 import { BarChart, LineChart } from "@/components/Chart"
 import { getTasks } from "@/lib/unified-task-history"
 import { deriveTaskTypeWeakness, rankWeaknesses, ALL_TASK_TYPES } from "@/lib/task-weakness"
+import {
+  SCORING_DIMENSIONS,
+  TASK_TYPE_REGISTRY,
+  averageDimensionScore,
+  getTaskTypesScoredAs,
+  taskTypeLabels,
+} from "@/lib/task-type-registry"
 import { useTranslation } from "@/lib/i18n"
 import type { PracticeTask, PteTaskType, TaskTypeWeakness, DimensionWeakness } from "@/types"
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
-const TASK_SHORT: Record<PteTaskType, string> = {
-  read_aloud: "RA",
-  repeat_sentence: "RS",
-  answer_short_question: "ASQ",
-  summarize_written_text: "SWT",
-  write_essay: "WE",
-  personal_intro: "PI",
-  write_from_dictation: "WFD",
-  describe_image: "DI",
-  re_tell_lecture: "RTL",
-  fill_in_the_blanks_reading: "FIB-R",
-  re_order_paragraphs: "ROP",
-  multiple_choice_reading: "MCR",
-  summarize_spoken_text: "SST",
-  fill_in_the_blanks_listening: "FIB-L",
-  highlight_correct_summary: "HCS",
-}
+const TASK_SHORT = Object.fromEntries(
+  ALL_TASK_TYPES.map((taskType) => [taskType, TASK_TYPE_REGISTRY[taskType].shortName])
+) as Record<PteTaskType, string>
 
 type TFunc = (key: string) => string
 
-function getTaskLabels(t: TFunc): Record<PteTaskType, string> {
-  return {
-    read_aloud: t("mock.taskLabel.read_aloud"),
-    repeat_sentence: t("mock.taskLabel.repeat_sentence"),
-    answer_short_question: t("mock.taskLabel.answer_short_question"),
-    summarize_written_text: t("mock.taskLabel.summarize_written_text"),
-    write_essay: t("mock.taskLabel.write_essay"),
-    personal_intro: t("mock.taskLabel.personal_intro"),
-    write_from_dictation: t("mock.taskLabel.write_from_dictation"),
-    describe_image: t("mock.taskLabel.describe_image"),
-    re_tell_lecture: t("mock.taskLabel.re_tell_lecture"),
-    fill_in_the_blanks_reading: t("mock.taskLabel.fill_in_the_blanks"),
-    re_order_paragraphs: t("mock.taskLabel.re_order_paragraphs"),
-    multiple_choice_reading: t("mock.taskLabel.multiple_choice"),
-    summarize_spoken_text: t("mock.taskLabel.summarize_spoken_text"),
-    fill_in_the_blanks_listening: t("mock.taskLabel.fill_in_the_blanks_listening"),
-    highlight_correct_summary: t("mock.taskLabel.highlight_correct_summary"),
-  }
-}
+const getTaskLabels = taskTypeLabels
 
-const SPEAKING_SCORED_TASKS = new Set<PteTaskType>([
-  "read_aloud", "repeat_sentence", "answer_short_question", "describe_image", "re_tell_lecture",
-])
+const SPEAKING_SCORED_TASKS = new Set(getTaskTypesScoredAs("speaking"))
 
-const WRITING_SCORED_TASKS = new Set<PteTaskType>(["summarize_written_text", "write_essay"])
+const WRITING_SCORED_TASKS = new Set(getTaskTypesScoredAs("writing"))
 
-const LISTENING_SCORED_TASKS = new Set<PteTaskType>([
-  "summarize_spoken_text", "fill_in_the_blanks_listening", "highlight_correct_summary",
-])
+const LISTENING_SCORED_TASKS = new Set(getTaskTypesScoredAs("listening"))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -95,11 +66,8 @@ function aggregateProfileScores(
 function taskOverallScore(task: PracticeTask): number | null {
   if (!task.feedback) return null
   const ds = task.feedback.dimensionScores
-  if (ds) {
-    if (ds.section === "speaking") return Math.round((ds.fluency + ds.pronunciation + ds.content) / 3)
-    if (ds.section === "writing") return Math.round((ds.grammar + ds.vocabulary + ds.form + ds.content) / 4)
-    if (ds.section === "reading") return Math.round((ds.vocabulary + ds.comprehension) / 2)
-  }
+  const average = ds ? averageDimensionScore(ds) : null
+  if (average !== null) return average
   const s = task.feedback.strengths.length
   const w = task.feedback.weaknesses.length
   const t = s + w
@@ -141,17 +109,17 @@ function computeStats(tasks: PracticeTask[]): PteStats {
   const speakingProfile = aggregateProfileScores(
     weaknesses,
     SPEAKING_SCORED_TASKS,
-    ["fluency", "pronunciation", "content"],
+    SCORING_DIMENSIONS.speaking,
   )
   const writingProfile = aggregateProfileScores(
     weaknesses,
     WRITING_SCORED_TASKS,
-    ["grammar", "vocabulary", "form", "content"],
+    SCORING_DIMENSIONS.writing,
   )
   const listeningProfile = aggregateProfileScores(
     weaknesses,
     LISTENING_SCORED_TASKS,
-    ["comprehension", "accuracy"],
+    SCORING_DIMENSIONS.listening,
   )
 
   const weekStarts: Date[] = []

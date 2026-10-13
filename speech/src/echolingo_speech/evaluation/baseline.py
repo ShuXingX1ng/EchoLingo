@@ -19,14 +19,10 @@ from pathlib import Path
 import numpy as np
 
 from echolingo_speech.config import load_config
-from echolingo_speech.evaluation.metrics import (
-    error_detection_metrics,
-    mean_absolute_error,
-    score_band_error,
-)
+from echolingo_speech.evaluation.report import ScorePairs, assemble_metrics
+from echolingo_speech.training.config import load_training_config
 from echolingo_speech.training.dataset import ScoringExample, SpeechOceanScoringDataset
 from echolingo_speech.training.labels import SENTENCE_TARGET_KEYS
-from echolingo_speech.training.loop import load_training_config
 
 
 def _sentence_targets(examples: list[ScoringExample], key_index: int) -> list[float]:
@@ -46,6 +42,11 @@ def _phone_accuracy_targets(examples: list[ScoringExample]) -> list[float]:
     return [phone.accuracy for example in examples for phone in example.phone_examples]
 
 
+def _constant_mean(train_targets: list[float], count: int) -> list[float]:
+    mean = float(np.mean(train_targets)) if train_targets else 0.0
+    return [mean] * count
+
+
 def constant_mean_baseline_metrics(
     train_examples: list[ScoringExample],
     test_examples: list[ScoringExample],
@@ -56,44 +57,31 @@ def constant_mean_baseline_metrics(
     """For each supervision level, predict the training partition's mean label
     for every test example and score it with the same metrics `evaluate` uses.
     """
-    metrics: dict = {}
+    pairs = ScorePairs()
 
     for index, key in enumerate(SENTENCE_TARGET_KEYS):
-        train_targets = _sentence_targets(train_examples, index)
         test_targets = _sentence_targets(test_examples, index)
-        mean = float(np.mean(train_targets)) if train_targets else 0.0
-        preds_original = [mean * 10 for _ in test_targets]
-        targets_original = [target * 10 for target in test_targets]
-        metrics[f"sentence_{key}_mae"] = mean_absolute_error(preds_original, targets_original)
-        metrics[f"sentence_{key}_score_band_error"] = score_band_error(
-            preds_original, targets_original, score_band_width
+        pairs.sentence_targets[key] = test_targets
+        pairs.sentence_preds[key] = _constant_mean(
+            _sentence_targets(train_examples, index), len(test_targets)
         )
 
-    train_word = _word_accuracy_targets(train_examples)
-    test_word = _word_accuracy_targets(test_examples)
-    if test_word:
-        mean = float(np.mean(train_word)) if train_word else 0.0
-        preds = [mean] * len(test_word)
-        metrics["word_accuracy_mae"] = mean_absolute_error(
-            [pred * 10 for pred in preds], [target * 10 for target in test_word]
-        )
-        metrics["word_error_detection"] = error_detection_metrics(
-            preds, test_word, error_detection_threshold
-        )
+    pairs.word_accuracy_targets = _word_accuracy_targets(test_examples)
+    pairs.word_accuracy_preds = _constant_mean(
+        _word_accuracy_targets(train_examples), len(pairs.word_accuracy_targets)
+    )
 
-    train_phone = _phone_accuracy_targets(train_examples)
-    test_phone = _phone_accuracy_targets(test_examples)
-    if test_phone:
-        mean = float(np.mean(train_phone)) if train_phone else 0.0
-        preds = [mean] * len(test_phone)
-        metrics["phone_accuracy_mae"] = mean_absolute_error(
-            [pred * 2 for pred in preds], [target * 2 for target in test_phone]
-        )
-        metrics["phone_error_detection"] = error_detection_metrics(
-            preds, test_phone, error_detection_threshold
-        )
+    pairs.phone_accuracy_targets = _phone_accuracy_targets(test_examples)
+    pairs.phone_accuracy_preds = _constant_mean(
+        _phone_accuracy_targets(train_examples), len(pairs.phone_accuracy_targets)
+    )
 
-    return metrics
+    return assemble_metrics(
+        pairs,
+        score_band_width=score_band_width,
+        error_detection_threshold=error_detection_threshold,
+        include_correlation=False,
+    )
 
 
 def _cli(argv: list[str] | None = None) -> int:

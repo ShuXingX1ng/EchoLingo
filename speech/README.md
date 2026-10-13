@@ -46,6 +46,9 @@ uv sync
 conda create -n aligner -c conda-forge montreal-forced-aligner
 conda run -n aligner mfa model download acoustic english_us_arpa
 conda run -n aligner mfa model download dictionary english_us_arpa
+# The aligner env is found under $CONDA_EXE's root, ~/miniforge3, ~/miniconda3,
+# or /opt/conda. If conda lives elsewhere, point at the binary directly:
+# export ECHOLINGO_MFA_BIN=/path/to/envs/aligner/bin/mfa
 
 # 4. Verify
 uv run python -m echolingo_speech.config validate --config configs/speech.yaml
@@ -88,6 +91,25 @@ uv run python -m echolingo_speech.training.loop train --config configs/speech.ya
 uv run python -m echolingo_speech.evaluation.baseline --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST
 ```
 
+Each training run writes `last.pt` and `best.pt` to
+`<artifact_root>/checkpoints/<run-name>/` after every epoch (run name defaults
+to `a0-seed<seed>`; override with `--run-name`). If a run is interrupted,
+repeat the same command with `--resume` to continue from `last.pt`. Starting
+a run whose directory already holds a checkpoint without `--resume` is
+refused rather than overwritten. Resuming is also refused when the seed, the
+model configuration, or any training hyperparameter other than `max_epochs`
+differs from what the run started with. A resumed run is logged as a new
+MLflow run (its `resumed_from_epoch` param says where it picked up), so the
+metric history of an interrupted run spans two MLflow runs.
+
+To score a saved checkpoint without retraining (for example the sealed test
+partition once a candidate is final):
+
+```bash
+uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST \
+  --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0-seed42/best.pt --partition test --out a0-seed42-test.json
+```
+
 Reproducibility checks before trusting the rebuild:
 
 - the tarball SHA-256 equals `tarball_sha256` in `configs/datasets/speechocean762.yaml`;
@@ -99,8 +121,9 @@ Compare runs with `uv run mlflow ui --backend-store-uri <mlflow_tracking_uri>`
 (forward the port over SSH to view it from another machine).
 
 **Back up after every stage.** A rented instance can be released. Copy
-`$MANIFEST`, `$SPEECH_HOME/artifacts/mlruns` (which holds the checkpoints),
-and any reports off the instance. Raw audio, MFA output, and the feature
+`$MANIFEST`, `$SPEECH_HOME/artifacts/mlruns` (which holds each run's best
+checkpoint), `$SPEECH_HOME/artifacts/checkpoints` (needed to resume), and any
+reports off the instance. Raw audio, MFA output, and the feature
 cache can be rebuilt with the commands above.
 
 ## Notes
@@ -109,7 +132,7 @@ MLflow >=3 disables its plain filesystem tracking backend by default; any
 code (including tests) using the local `file://.../mlruns` store from
 `docs/SPEECH_EVALUATOR_ROADMAP.md` SS9.4 must set `MLFLOW_ALLOW_FILE_STORE=true`
 first — this is an explicit opt-in for the intentional local-file design,
-not a workaround. `training/loop.py` sets it itself.
+not a workaround. `training/tracking.py` sets it itself.
 
 The pinned-encoder network smoke test (`test_pinned_encoder_forward_pass`)
 downloads ~360 MB from the Hugging Face Hub on first run. It is marked

@@ -1,149 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n"
-import { saveTask } from "@/lib/unified-task-history"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import { getStimulusFromBank, addStimulusToBank } from "@/lib/task-bank"
-import type { PracticeTask, TaskFeedback } from "@/types"
-
-const TIME_LIMIT = 600 // 10 min
-
-type Phase = "generating" | "ready" | "listening" | "writing" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
+import type { PracticeTask } from "@/types"
 
 export default function MockSummarizeSpokenText({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("generating")
-  const [passage, setPassage] = useState("")
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [summary, setSummary] = useState("")
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
-  const [doneTask, setDoneTask] = useState<PracticeTask | null>(null)
-  const [error, setError] = useState("")
-
-  const startedAtRef = useRef("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const submitRef = useRef<() => void>(() => {})
-  const passageRef = useRef("")
-  const summaryRef = useRef("")
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    audioRef.current?.pause()
-    if (audioUrl) URL.revokeObjectURL(audioUrl)
-  }, [audioUrl])
-
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(s => {
-        if (s <= 1) {
-          clearInterval(timerRef.current!)
-          submitRef.current()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase])
-
-  useEffect(() => { summaryRef.current = summary }, [summary])
-
-  const handleSubmit = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    const text = summaryRef.current.trim() || "(no response)"
-    const stim = passageRef.current
-    setPhase("processing")
-    const endedAt = new Date().toISOString()
-    const startedAt = startedAtRef.current || endedAt
-    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-
-    let fb: TaskFeedback | null = null
-    try {
-      fb = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "summarize_spoken_text", stimulus: stim, response: text })
-    } catch { /* best-effort */ }
-
-    const finalFb: TaskFeedback = fb ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-
-    let task: PracticeTask
-    try {
-      task = await saveTask({
-        taskType: "summarize_spoken_text",
-        stimulus: { kind: "audio", content: stim },
-        response: { kind: "text", content: text },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch {
-      task = {
-        id: `mock_${Date.now()}`,
-        taskType: "summarize_spoken_text",
-        stimulus: { kind: "audio", content: stim },
-        response: { kind: "text", content: text },
-        feedback: finalFb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      }
-    }
-
-    setDoneTask(task)
-    setPhase("done")
-  }, [])
-
-  useEffect(() => { submitRef.current = handleSubmit }, [handleSubmit])
-
-  const playAudio = useCallback((url: string) => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    const audio = new Audio(url)
-    audioRef.current = audio
-    audio.onended = () => {
-      if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-      setPhase("writing")
-    }
-    audio.onerror = () => {
-      if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-      setPhase("writing")
-    }
-    setPhase("listening")
-    audio.play().catch(() => {
-      if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
-      setSeconds(TIME_LIMIT)
-      setPhase("writing")
-    })
-  }, [])
-
-  useEffect(() => {
-    const generate = async () => {
-      try {
-        let text: string
-        const cached = getStimulusFromBank("summarize_spoken_text")
-        if (cached) {
-          text = cached
-        } else {
-          const res = await apiPost<{ text: string }>("/api/pte/stimulus", { taskType: "summarize_spoken_text" }, { timeoutMs: 45000 })
-          text = res.text
-          addStimulusToBank("summarize_spoken_text", text)
-        }
-        passageRef.current = text
-        setPassage(text)
-
-        const blob = await apiPostBlob("/api/tts", { text, voice: "en-US-AriaNeural", rate: 0.85 }, { timeoutMs: 30000 })
-        setAudioUrl(URL.createObjectURL(blob))
-        setPhase("ready")
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed")
-        setPhase("error")
-      }
-    }
-    generate()
-  }, [])
+  const {
+    phase, seconds, error, savedTask: doneTask,
+    userText: summary, setText: setSummary, play: playAudio, submit: handleSubmit, emptyTask,
+  } = usePracticeTaskRun("summarize_spoken_text", { mode: "mock" })
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -151,16 +17,7 @@ export default function MockSummarizeSpokenText({ onComplete }: { onComplete: (t
   const timeUrgent = seconds <= 60
   const wordCount = summary.trim().split(/\s+/).filter(Boolean).length
 
-  const skipTask = () => {
-    onComplete({
-      id: `mock_${Date.now()}`,
-      taskType: "summarize_spoken_text",
-      stimulus: { kind: "audio", content: passage },
-      response: { kind: "text", content: "" },
-      durationSeconds: 0,
-      createdAt: new Date().toISOString(),
-    })
-  }
+  const skipTask = () => onComplete(emptyTask())
 
   return (
     <div className="space-y-5">
@@ -171,13 +28,13 @@ export default function MockSummarizeSpokenText({ onComplete }: { onComplete: (t
         </div>
       )}
 
-      {phase === "ready" && audioUrl && (
+      {phase === "ready" && (
         <div className="border border-slate-900 bg-white p-8 text-center shadow-[4px_4px_0_rgba(15,23,42,0.08)] dark:border-white/15 dark:bg-slate-900">
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
             {t("mock.summarizeSpokenText.listenOnce")}
           </p>
           <button
-            onClick={() => playAudio(audioUrl)}
+            onClick={() => playAudio()}
             className="inline-flex items-center gap-3 rounded-xl bg-slate-950 px-8 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
           >
             {t("mock.common.playPassage")}

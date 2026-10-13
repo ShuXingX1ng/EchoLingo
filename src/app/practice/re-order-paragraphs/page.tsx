@@ -1,105 +1,52 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { usePracticeTaskRunner } from "@/hooks/usePracticeTaskRunner"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
-
-const TIME_LIMIT = 180 // 3 minutes
-
-type Paragraph = { label: string; text: string }
-type ParsedStimulus = { paragraphs: Paragraph[] }
-
-function parseStimulus(raw: string): ParsedStimulus | null {
-  try {
-    const parsed = JSON.parse(raw) as { paragraphs?: unknown }
-    if (!Array.isArray(parsed.paragraphs) || parsed.paragraphs.length < 2) return null
-    return parsed as ParsedStimulus
-  } catch {
-    return null
-  }
-}
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-function buildStimulusForFeedback(correctOrder: Paragraph[]): string {
-  return (
-    "Paragraphs in correct order:\n" +
-    correctOrder.map((p) => `[${p.label}] ${p.text}`).join("\n\n")
-  )
-}
-
-function buildResponseForFeedback(userOrder: Paragraph[], correctOrder: Paragraph[]): string {
-  const userLabels = userOrder.map((p) => p.label).join(" → ")
-  const correctLabels = correctOrder.map((p) => p.label).join(" → ")
-  const correctCount = userOrder.filter((p, i) => p.label === correctOrder[i].label).length
-  return (
-    `Submitted order: ${userLabels}\n` +
-    `Correct order:   ${correctLabels}\n` +
-    `${correctCount} of ${correctOrder.length} paragraphs in the correct position.`
-  )
-}
+import {
+  parseReOrderParagraphs,
+  reOrderParagraphsFeedbackResponse,
+  reOrderParagraphsFeedbackStimulus,
+  shuffleArray,
+  type Paragraph,
+} from "@/lib/structured-stimulus"
 
 export default function ReOrderParagraphsPage() {
   const { t } = useTranslation()
-  const { phase, stimulus, feedback, error, generate, submit } = usePracticeTaskRunner({
-    taskType: "re_order_paragraphs",
-    responseKind: "text",
-  })
-
   const [correctOrder, setCorrectOrder] = useState<Paragraph[]>([])
   const [displayOrder, setDisplayOrder] = useState<Paragraph[]>([])
-  const [seconds, setSeconds] = useState(TIME_LIMIT)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   const correctOrderRef = useRef<Paragraph[]>([])
   const displayOrderRef = useRef<Paragraph[]>([])
-  const [submittedResponse, setSubmittedResponse] = useState("")
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   useEffect(() => { correctOrderRef.current = correctOrder }, [correctOrder])
   useEffect(() => { displayOrderRef.current = displayOrder }, [displayOrder])
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  // Parse JSON stimulus when hook loads it
+  const { phase, stimulus, seconds, feedback, savedTask, error, generate, submit: handleSubmit } =
+    usePracticeTaskRun("re_order_paragraphs", {
+      buildSubmission: () => {
+        const correct = correctOrderRef.current
+        if (correct.length === 0) return null
+        return {
+          feedbackStimulus: reOrderParagraphsFeedbackStimulus(correct),
+          feedbackResponse: reOrderParagraphsFeedbackResponse(displayOrderRef.current, correct),
+        }
+      },
+    })
+  const submittedResponse = savedTask?.response.content ?? ""
+
+  // Parse the structured Stimulus when the run loads it
   useEffect(() => {
     if (!stimulus) return
-    const p = parseStimulus(stimulus)
+    const p = parseReOrderParagraphs(stimulus)
     if (!p) return
     setCorrectOrder(p.paragraphs)
     setDisplayOrder(shuffleArray(p.paragraphs))
-    setSeconds(TIME_LIMIT)
   }, [stimulus])
-
-  const handleSubmit = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    const feedbackStimulus = buildStimulusForFeedback(correctOrderRef.current)
-    const feedbackResponse = buildResponseForFeedback(displayOrderRef.current, correctOrderRef.current)
-    setSubmittedResponse(feedbackResponse)
-    await submit({ feedbackStimulus, feedbackResponse })
-  }, [submit])
-
-  // Timer while the user is reordering
-  useEffect(() => {
-    if (phase !== "writing") return
-    timerRef.current = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); handleSubmit(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [phase, handleSubmit])
 
   const moveUp = (idx: number) => {
     if (idx === 0) return
@@ -228,7 +175,7 @@ export default function ReOrderParagraphsPage() {
           <div className="space-y-6">
             <TaskFeedbackDisplay
               feedback={feedback}
-              stimulus={buildStimulusForFeedback(correctOrder)}
+              stimulus={reOrderParagraphsFeedbackStimulus(correctOrder)}
               stimulusLabel={t('practiceTask.re-order-paragraphs.correctOrder')}
               responseText={submittedResponse}
               responseLabel={t('practiceTask.re-order-paragraphs.yourOrder')}

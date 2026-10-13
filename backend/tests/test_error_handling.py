@@ -44,40 +44,6 @@ async def test_tts_azure_unexpected_error():
 
 
 @pytest.mark.anyio
-async def test_pronunciation_azure_assessment_failure():
-    with patch("services.azure_speech.azure_speech_service.assess_pronunciation", new_callable=AsyncMock) as mock_assess:
-        mock_assess.side_effect = ValueError("Pronunciation assessment failed: Audio too short")
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/api/pronunciation",
-                files={"audio": ("test.wav", b"short", "audio/wav")},
-                data={"referenceText": "hello"},
-            )
-
-    assert response.status_code == 500
-    assert "Pronunciation assessment failed" in response.json()["detail"]
-
-
-@pytest.mark.anyio
-async def test_pronunciation_azure_unexpected_error():
-    with patch("services.azure_speech.azure_speech_service.assess_pronunciation", new_callable=AsyncMock) as mock_assess:
-        mock_assess.side_effect = RuntimeError("SDK crash")
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/api/pronunciation",
-                files={"audio": ("test.wav", b"audio", "audio/wav")},
-                data={"referenceText": "hello"},
-            )
-
-    assert response.status_code == 500
-    assert "Failed to assess pronunciation" in response.json()["detail"]
-
-
-# ============================================================
-# Invalid Input Validation
-# ============================================================
-
-@pytest.mark.anyio
 async def test_tts_null_text():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

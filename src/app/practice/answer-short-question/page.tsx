@@ -1,165 +1,18 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
 import TaskFeedbackDisplay from "@/components/TaskFeedbackDisplay"
-import { saveTask } from "@/lib/unified-task-history"
-import { loadStimulusText } from "@/lib/stimulus-loader"
-import { useRecordingSession } from "@/hooks/useRecordingSession"
-import { apiPost, apiPostBlob } from "@/lib/api-client"
-import type { TaskFeedback } from "@/types"
 import { useTranslation } from "@/lib/i18n"
-
-const PAUSE_TIME = 3
-const RECORD_TIME = 10
-
-type Phase = "idle" | "generating" | "playing" | "countdown" | "recording" | "processing" | "done" | "error"
+import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 
 export default function AnswerShortQuestionPage() {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [question, setQuestion] = useState("")
-  const [correctAnswer, setCorrectAnswer] = useState("")
-  const [feedback, setFeedback] = useState<TaskFeedback | null>(null)
-  const [error, setError] = useState("")
-  const [countSec, setCountSec] = useState(PAUSE_TIME)
-  const [transcript, setTranscript] = useState("")
-
-  const prepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const audioUrlRef = useRef<string | null>(null)
-  const generateIdRef = useRef(0)
-
-  const cleanupAudio = useCallback(() => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
-    if (audioUrlRef.current) { URL.revokeObjectURL(audioUrlRef.current); audioUrlRef.current = null }
-  }, [])
-
-  const processResponse = useCallback(async (_blob: Blob, tx: string, startedAt: string) => {
-    setPhase("processing")
-    setTranscript(tx)
-    const endedAt = new Date().toISOString()
-    const durationSeconds = Math.round(
-      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-    )
-
-    const stimulusWithAnswer = `Question: ${question}\nCorrect answer: ${correctAnswer}`
-
-    let result: TaskFeedback | null = null
-    try {
-      result = await apiPost<TaskFeedback>("/api/pte/feedback", { taskType: "answer_short_question", stimulus: stimulusWithAnswer, response: tx }, { timeoutMs: 90000 })
-    } catch { /* ignore */ }
-
-    const fb: TaskFeedback = result ?? { summary: "Feedback unavailable.", strengths: [], weaknesses: [], suggestions: [] }
-    setFeedback(fb)
-
-    try {
-      await saveTask({
-        taskType: "answer_short_question",
-        stimulus: { kind: "text", content: question },
-        response: { kind: "audio", content: tx },
-        feedback: fb,
-        durationSeconds,
-        createdAt: startedAt,
-        endedAt,
-      })
-    } catch (e) { console.warn("saveTask failed:", e) }
-
-    setPhase("done")
-  }, [question, correctAnswer])
-
-  const recording = useRecordingSession({
-    totalSeconds: RECORD_TIME,
-    onComplete: processResponse,
-    onError: msg => { setError(msg); setPhase("error") },
-  })
-
-  // Start countdown directly — avoids the useEffect cleanup race condition
-  const startCountdown = useCallback(() => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    setCountSec(PAUSE_TIME)
-    setPhase("countdown")
-    let remaining = PAUSE_TIME
-    prepTimerRef.current = setInterval(() => {
-      remaining -= 1
-      setCountSec(remaining)
-      if (remaining <= 0) {
-        clearInterval(prepTimerRef.current!)
-        setPhase("recording")
-        recording.start()
-      }
-    }, 1000)
-  }, [recording])
-
-  useEffect(() => () => {
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    cleanupAudio()
-  }, [cleanupAudio])
-
-  const generate = useCallback(async () => {
-    const id = ++generateIdRef.current
-    if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    cleanupAudio()
-    setPhase("generating")
-    setError(""); setFeedback(null); setTranscript("")
-    try {
-      const text = await loadStimulusText({ taskType: "answer_short_question" })
-      if (id !== generateIdRef.current) return
-
-      const [q, a] = text.split("\n")
-      const questionText = q?.trim() ?? text
-      const answerText = a?.trim() ?? ""
-      setQuestion(questionText)
-      setCorrectAnswer(answerText)
-
-      // Fetch TTS for the question
-      let audioUrl: string | null = null
-      try {
-        const blob = await apiPostBlob("/api/tts", { text: questionText, voice: "en-US-AriaNeural", rate: 0.9 }, { timeoutMs: 30000 })
-        if (id !== generateIdRef.current) return
-        audioUrl = URL.createObjectURL(blob)
-        audioUrlRef.current = audioUrl
-      } catch { /* TTS failure falls back to countdown directly */ }
-
-      if (id !== generateIdRef.current) return
-      setPhase("playing")
-
-      if (audioUrl) {
-        const audio = new Audio(audioUrl)
-        audioRef.current = audio
-        let fired = false
-        const onDone = () => {
-          if (fired || id !== generateIdRef.current) return
-          fired = true
-          audioRef.current = null
-          startCountdown()
-        }
-        audio.onended = onDone
-        audio.onerror = onDone
-        audio.play().catch(onDone)
-      } else {
-        startCountdown()
-      }
-    } catch (e) {
-      if (id !== generateIdRef.current) return
-      setError(e instanceof Error ? e.message : t('practiceTask.answer-short-question.errorGenerate'))
-      setPhase("error")
-    }
-  }, [t, cleanupAudio, startCountdown])
-
-  useEffect(() => {
-    generate()
-    return () => {
-      // Invalidate any in-flight generate() so its async continuations bail out.
-      // This is essential for React Strict Mode which unmounts+remounts on dev.
-      generateIdRef.current++
-      cleanupAudio()
-      if (prepTimerRef.current) clearInterval(prepTimerRef.current)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const {
+    phase, stimulus: question, answer: correctAnswer, seconds: countSec, timer,
+    feedback, error, transcript, recSeconds, stopRecording, generate,
+  } = usePracticeTaskRun("answer_short_question")
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -174,7 +27,7 @@ export default function AnswerShortQuestionPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">{t('practiceTask.common.pteSpeaking')}</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{t("practiceTask.answer-short-question.title")}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            {t('practiceTask.answer-short-question.desc', { recordTime: String(RECORD_TIME) })}
+            {t('practiceTask.answer-short-question.desc', { recordTime: String(timer.recordSeconds) })}
           </p>
         </div>
 
@@ -196,7 +49,7 @@ export default function AnswerShortQuestionPage() {
           </div>
         )}
 
-        {phase === "playing" && (
+        {phase === "listening" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 shadow-[6px_6px_0_rgba(15,23,42,0.08)] space-y-4">
             <div className="flex items-center gap-3">
               <span className="relative flex h-3 w-3 shrink-0">
@@ -216,12 +69,12 @@ export default function AnswerShortQuestionPage() {
           </div>
         )}
 
-        {phase === "countdown" && (
+        {phase === "prep" && (
           <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[6px_6px_0_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-6">Question</p>
             <p className="text-xl font-semibold text-[var(--foreground)] leading-relaxed mb-6">{question}</p>
             <div className="flex flex-col items-center gap-2">
-              <CountdownRing seconds={countSec} total={PAUSE_TIME} size={56} />
+              <CountdownRing seconds={countSec} total={timer.prepSeconds} size={56} />
               <p className="text-xs text-slate-400">{t('practiceTask.answer-short-question.recordingStartsAuto')}</p>
             </div>
           </div>
@@ -235,10 +88,10 @@ export default function AnswerShortQuestionPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{t('practiceTask.common.recording')}</p>
               </div>
               <p className="text-xl font-semibold text-[var(--foreground)] mb-6">{question}</p>
-              <CountdownRing seconds={recording.recSeconds} total={RECORD_TIME} size={72} />
+              <CountdownRing seconds={recSeconds} total={timer.recordSeconds} size={72} />
             </div>
             <div className="text-center">
-              <button onClick={recording.stop}
+              <button onClick={stopRecording}
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-red-500 px-8 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
                 {t('practiceTask.common.stopRecording')}
               </button>

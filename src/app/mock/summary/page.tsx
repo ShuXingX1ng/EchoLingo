@@ -4,28 +4,13 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import { useTranslation } from "@/lib/i18n"
-import type { PracticeTask, PteTaskType } from "@/types"
+import { practicePath, taskTypeLabel } from "@/lib/task-type-registry"
+import { speechEvaluationOf } from "@/lib/speech-evaluation"
+import type { PracticeTask } from "@/types"
 
 const SESSION_KEY = "echo_mock_session"
 
 
-const TASK_PRACTICE_PATHS: Record<PteTaskType, string> = {
-  personal_intro: "/practice/personal-intro",
-  read_aloud: "/practice/read-aloud",
-  repeat_sentence: "/practice/repeat-sentence",
-  answer_short_question: "/practice/answer-short-question",
-  summarize_written_text: "/practice/summarize-written-text",
-  write_essay: "/practice/write-essay",
-  write_from_dictation: "/practice/write-from-dictation",
-  describe_image: "/practice/describe-image",
-  re_tell_lecture: "/practice/re-tell-lecture",
-  fill_in_the_blanks_reading: "/practice/fill-in-the-blanks",
-  re_order_paragraphs: "/practice/re-order-paragraphs",
-  multiple_choice_reading: "/practice/multiple-choice",
-  summarize_spoken_text: "/practice/summarize-spoken-text",
-  fill_in_the_blanks_listening: "/practice/fill-in-the-blanks-listening",
-  highlight_correct_summary: "/practice/highlight-correct-summary",
-}
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -109,9 +94,10 @@ export default function MockSummaryPage() {
     .slice(0, 5)
     .map(([w]) => w)
 
-  const scoredTasks = tasks.filter(t => t.feedback?.pronunciationAssessment)
-  const avgPronunciationScore = scoredTasks.length > 0
-    ? Math.round(scoredTasks.reduce((sum, t) => sum + (t.feedback!.pronunciationAssessment!.score), 0) / scoredTasks.length)
+  const overallSpeechScore = (task: PracticeTask) => speechEvaluationOf(task.feedback)?.overallScore ?? null
+  const speechScores = tasks.map(overallSpeechScore).filter((score): score is number => score !== null)
+  const avgPronunciationScore = speechScores.length > 0
+    ? Math.round(speechScores.reduce((sum, score) => sum + score, 0) / speechScores.length)
     : null
 
   return (
@@ -187,13 +173,13 @@ export default function MockSummaryPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {t("mock.taskLabel." + task.taskType)}
+                          {taskTypeLabel(t, task.taskType)}
                         </p>
-                        {task.feedback?.pronunciationAssessment && (
+                        {overallSpeechScore(task) !== null && (
                           <div className="flex items-center gap-3 mt-1">
-                            <ScoreDot score={task.feedback.pronunciationAssessment.score} />
+                            <ScoreDot score={overallSpeechScore(task)!} />
                             <span className="text-xs text-slate-500">
-                              {t("mock.summary.pronunciationScore", { score: task.feedback.pronunciationAssessment.score })}
+                              {t("mock.summary.pronunciationScore", { score: overallSpeechScore(task)! })}
                             </span>
                           </div>
                         )}
@@ -221,9 +207,9 @@ export default function MockSummaryPage() {
                   </div>
                 )}
                 <div className="border-t border-slate-100 dark:border-white/10 px-4 py-2">
-                  <Link href={TASK_PRACTICE_PATHS[task.taskType]}
+                  <Link href={practicePath(task.taskType) ?? "/practice"}
                     className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline">
-                    {t("mock.summary.practiceTask", { taskLabel: t("mock.taskLabel." + task.taskType) })}
+                    {t("mock.summary.practiceTask", { taskLabel: taskTypeLabel(t, task.taskType) })}
                   </Link>
                 </div>
               </div>
