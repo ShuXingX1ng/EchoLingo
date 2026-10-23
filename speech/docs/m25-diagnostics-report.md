@@ -207,3 +207,42 @@ Findings:
   acoustic features only feed the sentence heads.
 - The adult/child gap remains; child sentence accuracy is still 0.37-0.39.
 - A0-rebalance-acnorm replaces A0-rebalance as the reference for 3.4-3.5.
+
+## 9. Step 3.4 applied: canonical phone identities
+
+`configs/training/a0-rebalance-acnorm-phones.yaml` = the SS8 reference with
+`use_canonical_phones: true`. Canonical phones map onto the 39 ARPAbet base
+phones (stress digits stripped; id 0 for anything else). The phone head
+receives the expected phone's embedding next to its pooled frames; the word
+head receives the mean embedding of the word's canonical phones. A per-word
+identity embedding (roadmap wording "单词身份嵌入") was deliberately not used:
+2604 word types, and 750 of the 1869 test word types (40%) never occur in
+train, so those embeddings would be untrained exactly where they are needed.
+Runs `a0rnp-seed42` (36 epochs) and `a0rnp-seed1337` (49 epochs) at commit
+`d46b5aa`. Validation only; test not scored.
+
+| Validation (seed 42 / 1337) | SS8 reference | + canonical phones | Change |
+|---|---|---|---|
+| Word average precision | 0.332 / 0.337 | 0.375 / 0.441 | +0.043 / +0.104 |
+| Phone average precision | 0.263 / 0.274 | 0.283 / 0.313 | +0.020 / +0.039 |
+| Word accuracy Pearson | 0.361 / 0.366 | 0.399 / 0.445 | +0.038 / +0.079 |
+| Phone accuracy Pearson | 0.367 / 0.375 | 0.396 / 0.421 | +0.029 / +0.046 |
+| Word accuracy MAE (0-10) | 1.199 / 1.221 | 1.205 / 1.103 | +0.006 / -0.118 |
+| Phone accuracy MAE (0-2) | 0.249 / 0.258 | 0.251 / 0.244 | +0.002 / -0.014 |
+| Sentence accuracy Pearson | 0.760 / 0.760 | 0.767 / 0.757 | +0.007 / -0.003 |
+| Sentence fluency Pearson | 0.827 / 0.824 | 0.828 / 0.820 | +0.001 / -0.004 |
+| Word macro F1, validation-chosen cut (optimistic) | 0.635 / 0.640 | 0.658 / 0.691 | |
+| Adult word accuracy Pearson | 0.412 / 0.416 | 0.455 / 0.495 | |
+| Child word accuracy Pearson | 0.156 / 0.162 | 0.211 / 0.181 | |
+
+Findings:
+
+- SS18.2 #1 is confirmed: telling the heads what should have been said is
+  the largest word/phone gain of M2.5 so far, on both seeds, for both adults
+  and children. Sentence metrics are unchanged, as expected (the sentence
+  heads never see phone identities).
+- Seed-to-seed spread at word level grew (word AP 0.375 vs 0.441); both seeds
+  still clearly beat the reference, but the size of the gain is uncertain.
+- Error-class predictions still rarely cross 0.6 (0.2-0.5% of words), so the
+  validation-chosen cut from step 3.1 remains necessary.
+- A0-rebalance-acnorm-phones replaces the SS8 reference for step 3.5.

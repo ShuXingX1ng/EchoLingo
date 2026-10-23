@@ -549,7 +549,7 @@ LLM 不得：
 | M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
-| M2.5 A0 基线修复 | 进行中：步骤 2、3.1–3.3 完成，3.4 起未开始 | 本节、`speech/docs/m25-diagnostics-report.md` |
+| M2.5 A0 基线修复 | 进行中：步骤 2、3.1–3.4 完成，3.5 进行中 | 本节、`speech/docs/m25-diagnostics-report.md` |
 | M3 候选改进 | 未开始 | — |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
@@ -600,7 +600,7 @@ LLM 不得：
 1. 评估方式：在 Validation 上选择预测阈值，并增加不依赖阈值的指标（如 PR 曲线下面积）。这只改变度量方式，不改变模型。— 完成（2026-10-23）：阈值随检查点保存为 `prediction_thresholds.json`，报告新增 average precision；后续候选在 Validation 上用单词/音素 average precision 比较（A0 参照：单词 0.311 / 0.312，音素 0.260 / 0.265），F1 只在最终候选的封存 Test 上报告一次。
 2. 损失平衡：拆开并重新加权 Accuracy 与 Stress。— 完成（2026-10-23）：`a0-rebalance.yaml`（Accuracy 0.9 / Stress 0.1）；Stress 占验证损失从 0.48 降到 0.13，单词 AP 两个种子都 +0.017，单词 Pearson 约 +0.018，句子与音素持平。提升小、方向一致，作为 3.3 起的新参照。
 3. 声学特征标准化。— 完成（2026-10-23）：`a0-rebalance-acnorm.yaml`；句子级全部提升且两个种子更一致（Accuracy Pearson 0.760 / 0.760，Fluency 0.827 / 0.824，Fluency MAE 约 −0.07），单词/音素持平，作为 3.4 起的新参照。
-4. 规范音素/单词身份嵌入（针对问题 1，预期收益最大）。
+4. 规范音素/单词身份嵌入（针对问题 1，预期收益最大）。— 完成（2026-10-23）：`a0-rebalance-acnorm-phones.yaml`；只用规范音素嵌入（单词头用其音素嵌入的均值，因为 40% 的 Test 单词类型在 Train 中没出现过，不用单词身份嵌入）；单词 AP 0.375 / 0.441（+0.04 / +0.10），音素 AP +0.02 / +0.04，单词 Pearson 0.399 / 0.445，句子持平。
 5. 多层隐藏状态（需要重建特征缓存，存储量随层数增加）。
 
 完成标准：两个种子上单词错误检测 Macro F1 都超过无学习基线，句子 Accuracy 与 Fluency Pearson 不低于 A0，并写出更新后的基线报告。如果做完仍不达标，如实记录并决定是否带着缺口进入 M3。
