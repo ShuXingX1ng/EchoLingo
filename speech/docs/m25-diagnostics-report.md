@@ -141,3 +141,36 @@ use word and phone **average precision on validation**, which does not depend
 on a cut; A0's reference is 0.311 / 0.312 (word) and 0.260 / 0.265 (phone).
 
 Rerunning the diagnostics with the shared metric code reproduced SS2 exactly.
+
+## 7. Step 3.2 applied: word loss rebalanced toward accuracy
+
+`configs/training/a0-rebalance.yaml` = `a0.yaml` with the word loss weighted
+0.9 accuracy Huber / 0.1 stress BCE instead of 0.5 / 0.5; one factor changed.
+Runs `a0r-seed42` (47 epochs) and `a0r-seed1337` (40 epochs) at commit
+`80020c4`. Validation only; test not scored.
+
+| Validation (seed 42 / 1337) | A0 | A0-rebalance | Change |
+|---|---|---|---|
+| Word average precision | 0.311 / 0.312 | 0.328 / 0.330 | +0.017 / +0.018 |
+| Phone average precision | 0.260 / 0.265 | 0.258 / 0.265 | -0.002 / 0.000 |
+| Word accuracy Pearson | 0.344 / 0.347 | 0.363 / 0.363 | +0.019 / +0.016 |
+| Phone accuracy Pearson | 0.364 / 0.359 | 0.361 / 0.366 | -0.003 / +0.007 |
+| Sentence accuracy Pearson | 0.732 / 0.755 | 0.730 / 0.751 | -0.002 / -0.004 |
+| Sentence fluency Pearson | 0.786 / 0.798 | 0.786 / 0.806 | 0.000 / +0.008 |
+| Word stress BCE | 0.0758 / 0.0750 | 0.0745 / 0.0739 | unchanged |
+| Stress share of validation loss | 0.48 / 0.47 | 0.13 / 0.13 | |
+| Word macro F1, validation-chosen cut (optimistic) | 0.632 / 0.625 | 0.636 / 0.642 | |
+
+Validation loss values are not comparable across the two configurations
+(the weighting differs), so early stopping is compared by outcome, not loss.
+
+Findings:
+
+- The stress term no longer dominates model selection (share 0.48 -> 0.13),
+  and the stress head is no worse; it was learning almost nothing either way.
+- Word-level ranking improves on both seeds by a similar amount (AP +0.017,
+  Pearson about +0.018). Phone and sentence metrics are unchanged within
+  seed-to-seed spread. The gain is small, and both seeds share one 13-speaker
+  validation set, so it is consistent in direction rather than established.
+- No metric regressed beyond seed noise, so A0-rebalance replaces A0 as the
+  reference for steps 3.3-3.5. The adult/child gap is unchanged.
