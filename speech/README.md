@@ -180,9 +180,14 @@ Compare runs with `uv run mlflow ui --backend-store-uri <mlflow_tracking_uri>`
 **Back up after every stage.** A rented instance can be released. Copy
 `$MANIFEST`, `$SPEECH_HOME/mlruns` (which holds each run's best
 checkpoint), `$SPEECH_HOME/artifacts/checkpoints` (needed to resume), and any
-reports off the instance. Raw audio, MFA output, and the feature
-cache can be rebuilt with the commands above. The whole A0 backup (manifest,
-both runs, checkpoints, logs) is under 60 MB.
+reports off the instance. Raw audio and the feature cache can be rebuilt
+with the commands above. Also keep the MFA output (5000 TextGrids, ~2 MB as
+a tarball) with the manifest it was aligned into:
+`tar czf mfa-output.tar.gz -C $PROC mfa-output`. On a new instance, after
+`download` and `uv sync`, restoring both skips the `aligner` env and
+alignment (~20 min): copy that manifest to `$MANIFEST`, run
+`tar xzf mfa-output.tar.gz -C $PROC`, then continue at the feature cache.
+The whole A0 backup (manifest, both runs, checkpoints, logs) is under 60 MB.
 
 Observed on the 2026-10-23 rebuild (RTX 3090, 6 vCPU): download ~1 min from
 the elda mirror, MFA alignment of 5000 utterances ~5 min, feature
