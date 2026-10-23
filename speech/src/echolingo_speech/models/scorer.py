@@ -3,7 +3,8 @@
 Three pooling levels over frozen Wav2Vec2 hidden states feed six heads:
 sentence accuracy/fluency/prosodic/completeness (attentive statistics pooling
 + explicit acoustic features), word accuracy/stress (mean-pooled word spans),
-and phoneme accuracy (mean-pooled phone spans). The encoder itself never
+and phoneme accuracy (mean-pooled phone spans), plus optional heads for the
+experts' score spread at each level (M3 A0-Rater). The encoder itself never
 appears here -- `training/dataset.py` already loads its frozen hidden states
 from M1's cache, so this module only ever sees `(T, 768)` tensors.
 """
@@ -64,6 +65,7 @@ class SpeechEvaluatorA0(nn.Module):
         use_canonical_phones: bool = False,
         phone_embedding_dim: int = 32,
         num_hidden_layers: int = 1,
+        predict_rater_spread: bool = False,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -79,6 +81,7 @@ class SpeechEvaluatorA0(nn.Module):
             "use_canonical_phones": use_canonical_phones,
             "phone_embedding_dim": phone_embedding_dim,
             "num_hidden_layers": num_hidden_layers,
+            "predict_rater_spread": predict_rater_spread,
         }
         # Several cached encoder layers are mixed by a learned softmax weight
         # per layer (initially uniform) before any pooling.
@@ -119,6 +122,13 @@ class SpeechEvaluatorA0(nn.Module):
             nn.Linear(span_input_dim, phone_trunk_dim), nn.ReLU(), nn.Dropout(dropout)
         )
         self.phone_accuracy_head = nn.Linear(phone_trunk_dim, 1)
+
+        # Expert spread (std on [0, 1]) read off the same trunks: one output
+        # per sentence target, one per word, one per phone.
+        if predict_rater_spread:
+            self.sentence_spread_head = nn.Linear(sentence_trunk_dim, len(SENTENCE_TARGET_KEYS))
+            self.word_spread_head = nn.Linear(word_trunk_dim, 1)
+            self.phone_spread_head = nn.Linear(phone_trunk_dim, 1)
 
     def set_acoustic_normalization(self, mean: torch.Tensor, std: torch.Tensor) -> None:
         if not self.config["normalize_acoustic_features"]:
@@ -164,9 +174,12 @@ class SpeechEvaluatorA0(nn.Module):
             dim=-1,
         )  # (B, 4), column order == SENTENCE_TARGET_KEYS == dataset.py's target order
 
+        predict_spread = self.config["predict_rater_spread"]
         word_accuracy: list[torch.Tensor] = []
         word_stress_logit: list[torch.Tensor] = []
         phone_accuracy: list[torch.Tensor] = []
+        word_spread: list[torch.Tensor] = []
+        phone_spread: list[torch.Tensor] = []
 
         for b in range(hidden_states.shape[0]):
             word_pooled = _pool_spans(hidden_states[b], batch["word_examples"][b])
@@ -179,6 +192,10 @@ class SpeechEvaluatorA0(nn.Module):
                 torch.sigmoid(self.word_accuracy_head(word_trunk_out)).squeeze(-1)
             )
             word_stress_logit.append(self.word_stress_head(word_trunk_out).squeeze(-1))
+            if predict_spread:
+                word_spread.append(
+                    torch.sigmoid(self.word_spread_head(word_trunk_out)).squeeze(-1)
+                )
 
             phone_pooled = _pool_spans(hidden_states[b], batch["phone_examples"][b])
             if self.config["use_canonical_phones"]:
@@ -192,10 +209,21 @@ class SpeechEvaluatorA0(nn.Module):
             phone_accuracy.append(
                 torch.sigmoid(self.phone_accuracy_head(phone_trunk_out)).squeeze(-1)
             )
+            if predict_spread:
+                phone_spread.append(
+                    torch.sigmoid(self.phone_spread_head(phone_trunk_out)).squeeze(-1)
+                )
 
-        return {
+        outputs = {
             "sentence_scores": sentence_scores,
             "word_accuracy": word_accuracy,
             "word_stress_logit": word_stress_logit,
             "phone_accuracy": phone_accuracy,
         }
+        if predict_spread:
+            outputs["sentence_spread"] = torch.sigmoid(
+                self.sentence_spread_head(sentence_trunk_out)
+            )  # (B, 4), column order == SENTENCE_TARGET_KEYS
+            outputs["word_spread"] = word_spread
+            outputs["phone_spread"] = phone_spread
+        return outputs

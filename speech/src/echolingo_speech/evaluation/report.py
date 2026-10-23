@@ -43,6 +43,12 @@ class ScorePairs:
     word_accuracy_targets: list[float] = field(default_factory=list)
     phone_accuracy_preds: list[float] = field(default_factory=list)
     phone_accuracy_targets: list[float] = field(default_factory=list)
+    # Predicted vs observed expert spread, keyed `sentence_<target>`, `word`,
+    # `phone`; empty unless the scorer predicts rater spread.
+    spread_preds: dict[str, list[float]] = field(default_factory=dict)
+    spread_targets: dict[str, list[float]] = field(default_factory=dict)
+    # Mean rater-spread loss over the pass, when that term is trained.
+    spread_loss: float | None = None
 
 
 def _to_raw_scale(values: list[float], scale: float) -> list[float]:
@@ -97,5 +103,13 @@ def assemble_metrics(
         metrics[f"{level}_error_detection_average_precision"] = average_precision(
             preds, targets, error_detection_threshold
         )
+
+    # Spread stays on the [0, 1] scale: it is an internal signal, not a score.
+    for key, preds in pairs.spread_preds.items():
+        targets = pairs.spread_targets[key]
+        if not preds:
+            continue
+        metrics[f"rater_spread_{key}_pearson"] = pearson_correlation(preds, targets)
+        metrics[f"rater_spread_{key}_mae"] = mean_absolute_error(preds, targets)
 
     return metrics

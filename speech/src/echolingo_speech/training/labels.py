@@ -64,6 +64,46 @@ def normalize_phone_accuracy(raw: float) -> float:
     return raw / PHONE_SCALE
 
 
+# `scores-detail.json` keeps each of the five experts' raw scores. Its sentence
+# completeness is a 0-1 ratio (scores.json's is that ratio x 10); every other
+# field shares scores.json's scale. Phone scores are 0/1/2 per expert.
+RATER_COMPLETENESS_SCALE = 1.0
+
+
+def _mean_and_spread(values: list[float], scale: float) -> tuple[float, float]:
+    """Mean and population standard deviation of `values / scale`."""
+    normalized = [value / scale for value in values]
+    mean = sum(normalized) / len(normalized)
+    variance = sum((value - mean) ** 2 for value in normalized) / len(normalized)
+    return mean, variance**0.5
+
+
+def rater_sentence_targets(raters: dict) -> tuple[dict[str, float], dict[str, float]]:
+    """The experts' mean and spread for each sentence target, both on [0, 1]."""
+    centers: dict[str, float] = {}
+    spreads: dict[str, float] = {}
+    for key in SENTENCE_TARGET_KEYS:
+        scale = RATER_COMPLETENESS_SCALE if key == "completeness" else SENTENCE_SCALE
+        centers[key], spreads[key] = _mean_and_spread(raters[key], scale)
+    return centers, spreads
+
+
+def rater_word_targets(raters: dict) -> dict[str, float]:
+    """Word accuracy mean and spread on [0, 1], and stress as the fraction of
+    experts who marked it correct (a soft target for the stress BCE)."""
+    for value in raters["stress"]:
+        if value not in (STRESS_MISPLACED_RAW, STRESS_CORRECT_RAW):
+            raise ValueError(f"unexpected rater word stress value: {value!r}")
+    accuracy, accuracy_spread = _mean_and_spread(raters["accuracy"], WORD_SCALE)
+    stress = sum(value == STRESS_CORRECT_RAW for value in raters["stress"]) / len(raters["stress"])
+    return {"accuracy": accuracy, "accuracy_spread": accuracy_spread, "stress": stress}
+
+
+def rater_phone_targets(raters: list[float]) -> tuple[float, float]:
+    """One phone's expert mean and spread on [0, 1]."""
+    return _mean_and_spread(raters, PHONE_SCALE)
+
+
 def canonical_phone_id(phone: str) -> int:
     """Map a canonical phone label (e.g. `AH0`, `IH`) to its base-phone id."""
     return _PHONE_TO_ID.get(phone.rstrip("012"), UNKNOWN_PHONE_ID)

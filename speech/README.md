@@ -147,6 +147,26 @@ uv run python -m echolingo_speech.training.loop evaluate --config configs/speech
   --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0-seed42/best.pt --partition test --out a0-seed42-test.json
 ```
 
+M3 A0-Rater (validation only until a candidate is final). `build-manifest`
+stores the five experts' raw scores from `scores-detail.json` under
+`scores["raters"]`; a manifest built before that (for example a backup) gets
+them with `attach-raters`, which rewrites it in place:
+
+```bash
+uv run python -m echolingo_speech.data.speechocean attach-raters --raw-root $RAW --manifest $MANIFEST
+
+# Single-expert agreement: a human reference for the scorer's metrics
+uv run python -m echolingo_speech.evaluation.rater_agreement --manifest $MANIFEST --partition validation --out rater-agreement-validation.json
+
+# 3.1a expert-mean targets, then 3.1b spread heads, two seeds each
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-rater-mean.yaml --manifest $MANIFEST --seed $seed --run-name a0rm-seed$seed
+done
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-rater-mean-spread.yaml --manifest $MANIFEST --seed $seed --run-name a0rms-seed$seed
+done
+```
+
 Reproducibility checks before trusting the rebuild:
 
 - the tarball SHA-256 equals `tarball_sha256` in `configs/datasets/speechocean762.yaml`;

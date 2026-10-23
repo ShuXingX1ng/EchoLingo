@@ -1,0 +1,30 @@
+# M3 step 3.1a A0-Rater (roadmap SS18.3): the M2.5 candidate
+# (a0-rebalance-acnorm-phones-layers.yaml) trained on the five experts' mean
+# instead of the official aggregate (median for sentence and word; phones
+# were already a mean). Word stress becomes the fraction of experts marking
+# it correct. Validation and test keep the official labels. Only that one
+# factor changes. Needs rater scores in the manifest (`build-manifest` adds
+# them; `speechocean attach-raters` adds them to an older manifest). Two runs
+# use this file with --seed 42 and --seed 1337 (--run-name a0rm-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+rater_mean_targets: true
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

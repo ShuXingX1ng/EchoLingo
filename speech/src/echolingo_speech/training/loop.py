@@ -75,6 +75,8 @@ def _move_batch_to_device(batch: dict, device: str) -> dict:
     moved = dict(batch)
     for key in ("hidden_states", "frame_mask", "sentence_targets", "acoustic_features"):
         moved[key] = batch[key].to(device)
+    if batch.get("sentence_spread") is not None:
+        moved["sentence_spread"] = batch["sentence_spread"].to(device)
     return moved
 
 
@@ -83,6 +85,9 @@ def _loss_weights(training_config: TrainingConfig | None) -> dict[str, float]:
     return {
         "word_accuracy_weight": config.word_accuracy_weight,
         "word_stress_weight": config.word_stress_weight,
+        "rater_spread_weight": (
+            config.rater_spread_weight if config.predict_rater_spread else 0.0
+        ),
     }
 
 
@@ -116,11 +121,14 @@ def _score_pass(
     device: str,
     training_config: TrainingConfig | None = None,
 ) -> tuple[float, ScorePairs]:
-    """One pass without gradients: mean training loss plus every mask-valid
-    prediction/target pair."""
+    """One pass without gradients: mean scoring loss (the training loss
+    without the rater-spread term, so validation loss means the same thing
+    with or without spread heads), mean spread loss when it is trained, and
+    every mask-valid prediction/target pair."""
     weights = _loss_weights(training_config)
     model.eval()
     total_loss = 0.0
+    spread_loss = 0.0
     num_batches = 0
     pairs = ScorePairs()
 
@@ -128,8 +136,12 @@ def _score_pass(
         batch = _move_batch_to_device(batch, device)
         predictions = model(batch)
         losses = compute_total_loss(predictions, batch, **weights)
-        total_loss += losses["total"].item()
+        total_loss += losses["scoring"].item()
         num_batches += 1
+        if "spread" in losses:
+            spread_loss += losses["spread"].item()
+        if "sentence_spread" in predictions:
+            _collect_spread_pairs(pairs, predictions, batch)
 
         scores = predictions["sentence_scores"].cpu()
         targets = batch["sentence_targets"].cpu()
@@ -151,7 +163,30 @@ def _score_pass(
             pairs.phone_accuracy_preds.extend(pred_tensor.cpu().tolist())
             pairs.phone_accuracy_targets.extend(example.accuracy for example in examples)
 
+    if weights["rater_spread_weight"] > 0:
+        pairs.spread_loss = spread_loss / max(1, num_batches)
     return total_loss / max(1, num_batches), pairs
+
+
+def _collect_spread_pairs(pairs: ScorePairs, predictions: dict, batch: dict) -> None:
+    def extend(key: str, preds: list[float], targets: list[float]) -> None:
+        pairs.spread_preds.setdefault(key, []).extend(preds)
+        pairs.spread_targets.setdefault(key, []).extend(targets)
+
+    spread_preds = predictions["sentence_spread"].cpu()
+    spread_targets = batch["sentence_spread"].cpu()
+    for i, key in enumerate(SENTENCE_TARGET_KEYS):
+        extend(f"sentence_{key}", spread_preds[:, i].tolist(), spread_targets[:, i].tolist())
+    for level in ("word", "phone"):
+        for pred_tensor, examples in zip(
+            predictions[f"{level}_spread"], batch[f"{level}_examples"]
+        ):
+            if examples:
+                extend(
+                    level,
+                    pred_tensor.cpu().tolist(),
+                    [example.accuracy_spread for example in examples],
+                )
 
 
 def evaluate(
@@ -169,6 +204,8 @@ def evaluate(
     """
     loss, pairs = _score_pass(model, loader, device, training_config)
     metrics: dict = {"loss": loss}
+    if pairs.spread_loss is not None:
+        metrics["rater_spread_loss"] = pairs.spread_loss
     metrics.update(
         assemble_metrics(
             pairs,
@@ -246,6 +283,7 @@ def fit(
         normalize_acoustic_features=training_config.normalize_acoustic_features,
         use_canonical_phones=training_config.use_canonical_phones,
         num_hidden_layers=len(training_config.hidden_state_layers or [None]),
+        predict_rater_spread=training_config.predict_rater_spread,
     ).to(resolved_device)
     if training_config.normalize_acoustic_features:
         mean, std = acoustic_feature_statistics(train_loader)
@@ -385,9 +423,14 @@ def _partition_loader(
     *,
     shuffle: bool,
     hidden_state_layers: list[int] | None = None,
+    rater_targets: bool = False,
 ) -> DataLoader:
     dataset = SpeechOceanScoringDataset(
-        manifest_path, processed_root, partition=partition, hidden_state_layers=hidden_state_layers
+        manifest_path,
+        processed_root,
+        partition=partition,
+        hidden_state_layers=hidden_state_layers,
+        rater_targets=rater_targets,
     )
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
@@ -406,13 +449,15 @@ def run_training(
     resume: bool = False,
 ) -> tuple[SpeechEvaluatorA0, dict]:
     """`fit` over the manifest's train/validation partitions, optionally
-    followed by a test-partition evaluation of the best model.
+    followed by a test-partition evaluation of the best model. Only the train
+    partition ever uses rater-mean targets.
     """
     resolved_device = resolve_device(device)
     batch_size = training_config.batch_size
     train_loader = _partition_loader(
         manifest_path, processed_root, "train", batch_size, shuffle=True,
         hidden_state_layers=training_config.hidden_state_layers,
+        rater_targets=training_config.rater_mean_targets,
     )
     val_loader = _partition_loader(
         manifest_path, processed_root, "validation", batch_size, shuffle=False,

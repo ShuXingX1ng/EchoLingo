@@ -9,6 +9,11 @@ weights. Huber (Smooth L1) is used for every regression target -- more
 robust than MSE to the rare severe-mispronunciation outlier scores without
 losing convexity; word stress is a dedicated BCE term since the real label is
 strictly binary (see `training/labels.py`), not a regression target.
+
+The optional rater-spread term (M3 A0-Rater) sits outside those three
+weights: `compute_total_loss` adds it to `total` with its own
+`rater_spread_weight`, and also returns `scoring`, the total without it, so
+early stopping can keep A0's definition of validation loss.
 """
 
 from __future__ import annotations
@@ -93,12 +98,43 @@ def phone_loss(phone_accuracy: list[torch.Tensor], phone_examples: list[list]) -
     return F.huber_loss(torch.cat(predictions), torch.cat(targets), reduction="mean")
 
 
+def rater_spread_loss(predictions: dict, batch: dict) -> torch.Tensor:
+    """Mean of the sentence, word and phone Huber terms between predicted and
+    observed expert spread, over the levels that have examples in the batch.
+    Words and phones are pooled flat across records; word examples of a
+    record with an invalid word alignment are already empty."""
+    if batch.get("sentence_spread") is None:
+        raise ValueError("rater spread loss needs rater scores on every record")
+
+    terms = [F.huber_loss(predictions["sentence_spread"], batch["sentence_spread"])]
+    for level, examples_key in (("word", "word_examples"), ("phone", "phone_examples")):
+        preds = [
+            pred
+            for pred, examples in zip(predictions[f"{level}_spread"], batch[examples_key])
+            if examples
+        ]
+        if not preds:
+            continue
+        targets = [
+            torch.tensor(
+                [example.accuracy_spread for example in examples],
+                dtype=pred.dtype,
+                device=pred.device,
+            )
+            for pred, examples in zip(predictions[f"{level}_spread"], batch[examples_key])
+            if examples
+        ]
+        terms.append(F.huber_loss(torch.cat(preds), torch.cat(targets)))
+    return torch.stack(terms).mean()
+
+
 def compute_total_loss(
     predictions: dict,
     batch: dict,
     *,
     word_accuracy_weight: float = 0.5,
     word_stress_weight: float = 0.5,
+    rater_spread_weight: float = 0.0,
 ) -> dict[str, torch.Tensor]:
     l_sentence = sentence_loss(predictions["sentence_scores"], batch["sentence_targets"])
     l_word = word_loss(
@@ -112,4 +148,8 @@ def compute_total_loss(
     l_phone = phone_loss(predictions["phone_accuracy"], batch["phone_examples"])
 
     total = SENTENCE_WEIGHT * l_sentence + WORD_WEIGHT * l_word + PHONE_WEIGHT * l_phone
-    return {"total": total, "sentence": l_sentence, "word": l_word, "phone": l_phone}
+    losses = {"scoring": total, "sentence": l_sentence, "word": l_word, "phone": l_phone}
+    if rater_spread_weight > 0:
+        losses["spread"] = rater_spread_loss(predictions, batch)
+        total = total + rater_spread_weight * losses["spread"]
+    return {"total": total, **losses}

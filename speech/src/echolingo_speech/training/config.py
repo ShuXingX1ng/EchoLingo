@@ -32,6 +32,14 @@ class TrainingConfig(BaseModel):
     # Wav2Vec2 layers to mix (needs `features.cache extract-layers`); None
     # means the last layer from the original cache.
     hidden_state_layers: list[int] | None = None
+    # M3 A0-Rater: train on the five experts' mean (`scores["raters"]`) instead
+    # of the official aggregate. Validation and test always keep the official
+    # labels, so early stopping, thresholds and metrics stay comparable.
+    rater_mean_targets: bool = False
+    # Auxiliary heads that predict the experts' spread (std) at every level,
+    # weighted by `rater_spread_weight` in the total loss. Internal only.
+    predict_rater_spread: bool = False
+    rater_spread_weight: float = 1.0
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

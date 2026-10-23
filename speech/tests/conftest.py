@@ -85,6 +85,7 @@ def speechocean_mini_corpus(tmp_path: Path) -> Path:
     _build_split(corpus_dir, "test", _TEST_SPEAKERS)
 
     scores = {}
+    scores_detail = {}
     for speakers in (_TRAIN_SPEAKERS, _TEST_SPEAKERS):
         for speaker_id, _age_group, _gender in speakers:
             for i in range(2):
@@ -96,8 +97,34 @@ def speechocean_mini_corpus(tmp_path: Path) -> Path:
                     "prosodic": 7,
                     "total": 7,
                     "words": [
-                        {"text": "the", "accuracy": 2, "stress": 1, "total": 2, "phones": []},
+                        {
+                            "text": "THE",
+                            "accuracy": 8,
+                            "stress": 10,
+                            "total": 8,
+                            "phones": ["DH", "AH0"],
+                            "phones-accuracy": [2.0, 1.4],
+                        },
+                    ],
+                }
+                scores_detail[utt_id] = {
+                    "text": "THE QUICK BROWN FOX",
+                    "accuracy": [8.0, 8.0, 7.0, 9.0, 8.0],
+                    "completeness": [1.0, 1.0, 1.0, 1.0, 1.0],
+                    "fluency": [7.0, 6.0, 7.0, 8.0, 7.0],
+                    "prosodic": [7.0, 7.0, 7.0, 7.0, 7.0],
+                    "total": [7.6, 7.2, 7.0, 8.2, 7.6],
+                    "words": [
+                        {
+                            "text": "THE",
+                            "accuracy": [8.0, 10.0, 6.0, 8.0, 8.0],
+                            "stress": [10.0, 10.0, 10.0, 10.0, 10.0],
+                            "total": [8.0, 10.0, 6.0, 8.0, 8.0],
+                            "ref-phones": "DH AH0",
+                            "phones": ["DH AH0", "DH {AH0}", "DH (AH0)", "DH [L] AH0", "DH {AH0}"],
+                        },
                     ],
                 }
     (corpus_dir / "scores.json").write_text(json.dumps(scores), encoding="utf-8")
+    (corpus_dir / "scores-detail.json").write_text(json.dumps(scores_detail), encoding="utf-8")
     return corpus_dir

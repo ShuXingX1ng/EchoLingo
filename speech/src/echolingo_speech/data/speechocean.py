@@ -1,7 +1,8 @@
 """SpeechOcean762 download, Kaldi-format parsing, speaker-stratified split, and
 Speech Dataset Manifest construction.
 
-CLI: `python -m echolingo_speech.data.speechocean {download,build-manifest,audit-leakage}`
+CLI: `python -m echolingo_speech.data.speechocean
+{download,build-manifest,attach-raters,audit-leakage}`
 
 Nothing here trains or scores anything; it only produces the immutable raw copy,
 the fixed speaker-independent split, and the base manifest fields (`alignment` and
@@ -217,6 +218,100 @@ def _load_scores(corpus_dir: Path) -> dict[str, dict]:
     raise FileNotFoundError(f"scores.json not found under {corpus_dir} or {corpus_dir}/resource")
 
 
+RATER_COUNT = 5
+# scores-detail.json writes each expert's phone scores inline in the phone
+# string: a bare phone scored 2, `{P}` 1, `(P)` 0, and `[P]` an inserted phone
+# that has no canonical position (and no score).
+_RATER_PHONE_SCORES = {"{": 1.0, "(": 0.0}
+
+
+def _load_rater_detail(corpus_dir: Path) -> dict[str, dict]:
+    for candidate in (
+        corpus_dir / "scores-detail.json",
+        corpus_dir / "resource" / "scores-detail.json",
+    ):
+        if candidate.is_file():
+            return json.loads(candidate.read_text(encoding="utf-8"))
+    raise FileNotFoundError(
+        f"scores-detail.json not found under {corpus_dir} or {corpus_dir}/resource"
+    )
+
+
+def parse_rater_phones(notation: str) -> list[float]:
+    """One expert's phone string for a word -> that expert's score for each
+    canonical phone, in order, with inserted phones dropped."""
+    scores: list[float] = []
+    for token in notation.split():
+        if token.startswith("["):
+            continue
+        scores.append(_RATER_PHONE_SCORES.get(token[0], 2.0))
+    return scores
+
+
+def rater_scores(utt_id: str, detail: dict, words: list[dict]) -> dict:
+    """The five experts' raw scores for one utterance, checked against its
+    aggregated `scores.json` words so word and phone positions line up.
+
+    Returns `{"sentence": {key: [5 scores]}, "words": [{"accuracy": [...],
+    "stress": [...], "phones-accuracy": [[5 scores] per canonical phone]}]}`.
+    """
+
+    def check_count(values: list, what: str) -> list:
+        if len(values) != RATER_COUNT:
+            raise ValueError(f"{utt_id}: {what} has {len(values)} rater scores, not {RATER_COUNT}")
+        return values
+
+    sentence = {
+        key: check_count(detail[key], key)
+        for key in ("accuracy", "fluency", "prosodic", "completeness")
+    }
+    if len(detail["words"]) != len(words):
+        raise ValueError(
+            f"{utt_id}: scores-detail.json has {len(detail['words'])} words, "
+            f"scores.json has {len(words)}"
+        )
+
+    rater_words = []
+    for index, (detail_word, word) in enumerate(zip(detail["words"], words)):
+        if detail_word["text"] != word["text"]:
+            raise ValueError(
+                f"{utt_id} word {index}: {detail_word['text']!r} != {word['text']!r}"
+            )
+        per_rater = [
+            parse_rater_phones(notation)
+            for notation in check_count(detail_word["phones"], f"word {index} phones")
+        ]
+        phone_count = len(word["phones-accuracy"])
+        if any(len(scores) != phone_count for scores in per_rater):
+            raise ValueError(
+                f"{utt_id} word {index}: rater phone counts {[len(s) for s in per_rater]} "
+                f"!= {phone_count} canonical phones"
+            )
+        rater_words.append(
+            {
+                "accuracy": check_count(detail_word["accuracy"], f"word {index} accuracy"),
+                "stress": check_count(detail_word["stress"], f"word {index} stress"),
+                "phones-accuracy": [list(scores) for scores in zip(*per_rater)],
+            }
+        )
+    return {"sentence": sentence, "words": rater_words}
+
+
+def utt_id_from_sample_id(sample_id: str) -> str:
+    """`SPEAKER0001_000010011` -> `000010011`."""
+    return sample_id.partition("_")[2]
+
+
+def attach_rater_scores(records: list[ManifestRecord], corpus_dir: Path) -> None:
+    """Add `scores["raters"]` (see `rater_scores`) to every record in place."""
+    detail = _load_rater_detail(corpus_dir)
+    for record in records:
+        utt_id = utt_id_from_sample_id(record.sample_id)
+        if utt_id not in detail:
+            raise ValueError(f"{record.sample_id}: no entry in scores-detail.json")
+        record.scores["raters"] = rater_scores(utt_id, detail[utt_id], record.scores["words"])
+
+
 def stratified_validation_speakers(
     train_utterances: dict[str, dict],
     *,
@@ -305,6 +400,7 @@ def build_manifest(
                     derivation=DerivationInfo(code_version=code_version, generated_at=generated_at),
                 )
             )
+    attach_rater_scores(records, corpus_dir)
     return records
 
 
@@ -346,6 +442,13 @@ def _cli(argv: list[str] | None = None) -> int:
     manifest_parser.add_argument("--out", type=Path, required=True)
     manifest_parser.add_argument("--validation-ratio", type=float, default=DEFAULT_VALIDATION_RATIO)
     manifest_parser.add_argument("--split-seed", type=int, default=DEFAULT_SPLIT_SEED)
+
+    raters_parser = subparsers.add_parser(
+        "attach-raters",
+        help="Add the five experts' raw scores to an existing manifest, in place",
+    )
+    raters_parser.add_argument("--raw-root", type=Path, required=True)
+    raters_parser.add_argument("--manifest", type=Path, required=True)
 
     audit_parser = subparsers.add_parser(
         "audit-leakage", help="Audit an existing manifest for leakage"
@@ -390,6 +493,16 @@ def _cli(argv: list[str] | None = None) -> int:
         for violation in result.violations:
             print(f"    - {violation}")
         return 0 if result.ok else 1
+
+    if args.command == "attach-raters":
+        from echolingo_speech.data.manifest import read_jsonl
+
+        corpus_dir, _ = download(args.raw_root)
+        records = read_jsonl(args.manifest)
+        attach_rater_scores(records, corpus_dir)
+        write_jsonl(args.manifest, records)
+        print(f"OK: attached rater scores to {len(records)} records in {args.manifest}")
+        return 0
 
     if args.command == "audit-leakage":
         from echolingo_speech.data.manifest import read_jsonl
