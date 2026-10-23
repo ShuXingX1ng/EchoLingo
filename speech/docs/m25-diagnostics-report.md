@@ -246,3 +246,60 @@ Findings:
 - Error-class predictions still rarely cross 0.6 (0.2-0.5% of words), so the
   validation-chosen cut from step 3.1 remains necessary.
 - A0-rebalance-acnorm-phones replaces the SS8 reference for step 3.5.
+
+## 10. Step 3.5 applied: five encoder layers
+
+`configs/training/a0-rebalance-acnorm-phones-layers.yaml` = the SS9 reference
+reading Wav2Vec2 layers 4, 6, 8, 10 and 12 (fp16 cache from
+`features.cache extract-layers`; layer 12 matches the original cache within
+fp16 rounding, max difference 0.00098 on 50 sampled utterances), mixed by a
+learned softmax weight per layer. Runs `a0rnpl-seed42` (36 epochs) and
+`a0rnpl-seed1337` (35 epochs) at commit `a755d58`. Validation only.
+
+| Validation (seed 42 / 1337) | SS9 reference | + five layers | Change |
+|---|---|---|---|
+| Sentence accuracy Pearson | 0.767 / 0.757 | 0.810 / 0.817 | +0.043 / +0.060 |
+| Sentence accuracy MAE (0-10) | 0.869 / 0.881 | 0.798 / 0.789 | -0.071 / -0.092 |
+| Sentence fluency Pearson | 0.828 / 0.820 | 0.860 / 0.862 | +0.032 / +0.042 |
+| Sentence fluency MAE (0-10) | 0.638 / 0.627 | 0.571 / 0.570 | -0.067 / -0.057 |
+| Sentence prosodic Pearson | 0.809 / 0.799 | 0.846 / 0.854 | +0.037 / +0.055 |
+| Word average precision | 0.375 / 0.441 | 0.443 / 0.462 | +0.068 / +0.021 |
+| Phone average precision | 0.283 / 0.313 | 0.331 / 0.333 | +0.048 / +0.020 |
+| Word accuracy Pearson | 0.399 / 0.445 | 0.458 / 0.463 | +0.059 / +0.018 |
+| Phone accuracy Pearson | 0.396 / 0.421 | 0.444 / 0.447 | +0.048 / +0.026 |
+| Word / phone accuracy MAE | 1.205 / 1.103, 0.251 / 0.244 | 1.130 / 1.075, 0.228 / 0.230 | lower |
+| Adult sentence fluency Pearson | 0.881 / 0.881 | 0.908 / 0.904 | |
+| Child word accuracy Pearson | 0.211 / 0.181 | 0.257 / 0.260 | |
+
+Learned layer weights (softmax, layers 4/6/8/10/12): seed 42
+0.247/0.211/0.241/0.153/0.148, seed 1337 0.244/0.210/0.239/0.156/0.152. Both
+seeds put the least weight on the final layer and the most on layers 4 and 8.
+
+Findings:
+
+- SS18.2 #4 is confirmed: middle layers carry pronunciation information the
+  CTC-specialised final layer has lost, and the model learns that the same
+  way on both seeds. Every metric at every level improves on both seeds, and
+  the seeds now agree closely at word level (AP 0.443 / 0.462).
+- The train/validation loss gap widens (train 0.006, validation 0.017-0.019
+  near the end), so the larger input is closer to overfitting; early
+  stopping handled it here.
+- A0-rebalance-acnorm-phones-layers is the M2.5 candidate.
+
+## 11. M2.5 summary (validation, seed 42 / 1337)
+
+| | A0 | M2.5 candidate |
+|---|---|---|
+| Sentence accuracy Pearson | 0.732 / 0.755 | 0.810 / 0.817 |
+| Sentence fluency Pearson | 0.786 / 0.798 | 0.860 / 0.862 |
+| Word average precision (chance 0.134) | 0.311 / 0.312 | 0.443 / 0.462 |
+| Phone average precision (chance 0.087) | 0.260 / 0.265 | 0.331 / 0.333 |
+| Word accuracy Pearson | 0.344 / 0.347 | 0.458 / 0.463 |
+| Phone accuracy Pearson | 0.364 / 0.359 | 0.444 / 0.447 |
+| Word macro F1 (A0: fixed 0.6; candidate: validation-chosen cut, optimistic) | 0.464 / 0.464 | 0.700 / 0.701 |
+
+All of this is validation evidence; every change was selected on it. The
+SS18.3 completion check (word error-detection macro F1 above the no-learning
+baseline on both seeds, sentence accuracy/fluency not below A0) is to be
+confirmed by one sealed-test evaluation of this candidate with its saved
+thresholds.
