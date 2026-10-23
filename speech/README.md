@@ -3,8 +3,9 @@
 Read Aloud Speech Evaluator package. See `docs/SPEECH_EVALUATOR_ROADMAP.md`
 and ADR 0011-0013 for the full plan. Current status: M0 (environment
 skeleton), M1 (SpeechOcean762 data pipeline), and M2 (A0 frozen-encoder
-baseline -- see `docs/m2-acceptance-report.md`) are complete. No Bundle
-export, Worker, or FastAPI integration (M4/M5) yet.
+baseline -- see `docs/m2-acceptance-report.md`) are complete, and A0 was
+reproduced on a rented GPU on 2026-10-23 (roadmap SS18). No Bundle export,
+Worker, or FastAPI integration (M4/M5) yet.
 
 ## Runtime environment
 
@@ -27,19 +28,24 @@ empty and must rebuild M1 and re-run A0 before any new experiment.
 
 ## Setup on a fresh Linux GPU instance
 
-Not yet executed on a rented instance (written 2026-10-11 from the CLI
-definitions in this package); correct this section after the first real run.
+Executed end to end on 2026-10-23 on a Featurize RTX 3090 instance (see
+"Featurize notes" below for that platform's specifics).
 
 ```bash
-# 1. Roots on the persistent data disk, not the system disk
+# 1. Roots on a fast local disk, not a network/sync mount
 export SPEECH_HOME=/path/to/data-disk/echolingo-speech
 mkdir -p $SPEECH_HOME/data/{raw,processed,benchmarks,consented}
-mkdir -p $SPEECH_HOME/artifacts/{hf-cache,mlruns,bundles}
+mkdir -p $SPEECH_HOME/artifacts/{hf-cache,bundles,checkpoints} $SPEECH_HOME/mlruns
 export HF_HOME=$SPEECH_HOME/artifacts/hf-cache
+# Keep the venv and uv cache off a slow repo mount
+export UV_PROJECT_ENVIRONMENT=$SPEECH_HOME/venv UV_CACHE_DIR=$SPEECH_HOME/uv-cache
 
 # 2. Python environment
 cd speech
 cp configs/speech.example.yaml configs/speech.yaml   # set data_root, artifact_root, mlflow_tracking_uri
+# mlflow_tracking_uri must NOT be under a directory named "artifacts": MLflow's
+# file store rejects such runs ("Run ... not found" on the first start_run).
+# Use file://$SPEECH_HOME/mlruns; `config validate` refuses the bad layout.
 uv sync
 
 # 3. MFA (conda env must be named `aligner`)
@@ -57,9 +63,14 @@ uv run pytest tests/ -v          # gpu/network-marked tests skip cleanly if unav
 uv run ruff check src/ tests/
 ```
 
-If Hugging Face is slow or unreachable from the instance, point `HF_ENDPOINT`
-at a mirror before step 4; the encoder revision is pinned by commit, so a
-mirror must serve that same commit.
+If Hugging Face is slow or unreachable from the instance (it returned HTTP 429
+from Featurize), set `HF_ENDPOINT=https://hf-mirror.com` before step 4; the
+encoder revision is pinned by commit, so a mirror must serve that same commit.
+
+The RTX 5090 (Blackwell) is not supported by the locked torch 2.5.1+cu121
+wheel; use an Ampere/Ada 24 GB card (3090, 4090, A5000). The host driver must
+be >= 530. The image's own PyTorch is irrelevant: `uv sync` installs the
+locked one into its own venv.
 
 ## Rebuilding M1 data and the A0 baseline
 
@@ -68,7 +79,11 @@ RAW=$SPEECH_HOME/data/raw/speechocean762
 PROC=$SPEECH_HOME/data/processed/speechocean762
 MANIFEST=$PROC/manifest.jsonl
 
-# Download + verify; prints the extracted corpus directory -> use it as CORPUS
+# Download + verify; prints the extracted corpus directory -> use it as CORPUS.
+# Mirrors are tried in order and the first (trmal) can be ~40 KB/s. A tarball
+# already at $RAW/speechocean762.tar.gz is not re-downloaded, so fetching it
+# from a fast mirror first is fine -- the SHA-256 is still checked:
+#   curl -L -o $RAW/speechocean762.tar.gz https://openslr.elda.org/resources/101/speechocean762.tar.gz
 uv run python -m echolingo_speech.data.speechocean download --raw-root $RAW
 CORPUS=<directory printed above>
 
@@ -121,10 +136,26 @@ Compare runs with `uv run mlflow ui --backend-store-uri <mlflow_tracking_uri>`
 (forward the port over SSH to view it from another machine).
 
 **Back up after every stage.** A rented instance can be released. Copy
-`$MANIFEST`, `$SPEECH_HOME/artifacts/mlruns` (which holds each run's best
+`$MANIFEST`, `$SPEECH_HOME/mlruns` (which holds each run's best
 checkpoint), `$SPEECH_HOME/artifacts/checkpoints` (needed to resume), and any
 reports off the instance. Raw audio, MFA output, and the feature
-cache can be rebuilt with the commands above.
+cache can be rebuilt with the commands above. The whole A0 backup (manifest,
+both runs, checkpoints, logs) is under 60 MB.
+
+Observed on the 2026-10-23 rebuild (RTX 3090, 6 vCPU): download ~1 min from
+the elda mirror, MFA alignment of 5000 utterances ~5 min, feature
+extraction ~2 min, each A0 seed ~10 min including dataset assembly, baseline
+~2 min.
+
+### Featurize notes
+
+- Only `~/work` survives returning an instance (cloud-synced, quota-limited,
+  slow I/O). Put the repo, an env file you `source`, and backups there; put
+  `$SPEECH_HOME` (data, venv, caches) on the local disk, e.g.
+  `/home/featurize/echolingo-speech`, and rebuild it on a new instance.
+- sshd reads public keys from `~/work/.ssh/authorized_keys`, not
+  `~/.ssh/authorized_keys`; a key placed there also persists across instances.
+- The base image's Miniconda is found automatically for the `aligner` env.
 
 ## Notes
 

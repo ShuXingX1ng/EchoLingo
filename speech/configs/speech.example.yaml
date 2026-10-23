@@ -4,7 +4,8 @@
 data_root: /home/zhe/echolingo-speech/data
 artifact_root: /home/zhe/echolingo-speech/artifacts
 
-mlflow_tracking_uri: file:///home/zhe/echolingo-speech/artifacts/mlruns
+# Keep the MLflow store outside artifact_root: MLflow rejects runs under a dir named "artifacts".
+mlflow_tracking_uri: file:///home/zhe/echolingo-speech/mlruns
 
 worker_host: localhost
 worker_port: 8100

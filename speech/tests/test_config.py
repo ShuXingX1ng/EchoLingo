@@ -10,7 +10,14 @@ from echolingo_speech.config import load_config
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _write_config(tmp_path: Path, *, data_root: Path, artifact_root: Path, revision: str) -> Path:
+def _write_config(
+    tmp_path: Path,
+    *,
+    data_root: Path,
+    artifact_root: Path,
+    revision: str,
+    tracking_uri: str | None = None,
+) -> Path:
     encoder_config = tmp_path / "encoder.yaml"
     encoder_config.write_text(
         yaml.safe_dump({"model_id": "facebook/wav2vec2-base-960h", "revision": revision})
@@ -22,7 +29,7 @@ def _write_config(tmp_path: Path, *, data_root: Path, artifact_root: Path, revis
             {
                 "data_root": str(data_root),
                 "artifact_root": str(artifact_root),
-                "mlflow_tracking_uri": f"file://{artifact_root}/mlruns",
+                "mlflow_tracking_uri": tracking_uri or f"file://{tmp_path}/mlruns",
                 "worker_host": "localhost",
                 "worker_port": 8100,
                 "encoder_config_path": "encoder.yaml",
@@ -82,12 +89,27 @@ def test_non_commit_revision_is_rejected(tmp_path):
         load_config(config_path)
 
 
+def test_tracking_uri_under_artifacts_dir_is_rejected(tmp_path):
+    data_root, artifact_root = _make_roots(tmp_path)
+    config_path = _write_config(
+        tmp_path,
+        data_root=data_root,
+        artifact_root=artifact_root,
+        revision="22aad52d435eb6dbaf354bdad9b0da84ce7d6156",
+        tracking_uri=f"file://{artifact_root}/mlruns",
+    )
+
+    with pytest.raises(ValueError, match="artifacts"):
+        load_config(config_path)
+
+
 def test_shipped_example_config_is_structurally_valid():
     example = REPO_ROOT / "configs" / "speech.example.yaml"
     raw = yaml.safe_load(example.read_text(encoding="utf-8"))
     assert "data_root" in raw
     assert "artifact_root" in raw
     assert "encoder_config_path" in raw
+    assert "artifacts" not in Path(raw["mlflow_tracking_uri"].removeprefix("file://")).parts
 
     encoder_path = example.parent / raw["encoder_config_path"]
     encoder_raw = yaml.safe_load(encoder_path.read_text(encoding="utf-8"))

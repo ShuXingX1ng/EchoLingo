@@ -11,7 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DATA_SUBDIRS = ("raw", "processed", "benchmarks", "consented")
-ARTIFACT_SUBDIRS = ("hf-cache", "mlruns", "bundles")
+# The MLflow store is not here: MLflow rejects runs under a directory named
+# "artifacts", so mlflow_tracking_uri points outside artifact_root.
+ARTIFACT_SUBDIRS = ("hf-cache", "bundles")
 
 
 @dataclass(frozen=True)
@@ -38,10 +40,6 @@ class SpeechPaths:
     @property
     def hf_cache(self) -> Path:
         return self.artifact_root / "hf-cache"
-
-    @property
-    def mlruns(self) -> Path:
-        return self.artifact_root / "mlruns"
 
     @property
     def bundles(self) -> Path:

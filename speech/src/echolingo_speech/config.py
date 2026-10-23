@@ -11,6 +11,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from pydantic import BaseModel, field_validator
@@ -60,6 +61,20 @@ class SpeechConfig(BaseModel):
         except OSError as exc:
             raise ValueError(f"path is not writable: {resolved} ({exc})") from exc
         return resolved
+
+    @field_validator("mlflow_tracking_uri")
+    @classmethod
+    def _file_store_not_under_artifacts_dir(cls, value: str) -> str:
+        # MLflow's file store refuses any run whose path has a directory named
+        # "artifacts" above it (path-traversal guard), so a store at
+        # <artifact_root>/mlruns fails on the first start_run with "Run not found".
+        parsed = urlparse(value)
+        if parsed.scheme == "file" and "artifacts" in Path(parsed.path).parts:
+            raise ValueError(
+                "mlflow_tracking_uri must not sit under a directory named 'artifacts' "
+                f"(MLflow rejects such runs): {value}"
+            )
+        return value
 
 
 def load_config(config_path: Path) -> SpeechConfig:

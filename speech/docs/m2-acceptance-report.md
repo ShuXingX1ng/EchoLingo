@@ -87,3 +87,39 @@ error-detection does not yet. M2's frozen-encoder code and two-seed benchmark
 are complete enough to move into M3 candidate experiments, with closing the
 word-level error-detection gap (e.g. rater-disagreement labels, or the A1
 encoder adapter) as an explicit target rather than an assumed side effect.
+
+## 6. Reproduction on a rented GPU (2026-10-23)
+
+The original machine and its MLflow runs were lost (ADR-0014), so A0 was
+rebuilt from scratch on a Featurize RTX 3090 instance at commit `dc7070a`,
+with the unchanged `uv.lock`, encoder revision, and `configs/training/a0.yaml`.
+
+Rebuild checks: tarball SHA-256 equals the frozen `876c34b8...`; 5000 records
+(train 2240 / validation 260 / test 2500); the 13 validation speakers equal the
+frozen list; leakage audit PASS; MFA aligned 5000/5000 (0 degraded, 0 failed).
+
+| Sealed test metric | seed 42: SS2 -> rerun | seed 1337: SS2 -> rerun |
+|---|---|---|
+| sentence accuracy Pearson | 0.631 -> 0.626 | 0.636 -> 0.644 |
+| sentence fluency Pearson | 0.728 -> 0.722 | 0.720 -> 0.725 |
+| sentence prosodic Pearson | 0.724 -> 0.718 | 0.720 -> 0.725 |
+| sentence completeness Pearson | 0.004 -> 0.238 | 0.062 -> 0.005 |
+| word accuracy Pearson | 0.273 -> 0.287 | 0.274 -> 0.284 |
+| phone accuracy Pearson | 0.288 -> 0.291 | 0.278 -> 0.286 |
+| word error-detection macro F1 | 0.4801 -> 0.4801 | 0.4801 -> 0.4801 |
+| phone error-detection macro F1 | 0.4929 -> 0.4943 | 0.4959 -> 0.4908 |
+| epochs run / best val loss | 47 / 0.0250 -> 47 / 0.0254 | 38 / 0.0250 -> 41 / 0.0255 |
+
+The no-learning baseline reproduced exactly (sentence accuracy MAE 1.146,
+word error-detection macro F1 0.4801, phone 0.4889).
+
+Sentence accuracy and fluency Pearson are within 0.01 of SS2 on both seeds,
+inside the 0.02 tolerance of roadmap SS18.3 step 1, so the rebuild is accepted
+as the A0 reference for M2.5. Completeness Pearson swings between seeds and
+runs; its labels are almost all at ceiling, so it stays informative only. The
+word error-detection gap is unchanged: the model still never predicts the
+"error" class (precision and recall 0).
+
+The MLflow store had to move out of `artifact_root` (MLflow rejects runs under
+a directory named `artifacts`); that is a storage-layout change only.
+Manifest, both runs, checkpoints, and logs are backed up off the instance.
