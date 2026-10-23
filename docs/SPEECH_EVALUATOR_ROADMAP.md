@@ -549,7 +549,7 @@ LLM 不得：
 | M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
-| M2.5 A0 基线修复 | 进行中：步骤 2、3.1–3.5 完成，待封存 Test 一次性确认 | 本节、`speech/docs/m25-diagnostics-report.md` |
+| M2.5 A0 基线修复 | 完成（2026-10-23） | `speech/docs/m25-diagnostics-report.md` 第 12 节 |
 | M3 候选改进 | 未开始 | — |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
@@ -605,9 +605,11 @@ LLM 不得：
 
 完成标准：两个种子上单词错误检测 Macro F1 都超过无学习基线，句子 Accuracy 与 Fluency Pearson 不低于 A0，并写出更新后的基线报告。如果做完仍不达标，如实记录并决定是否带着缺口进入 M3。
 
+结果（2026-10-23，封存 Test 一次性评估，使用 Validation 上选好并保存的阈值）：**达标**。M2.5 候选 `a0-rebalance-acnorm-phones-layers.yaml` 的单词错误检测 Macro F1 为 0.638 / 0.628（无学习基线 0.4801），句子 Accuracy Pearson 0.712 / 0.705（A0 0.626 / 0.644），Fluency 0.788 / 0.789（A0 0.722 / 0.725），单词 Accuracy Pearson 0.397 / 0.399（A0 约 0.29）。Test 明显低于 Validation（句子 Accuracy 0.81 → 0.71），对外应引用 Test 数字。该候选是 M3 的比较基线；本次 Test 评估后 M2.5 不再改动。
+
 **步骤 4：M3 候选改进**
 
-按成本从低到高：A0-Rater → A0-Aug → 成人目标域 → A1 Loquacious CTC Adapter 与 A1 Scorer。每个候选都与修复后的基线在同一封存基准上比较。
+按成本从低到高：A0-Rater → A0-Aug → 成人目标域 → A1 Loquacious CTC Adapter 与 A1 Scorer。每个候选都与修复后的基线（M2.5 候选，`a0-rebalance-acnorm-phones-layers.yaml`）在同一封存基准上比较；候选之间先在 Validation 上用单词/音素 average precision 和句子 Pearson 比较，Test 只给定稿候选看一次。
 
 ### 18.4 实验纪律
 

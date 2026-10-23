@@ -303,3 +303,41 @@ SS18.3 completion check (word error-detection macro F1 above the no-learning
 baseline on both seeds, sentence accuracy/fluency not below A0) is to be
 confirmed by one sealed-test evaluation of this candidate with its saved
 thresholds.
+
+## 12. Sealed test: one evaluation of the M2.5 candidate (2026-10-23)
+
+Evaluated once, after the candidate was fixed, with the prediction
+thresholds saved from validation (word 0.872 / 0.910, phone 0.779 / 0.812);
+nothing was re-selected on test. A0 numbers are the reproduction in
+`m2-acceptance-report.md` SS6; the no-learning baseline is unchanged from
+SS2 there (a constant predictor scores at most these macro F1 values at any
+cut).
+
+| Sealed test (seed 42 / 1337) | No-learning baseline | A0 | M2.5 candidate |
+|---|---|---|---|
+| Sentence accuracy Pearson | - | 0.626 / 0.644 | 0.712 / 0.705 |
+| Sentence accuracy MAE (0-10) | 1.146 | 0.889 / 0.863 | 0.811 / 0.787 |
+| Sentence fluency Pearson | - | 0.722 / 0.725 | 0.788 / 0.789 |
+| Sentence prosodic Pearson | - | 0.718 / 0.725 | 0.783 / 0.784 |
+| Word accuracy Pearson | - | 0.287 / 0.284 | 0.397 / 0.399 |
+| Phone accuracy Pearson | - | 0.291 / 0.286 | 0.369 / 0.372 |
+| Word accuracy MAE (0-10) | 1.078 | 0.981 / 1.028 | 0.912 / 0.840 |
+| Word error-detection macro F1 | 0.4801 | 0.4801 / 0.4801 | **0.638 / 0.628** |
+| Word error precision / recall | 0 / 0 | 0 / 0 | 0.262 / 0.628, 0.248 / 0.674 |
+| Phone error-detection macro F1 | 0.4889 | 0.4943 / 0.4908 | 0.621 / 0.621 |
+| Word / phone average precision | 0.076 / 0.045 (error rate) | not recorded | 0.321 / 0.201, 0.320 / 0.206 |
+
+**SS18.3 completion check: met.** Word error-detection macro F1 beats the
+no-learning baseline on both seeds (0.638 / 0.628 vs 0.4801), and sentence
+accuracy and fluency Pearson are above A0 on both seeds (+0.06 to +0.09).
+
+Caveats:
+
+- Test scores are well below validation (sentence accuracy 0.81 -> 0.71,
+  word AP 0.45 -> 0.32). Validation has 13 speakers and every M2.5 change
+  was selected on it, so validation numbers were optimistic; test also has a
+  lower error rate (7.6% of words vs 13.4%). Test is the number to quote.
+- The "error" class is still found with low precision (about 1 in 4 flagged
+  words is a real error) at the chosen cut; the cut favours recall.
+- Adult and child test metrics were not broken out in this one evaluation.
+- Test is now spent for M2.5: no further M2.5 change may be chosen on it.

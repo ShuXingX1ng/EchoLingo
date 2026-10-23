@@ -3,9 +3,11 @@
 Read Aloud Speech Evaluator package. See `docs/SPEECH_EVALUATOR_ROADMAP.md`
 and ADR 0011-0013 for the full plan. Current status: M0 (environment
 skeleton), M1 (SpeechOcean762 data pipeline), and M2 (A0 frozen-encoder
-baseline -- see `docs/m2-acceptance-report.md`) are complete, and A0 was
-reproduced on a rented GPU on 2026-10-23 (roadmap SS18). No Bundle export,
-Worker, or FastAPI integration (M4/M5) yet.
+baseline -- see `docs/m2-acceptance-report.md`) are complete, A0 was
+reproduced on a rented GPU on 2026-10-23, and M2.5 baseline repair is
+complete (`docs/m25-diagnostics-report.md`; the M2.5 candidate is
+`configs/training/a0-rebalance-acnorm-phones-layers.yaml`). No Bundle
+export, Worker, or FastAPI integration (M4/M5) yet.
 
 ## Runtime environment
 
@@ -100,7 +102,13 @@ uv run python -m echolingo_speech.alignment.mfa report --manifest $MANIFEST
 # Frozen Wav2Vec2 feature cache (writes under $PROC/features)
 uv run python -m echolingo_speech.features.cache extract --manifest $MANIFEST --corpus-root $CORPUS --speech-config configs/speech.yaml
 
-# A0, two seeds, plus the no-learning baseline
+# Five-layer fp16 cache for the M2.5 candidate config (~7 GB; reads the
+# waveform cache above, leaves the manifest unchanged)
+uv run python -m echolingo_speech.features.cache extract-layers --manifest $MANIFEST --speech-config configs/speech.yaml --layers 4,6,8,10,12
+
+# A0, two seeds, plus the no-learning baseline. For the M2.5 candidate use
+# --training-config configs/training/a0-rebalance-acnorm-phones-layers.yaml
+# and drop --evaluate-test (the sealed test is scored once per final candidate).
 uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST --seed 42 --evaluate-test
 uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST --seed 1337 --evaluate-test
 uv run python -m echolingo_speech.evaluation.baseline --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST

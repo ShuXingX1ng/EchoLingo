@@ -17,7 +17,7 @@ PTE 产品 MVP 和平台架构已完成，当前进入 **Read Aloud Speech Evalu
 - 已完成：PTE 练习与 Mock、FastAPI 分离、LangGraph feedback、rubric RAG、Exemplar retrieval、Study Assistant、Onboarding、Supabase 同步、i18n。
 - 当前运行：Azure Pronunciation Assessment 为 Read Aloud 和 Repeat Sentence 提供语音证据。
 - 已完成：Speech Evaluator M0（`speech/` 包骨架、固定 encoder revision、smoke test）、M1（SpeechOcean762 下载/校验、说话人隔离切分、MFA 对齐、Wav2Vec2 特征缓存）、M2（A0 冻结编码器多任务评分基线，两个种子；结果见 `speech/docs/m2-acceptance-report.md`）。
-- A0 现状：封存测试集句子级 Accuracy/Fluency Pearson 达到 0.60 门槛；单词/音素级相关性约 0.27–0.29，单词错误检测与无学习基线持平。A0 是研究基线，不是已验收模型。
+- 评估器现状：A0 的封存测试集句子级 Accuracy/Fluency Pearson 为 0.63/0.72，单词错误检测与无学习基线持平。M2.5（2026-10-23）修复后的候选（Accuracy/Stress 重新加权、声学特征标准化、规范音素身份嵌入、第 4/6/8/10/12 层加权混合、在 Validation 上选错误检测阈值）在封存测试集上句子 Accuracy/Fluency Pearson 0.71/0.79、单词 Accuracy Pearson 0.40、单词错误检测 Macro F1 0.63（基线 0.48）。仍是研究基线，不是已验收模型，也未接入运行时。
 - 训练环境：原 WSL2 + RTX 4070 机器已不可用，训练迁移到租用的 Linux 云 GPU（ADR-0014）。2026-10-23 已在 Featurize RTX 3090 实例上重建 M1 并复现 A0（两个种子与验收报告相差不超过 0.01）。数据、特征缓存不在 Git 中，实例退还后需按 `speech/README.md` 重建；manifest、MLflow 记录与检查点在每阶段结束后备份到实例之外。MLflow 文件存储必须放在 `artifact_root` 之外。
 - 已实施的 seam：`backend/services/speech_evaluation.py` 定义 provider-neutral 的 Speech Evaluation Result，目前只有 Azure 一个 adapter；前端与 Feedback 流程不再接触 Azure 字段名。
 - 已确认但未实施：M3 候选改进、Checkpoint Bundle、独立 GPU worker 服务、EchoLingo provider 和显式 compare mode。
