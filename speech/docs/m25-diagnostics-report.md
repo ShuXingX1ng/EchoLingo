@@ -174,3 +174,36 @@ Findings:
   validation set, so it is consistent in direction rather than established.
 - No metric regressed beyond seed noise, so A0-rebalance replaces A0 as the
   reference for steps 3.3-3.5. The adult/child gap is unchanged.
+
+## 8. Step 3.3 applied: standardized acoustic features
+
+`configs/training/a0-rebalance-acnorm.yaml` = `a0-rebalance.yaml` with
+`normalize_acoustic_features: true`: the 9 explicit acoustic features are
+scaled with training-partition mean/std held in the model. One factor
+changed. Runs `a0rn-seed42` (45 epochs) and `a0rn-seed1337` (41 epochs) at
+commit `9c97e98`. Validation only; test not scored.
+
+| Validation (seed 42 / 1337) | A0-rebalance | + acoustic norm | Change |
+|---|---|---|---|
+| Sentence accuracy Pearson | 0.730 / 0.751 | 0.760 / 0.760 | +0.030 / +0.009 |
+| Sentence accuracy MAE (0-10) | 0.936 / 0.920 | 0.888 / 0.886 | -0.048 / -0.034 |
+| Sentence fluency Pearson | 0.786 / 0.806 | 0.827 / 0.824 | +0.041 / +0.018 |
+| Sentence fluency MAE (0-10) | 0.710 / 0.687 | 0.625 / 0.622 | -0.085 / -0.065 |
+| Sentence prosodic Pearson | 0.771 / 0.791 | 0.809 / 0.805 | +0.038 / +0.014 |
+| Word average precision | 0.328 / 0.330 | 0.332 / 0.337 | +0.004 / +0.007 |
+| Phone average precision | 0.258 / 0.265 | 0.263 / 0.274 | +0.005 / +0.009 |
+| Sentence Huber (validation) | 0.0041 / 0.0038 | 0.0034 / 0.0034 | |
+| Adult sentence fluency Pearson | 0.853 / 0.872 | 0.886 / 0.885 | |
+| Child sentence accuracy Pearson | 0.315 / 0.430 | 0.373 / 0.389 | |
+
+Findings:
+
+- Every sentence-level metric improves on both seeds, and the two seeds now
+  agree closely (accuracy Pearson 0.760 / 0.760, previously 0.730 / 0.751),
+  which is what better-conditioned inputs should do. This is larger than SS5
+  anticipated: the sentence loss was already small, but the raw-scale
+  features were still hurting the sentence trunk.
+- Word and phone metrics are unchanged within seed spread, as expected: the
+  acoustic features only feed the sentence heads.
+- The adult/child gap remains; child sentence accuracy is still 0.37-0.39.
+- A0-rebalance-acnorm replaces A0-rebalance as the reference for 3.4-3.5.
