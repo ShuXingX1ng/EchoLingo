@@ -245,6 +245,7 @@ def fit(
         dropout=training_config.dropout,
         normalize_acoustic_features=training_config.normalize_acoustic_features,
         use_canonical_phones=training_config.use_canonical_phones,
+        num_hidden_layers=len(training_config.hidden_state_layers or [None]),
     ).to(resolved_device)
     if training_config.normalize_acoustic_features:
         mean, std = acoustic_feature_statistics(train_loader)
@@ -377,9 +378,17 @@ def fit(
 
 
 def _partition_loader(
-    manifest_path: Path, processed_root: Path, partition: str, batch_size: int, *, shuffle: bool
+    manifest_path: Path,
+    processed_root: Path,
+    partition: str,
+    batch_size: int,
+    *,
+    shuffle: bool,
+    hidden_state_layers: list[int] | None = None,
 ) -> DataLoader:
-    dataset = SpeechOceanScoringDataset(manifest_path, processed_root, partition=partition)
+    dataset = SpeechOceanScoringDataset(
+        manifest_path, processed_root, partition=partition, hidden_state_layers=hidden_state_layers
+    )
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
 
@@ -402,10 +411,12 @@ def run_training(
     resolved_device = resolve_device(device)
     batch_size = training_config.batch_size
     train_loader = _partition_loader(
-        manifest_path, processed_root, "train", batch_size, shuffle=True
+        manifest_path, processed_root, "train", batch_size, shuffle=True,
+        hidden_state_layers=training_config.hidden_state_layers,
     )
     val_loader = _partition_loader(
-        manifest_path, processed_root, "validation", batch_size, shuffle=False
+        manifest_path, processed_root, "validation", batch_size, shuffle=False,
+        hidden_state_layers=training_config.hidden_state_layers,
     )
 
     model, result = fit(
@@ -427,7 +438,8 @@ def run_training(
 
     if evaluate_test:
         test_loader = _partition_loader(
-            manifest_path, processed_root, "test", batch_size, shuffle=False
+            manifest_path, processed_root, "test", batch_size, shuffle=False,
+            hidden_state_layers=training_config.hidden_state_layers,
         )
         result["test_metrics"] = evaluate(
             model, test_loader, resolved_device, training_config, prediction_thresholds=thresholds
@@ -473,7 +485,8 @@ def evaluate_checkpoint(
     checkpoint_dir = checkpoint_path.parent
     if select_thresholds:
         val_loader = _partition_loader(
-            manifest_path, processed_root, "validation", training_config.batch_size, shuffle=False
+            manifest_path, processed_root, "validation", training_config.batch_size, shuffle=False,
+            hidden_state_layers=training_config.hidden_state_layers,
         )
         thresholds = select_prediction_thresholds(
             model, val_loader, resolved_device, training_config
@@ -482,7 +495,8 @@ def evaluate_checkpoint(
     else:
         thresholds = read_prediction_thresholds(checkpoint_dir)
     loader = _partition_loader(
-        manifest_path, processed_root, partition, training_config.batch_size, shuffle=False
+        manifest_path, processed_root, partition, training_config.batch_size, shuffle=False,
+        hidden_state_layers=training_config.hidden_state_layers,
     )
     return evaluate(
         model, loader, resolved_device, training_config, prediction_thresholds=thresholds

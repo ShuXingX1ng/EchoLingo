@@ -378,7 +378,9 @@ def _cli(argv: list[str] | None = None) -> int:
     counts = {record.sample_id: _canonical_counts(record) for record in manifest}
 
     datasets = {
-        partition: SpeechOceanScoringDataset(args.manifest, processed_root, partition)
+        partition: SpeechOceanScoringDataset(
+            args.manifest, processed_root, partition, training_config.hidden_state_layers
+        )
         for partition in COVERAGE_PARTITIONS
     }
     coverage = {}

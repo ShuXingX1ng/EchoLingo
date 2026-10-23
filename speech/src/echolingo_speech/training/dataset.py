@@ -21,6 +21,7 @@ from torch.utils.data import Dataset
 from echolingo_speech.alignment.mfa import TextGridSpan, parse_textgrid_spans
 from echolingo_speech.data.manifest import ManifestRecord, read_jsonl
 from echolingo_speech.features.acoustic import compute_acoustic_features, feature_vector
+from echolingo_speech.features.cache import layer_cache_dir_name
 from echolingo_speech.training.labels import (
     SENTENCE_TARGET_KEYS,
     canonical_phone_id,
@@ -54,7 +55,8 @@ class PhoneExample:
 @dataclass
 class ScoringExample:
     sample_id: str
-    hidden_states: torch.Tensor  # (T, 768), frozen Wav2Vec2 hidden states
+    # (T, 768) last layer, or (L, T, 768) fp16 for a multi-layer cache
+    hidden_states: torch.Tensor
     sentence_targets: torch.Tensor  # (4,), order = SENTENCE_TARGET_KEYS
     acoustic_features: torch.Tensor  # (len(FEATURE_NAMES),)
     word_examples: list[WordExample]
@@ -150,13 +152,25 @@ def _match_words_and_phones(
     return word_examples, phone_examples, True
 
 
-def _build_example(record: ManifestRecord, processed_root: Path) -> ScoringExample:
+def _build_example(
+    record: ManifestRecord,
+    processed_root: Path,
+    hidden_state_layers: tuple[int, ...] | None = None,
+) -> ScoringExample:
     feature_root = processed_root / "features"
     assert record.features is not None, f"{record.sample_id} has no cached features"
 
-    hidden_states = torch.from_numpy(
-        np.load(feature_root / record.features.wav2vec2_hidden_state_path)
-    ).float()
+    if hidden_state_layers:
+        # Kept fp16 in memory (5 layers x 2500 records would not fit as fp32
+        # alongside the other partitions); `collate_fn` casts each batch.
+        layer_dir = layer_cache_dir_name(record.features.encoder_revision, hidden_state_layers)
+        hidden_states = torch.from_numpy(
+            np.load(feature_root / layer_dir / f"{record.sample_id}.npy")
+        )
+    else:
+        hidden_states = torch.from_numpy(
+            np.load(feature_root / record.features.wav2vec2_hidden_state_path)
+        ).float()
     waveform = torch.from_numpy(np.load(feature_root / record.features.waveform_cache_path)).float()
 
     word_spans: list[TextGridSpan] = []
@@ -166,7 +180,7 @@ def _build_example(record: ManifestRecord, processed_root: Path) -> ScoringExamp
         word_spans, phone_spans = parse_textgrid_spans(textgrid_path)
 
     canonical_words = record.scores["words"]
-    num_frames = hidden_states.shape[0]
+    num_frames = hidden_states.shape[-2]
     duration_sec = record.audio.duration_sec
 
     word_examples, phone_examples, word_alignment_valid = _match_words_and_phones(
@@ -204,11 +218,18 @@ class SpeechOceanScoringDataset(Dataset):
     avoids re-parsing TextGrids and re-loading `.npy` files every epoch.
     """
 
-    def __init__(self, manifest_path: Path, processed_root: Path, partition: str) -> None:
+    def __init__(
+        self,
+        manifest_path: Path,
+        processed_root: Path,
+        partition: str,
+        hidden_state_layers: tuple[int, ...] | list[int] | None = None,
+    ) -> None:
         records = [
             record for record in read_jsonl(manifest_path) if record.partition == partition
         ]
-        self.examples = [_build_example(record, processed_root) for record in records]
+        layers = tuple(hidden_state_layers) if hidden_state_layers else None
+        self.examples = [_build_example(record, processed_root, layers) for record in records]
 
     def __len__(self) -> int:
         return len(self.examples)
@@ -223,14 +244,18 @@ def collate_fn(batch: list[ScoringExample]) -> dict:
     inherently per-sample and this dataset is far too small for that to be a
     performance concern.
     """
-    max_frames = max(example.hidden_states.shape[0] for example in batch)
-    hidden_dim = batch[0].hidden_states.shape[1]
+    max_frames = max(example.hidden_states.shape[-2] for example in batch)
+    # (T, H) single layer -> (B, T, H); (L, T, H) multi-layer -> (B, L, T, H)
+    leading = tuple(batch[0].hidden_states.shape[:-2])
+    hidden_dim = batch[0].hidden_states.shape[-1]
 
-    padded_hidden_states = torch.zeros(len(batch), max_frames, hidden_dim, dtype=torch.float32)
+    padded_hidden_states = torch.zeros(
+        (len(batch), *leading, max_frames, hidden_dim), dtype=torch.float32
+    )
     frame_mask = torch.zeros(len(batch), max_frames, dtype=torch.bool)
     for i, example in enumerate(batch):
-        num_frames = example.hidden_states.shape[0]
-        padded_hidden_states[i, :num_frames] = example.hidden_states
+        num_frames = example.hidden_states.shape[-2]
+        padded_hidden_states[i, ..., :num_frames, :] = example.hidden_states.float()
         frame_mask[i, :num_frames] = True
 
     return {

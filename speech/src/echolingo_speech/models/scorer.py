@@ -63,6 +63,7 @@ class SpeechEvaluatorA0(nn.Module):
         normalize_acoustic_features: bool = False,
         use_canonical_phones: bool = False,
         phone_embedding_dim: int = 32,
+        num_hidden_layers: int = 1,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -77,7 +78,12 @@ class SpeechEvaluatorA0(nn.Module):
             "normalize_acoustic_features": normalize_acoustic_features,
             "use_canonical_phones": use_canonical_phones,
             "phone_embedding_dim": phone_embedding_dim,
+            "num_hidden_layers": num_hidden_layers,
         }
+        # Several cached encoder layers are mixed by a learned softmax weight
+        # per layer (initially uniform) before any pooling.
+        if num_hidden_layers > 1:
+            self.layer_weights = nn.Parameter(torch.zeros(num_hidden_layers))
         # Training-partition mean/std of the explicit acoustic features (Hz,
         # seconds, counts on very different scales), stored as buffers so a
         # checkpoint carries them; set by `set_acoustic_normalization`.
@@ -139,6 +145,10 @@ class SpeechEvaluatorA0(nn.Module):
     def forward(self, batch: dict) -> dict:
         hidden_states = batch["hidden_states"]
         frame_mask = batch["frame_mask"]
+        if self.config["num_hidden_layers"] > 1:
+            # (B, L, T, H) -> (B, T, H)
+            weights = torch.softmax(self.layer_weights, dim=0)
+            hidden_states = torch.einsum("l,bltd->btd", weights, hidden_states)
 
         acoustic = batch["acoustic_features"]
         if self.config["normalize_acoustic_features"]:

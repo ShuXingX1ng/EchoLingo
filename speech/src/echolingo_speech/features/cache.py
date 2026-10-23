@@ -89,6 +89,48 @@ def extract_features(
     return updated
 
 
+def layer_cache_dir_name(encoder_revision: str, layers: tuple[int, ...] | list[int]) -> str:
+    """Directory (under the feature cache root) holding the multi-layer cache
+    for one encoder revision and layer selection. `training/dataset.py` finds
+    the files through this same function, so the manifest is unchanged."""
+    return f"wav2vec2-layers-{encoder_revision[:12]}-l{'-'.join(str(i) for i in layers)}"
+
+
+def extract_layer_features(
+    records: list[ManifestRecord],
+    *,
+    cache_root: Path,
+    encoder_model_id: str,
+    encoder_revision: str,
+    layers: tuple[int, ...],
+    hf_cache_dir: Path | None = None,
+    device: str = "cpu",
+) -> Path:
+    """Cache several Wav2Vec2 layers per utterance as one `(L, T, 768)` fp16
+    array (roadmap SS18.3 step 3.5). Index 0 is the CNN feature projection and
+    index 12 the final layer (== `last_hidden_state`). Reads the waveforms
+    `extract_features` already resampled, so it must run after it.
+    """
+    from transformers import Wav2Vec2Model
+
+    model = Wav2Vec2Model.from_pretrained(
+        encoder_model_id, revision=encoder_revision, cache_dir=hf_cache_dir
+    )
+    model.to(device)
+    model.eval()
+
+    layer_dir = cache_root / layer_cache_dir_name(encoder_revision, layers)
+    layer_dir.mkdir(parents=True, exist_ok=True)
+    for record in records:
+        assert record.features is not None, f"{record.sample_id} has no waveform cache yet"
+        waveform = torch.from_numpy(np.load(cache_root / record.features.waveform_cache_path))
+        with torch.no_grad():
+            output = model(waveform.float().to(device), output_hidden_states=True)
+        stacked = torch.stack([output.hidden_states[i].squeeze(0) for i in layers])
+        np.save(layer_dir / f"{record.sample_id}.npy", stacked.cpu().numpy().astype(np.float16))
+    return layer_dir
+
+
 def _cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m echolingo_speech.features.cache")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -102,7 +144,30 @@ def _cli(argv: list[str] | None = None) -> int:
     default_device = "cuda" if torch.cuda.is_available() else "cpu"
     extract_parser.add_argument("--device", type=str, default=default_device)
 
+
+    layers_parser = subparsers.add_parser(
+        "extract-layers", help="Cache several Wav2Vec2 layers (after `extract`)"
+    )
+    layers_parser.add_argument("--manifest", type=Path, required=True)
+    layers_parser.add_argument("--speech-config", type=Path, required=True)
+    layers_parser.add_argument("--layers", required=True, help="comma-separated, e.g. 4,6,8,10,12")
+    layers_parser.add_argument("--device", type=str, default=default_device)
     args = parser.parse_args(argv)
+
+    if args.command == "extract-layers":
+        config = load_config(args.speech_config)
+        layers = tuple(int(value) for value in args.layers.split(","))
+        layer_dir = extract_layer_features(
+            read_jsonl(args.manifest),
+            cache_root=config.data_root / "processed" / "speechocean762" / "features",
+            encoder_model_id=config.encoder.model_id,
+            encoder_revision=config.encoder.revision,
+            layers=layers,
+            hf_cache_dir=config.artifact_root / "hf-cache",
+            device=args.device,
+        )
+        print(f"OK: cached layers {list(layers)} at {layer_dir}")
+        return 0
 
     if args.command == "extract":
         config = load_config(args.speech_config)

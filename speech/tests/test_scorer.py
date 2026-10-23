@@ -125,3 +125,23 @@ def test_canonical_phones_are_off_by_default():
     model = SpeechEvaluatorA0()
     assert model.config["use_canonical_phones"] is False
     assert not hasattr(model, "phone_embedding")
+
+
+def test_multi_layer_input_is_mixed_by_learned_layer_weights():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    layered = SpeechEvaluatorA0(dropout=0.0, num_hidden_layers=3)
+    single = SpeechEvaluatorA0(dropout=0.0)
+    single.load_state_dict(
+        {k: v for k, v in layered.state_dict().items() if k != "layer_weights"}
+    )
+    layered.eval()
+    single.eval()
+
+    stacked = torch.randn(2, 3, 20, 768)
+    with torch.no_grad():
+        # Zero-initialized weights -> uniform softmax -> the layer mean.
+        expected = single(dict(batch, hidden_states=stacked.mean(dim=1)))["sentence_scores"]
+        actual = layered(dict(batch, hidden_states=stacked))["sentence_scores"]
+    assert torch.allclose(actual, expected, atol=1e-6)
+    assert layered.layer_weights.requires_grad

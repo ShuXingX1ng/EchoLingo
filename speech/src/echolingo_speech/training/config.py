@@ -29,6 +29,9 @@ class TrainingConfig(BaseModel):
     normalize_acoustic_features: bool = False
     # Give word/phone heads the canonical (expected) phone identities.
     use_canonical_phones: bool = False
+    # Wav2Vec2 layers to mix (needs `features.cache extract-layers`); None
+    # means the last layer from the original cache.
+    hidden_state_layers: list[int] | None = None
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

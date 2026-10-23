@@ -291,3 +291,47 @@ def test_dataset_and_collate_end_to_end(tmp_path: Path):
     assert batch["word_alignment_valid"] == [True, False]
     assert len(batch["word_examples"][0]) == 2
     assert batch["word_examples"][1] == []
+
+
+def test_dataset_loads_a_multi_layer_cache_and_collates_it(tmp_path: Path):
+    from echolingo_speech.features.cache import layer_cache_dir_name
+
+    layers = (4, 12)
+    records = []
+    for sample_id, num_frames in (("SAMPLE_A", 50), ("SAMPLE_B", 80)):
+        record = _write_record_assets(
+            tmp_path,
+            sample_id=sample_id,
+            num_frames=num_frames,
+            words=[(0.0, 0.5, "we"), (0.5, 1.0, "call")],
+            phones=[(0.0, 0.25, "W"), (0.25, 0.5, "IY1"), (0.5, 0.75, "K"), (0.75, 1.0, "AO0")],
+        )
+        layer_dir = tmp_path / "features" / layer_cache_dir_name("abc", layers)
+        layer_dir.mkdir(parents=True, exist_ok=True)
+        stacked = np.stack([np.full((num_frames, 768), value) for value in (1.0, 2.0)])
+        np.save(layer_dir / f"{sample_id}.npy", stacked.astype(np.float16))
+        records.append(record)
+    manifest_path = tmp_path / "manifest.jsonl"
+    write_jsonl(manifest_path, records)
+
+    dataset = SpeechOceanScoringDataset(
+        manifest_path, tmp_path, partition="train", hidden_state_layers=list(layers)
+    )
+    batch = collate_fn([dataset[0], dataset[1]])
+
+    assert dataset[0].hidden_states.shape == (2, 50, 768)
+    assert batch["hidden_states"].shape == (2, 2, 80, 768)
+    assert batch["hidden_states"].dtype == torch.float32
+    assert batch["frame_mask"][0].sum().item() == 50
+    assert torch.all(batch["hidden_states"][0, 1, :50] == 2.0)
+    assert torch.all(batch["hidden_states"][0, :, 50:] == 0.0)
+    # Spans are mapped over the cached frame count, as for a single layer.
+    assert len(dataset[0].word_examples) == 2
+
+
+def test_layer_cache_dir_name_is_deterministic_per_revision_and_layers():
+    from echolingo_speech.features.cache import layer_cache_dir_name
+
+    name = layer_cache_dir_name("22aad52d435eb6dbaf354bdad9b0da84ce7d6156", [4, 6, 12])
+    assert name == "wav2vec2-layers-22aad52d435e-l4-6-12"
+    assert name != layer_cache_dir_name("22aad52d435eb6dbaf354bdad9b0da84ce7d6156", [4, 6])
