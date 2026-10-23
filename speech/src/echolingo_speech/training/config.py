@@ -22,6 +22,9 @@ class TrainingConfig(BaseModel):
     early_stopping_patience: int = 15
     lr_scheduler_patience: int = 7
     lr_scheduler_factor: float = 0.5
+    # Within the word loss: accuracy Huber vs stress BCE (A0: equal 0.5 / 0.5).
+    word_accuracy_weight: float = 0.5
+    word_stress_weight: float = 0.5
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

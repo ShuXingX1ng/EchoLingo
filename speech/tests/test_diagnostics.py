@@ -96,3 +96,20 @@ def test_diagnose_records_reports_age_groups_and_skips_masked_words():
     # Two valid records x two words; the masked record contributes none.
     assert report["word_error_detection"]["prediction_distribution"]["n"] == 4
     assert sum(report["word_error_detection"]["confusion"].values()) == 4
+
+
+def test_loss_components_follow_configured_word_weights():
+    torch.manual_seed(1)
+    examples = [_make_example(f"s{i}", accuracy) for i, accuracy in enumerate([0.2, 0.9])]
+    model = SpeechEvaluatorA0(dropout=0.0)
+    config = TrainingConfig(word_accuracy_weight=0.9, word_stress_weight=0.1)
+
+    records = collect_outputs(model, examples, {}, "cpu", batch_size=len(examples))
+    losses = diagnose_records(records, config)["loss_components"]
+
+    with torch.no_grad():
+        batch = collate_fn(examples)
+        expected = compute_total_loss(
+            model(batch), batch, word_accuracy_weight=0.9, word_stress_weight=0.1
+        )
+    assert losses["total"] == pytest.approx(float(expected["total"]), rel=1e-5)

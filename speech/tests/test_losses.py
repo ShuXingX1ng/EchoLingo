@@ -113,3 +113,22 @@ def test_compute_total_loss_applies_fixed_weights():
         + PHONE_WEIGHT * losses["phone"]
     )
     assert torch.isclose(losses["total"], expected_total)
+
+
+def test_word_loss_applies_accuracy_and_stress_weights():
+    accuracy_pred = torch.tensor([0.9, 0.4])
+    stress_logit_pred = torch.tensor([2.0, -2.0])
+    examples = [WordExample(0, 1, 1.0, 1.0), WordExample(1, 2, 0.5, 1.0)]
+
+    loss = word_loss(
+        word_accuracy=[accuracy_pred],
+        word_stress_logit=[stress_logit_pred],
+        word_examples=[examples],
+        word_alignment_valid=[True],
+        accuracy_weight=0.9,
+        stress_weight=0.1,
+    )
+
+    accuracy_huber = F.huber_loss(accuracy_pred, torch.tensor([1.0, 0.5]))
+    stress_bce = F.binary_cross_entropy_with_logits(stress_logit_pred, torch.tensor([1.0, 1.0]))
+    assert torch.isclose(loss, 0.9 * accuracy_huber + 0.1 * stress_bce)

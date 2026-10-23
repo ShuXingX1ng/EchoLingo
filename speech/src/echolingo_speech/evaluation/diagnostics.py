@@ -179,10 +179,13 @@ def error_detection_diagnostics(
     }
 
 
-def loss_components(records: Sequence[RecordOutputs]) -> dict:
+def loss_components(
+    records: Sequence[RecordOutputs], training_config: TrainingConfig | None = None
+) -> dict:
     """Each term reduced exactly as `training/losses.py` reduces it, but over
     the whole partition and without summing the word terms together.
     """
+    config = training_config if training_config is not None else TrainingConfig()
     sentence_preds = torch.tensor([record.sentence_preds for record in records])
     sentence_targets = torch.tensor([record.sentence_targets for record in records])
     sentence_terms = {
@@ -218,8 +221,8 @@ def loss_components(records: Sequence[RecordOutputs]) -> dict:
 
     weighted = {
         "sentence": SENTENCE_WEIGHT * sentence,
-        "word_accuracy": WORD_WEIGHT * word_accuracy / 2,
-        "word_stress": WORD_WEIGHT * word_stress / 2,
+        "word_accuracy": WORD_WEIGHT * config.word_accuracy_weight * word_accuracy,
+        "word_stress": WORD_WEIGHT * config.word_stress_weight * word_stress,
         "phone": PHONE_WEIGHT * phone,
     }
     total = sum(weighted.values())
@@ -281,7 +284,7 @@ def diagnose_records(records: Sequence[RecordOutputs], training_config: Training
         "phone_error_detection": error_detection_diagnostics(
             pairs.phone_accuracy_preds, pairs.phone_accuracy_targets, threshold
         ),
-        "loss_components": loss_components(records),
+        "loss_components": loss_components(records, training_config),
         "by_age_group": by_age_group,
     }
 

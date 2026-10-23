@@ -78,9 +78,22 @@ def _move_batch_to_device(batch: dict, device: str) -> dict:
     return moved
 
 
+def _loss_weights(training_config: TrainingConfig | None) -> dict[str, float]:
+    config = training_config if training_config is not None else TrainingConfig()
+    return {
+        "word_accuracy_weight": config.word_accuracy_weight,
+        "word_stress_weight": config.word_stress_weight,
+    }
+
+
 def train_one_epoch(
-    model: SpeechEvaluatorA0, loader: DataLoader, optimizer: torch.optim.Optimizer, device: str
+    model: SpeechEvaluatorA0,
+    loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    device: str,
+    training_config: TrainingConfig | None = None,
 ) -> float:
+    weights = _loss_weights(training_config)
     model.train()
     total_loss = 0.0
     num_batches = 0
@@ -88,7 +101,7 @@ def train_one_epoch(
         batch = _move_batch_to_device(batch, device)
         optimizer.zero_grad()
         predictions = model(batch)
-        losses = compute_total_loss(predictions, batch)
+        losses = compute_total_loss(predictions, batch, **weights)
         losses["total"].backward()
         optimizer.step()
         total_loss += losses["total"].item()
@@ -98,10 +111,14 @@ def train_one_epoch(
 
 @torch.no_grad()
 def _score_pass(
-    model: SpeechEvaluatorA0, loader: DataLoader, device: str
+    model: SpeechEvaluatorA0,
+    loader: DataLoader,
+    device: str,
+    training_config: TrainingConfig | None = None,
 ) -> tuple[float, ScorePairs]:
     """One pass without gradients: mean training loss plus every mask-valid
     prediction/target pair."""
+    weights = _loss_weights(training_config)
     model.eval()
     total_loss = 0.0
     num_batches = 0
@@ -110,7 +127,7 @@ def _score_pass(
     for batch in loader:
         batch = _move_batch_to_device(batch, device)
         predictions = model(batch)
-        losses = compute_total_loss(predictions, batch)
+        losses = compute_total_loss(predictions, batch, **weights)
         total_loss += losses["total"].item()
         num_batches += 1
 
@@ -150,7 +167,7 @@ def evaluate(
     (for us to read and reason about) -- no single metric here decides
     anything on its own.
     """
-    loss, pairs = _score_pass(model, loader, device)
+    loss, pairs = _score_pass(model, loader, device, training_config)
     metrics: dict = {"loss": loss}
     metrics.update(
         assemble_metrics(
@@ -168,7 +185,7 @@ def select_prediction_thresholds(
 ) -> dict[str, float]:
     """Word and phone prediction cuts that maximize macro F1 on `loader`,
     which must be the validation partition (roadmap SS18.3 step 3.1)."""
-    _, pairs = _score_pass(model, loader, device)
+    _, pairs = _score_pass(model, loader, device, training_config)
     label_threshold = training_config.error_detection_threshold
     return {
         "word": select_prediction_threshold(
@@ -286,7 +303,9 @@ def fit(
         if state.epochs_without_improvement >= training_config.early_stopping_patience:
             break
 
-        train_loss = train_one_epoch(model, train_loader, optimizer, resolved_device)
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, resolved_device, training_config
+        )
         val_metrics = evaluate(model, val_loader, resolved_device, training_config)
         scheduler.step(val_metrics["loss"])
 

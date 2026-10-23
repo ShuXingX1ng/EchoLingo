@@ -34,11 +34,15 @@ def word_loss(
     word_stress_logit: list[torch.Tensor],
     word_examples: list[list],
     word_alignment_valid: list[bool],
+    *,
+    accuracy_weight: float = 0.5,
+    stress_weight: float = 0.5,
 ) -> torch.Tensor:
     """Records with an invalid (mismatched-count) word alignment are excluded
     entirely; within a valid record, accuracy (Huber) and stress (BCE) are
-    averaged per word, then averaged across words in that record, then
-    averaged across valid records in the batch.
+    each averaged across the record's words, combined with `accuracy_weight`
+    and `stress_weight` (A0: an equal 0.5 / 0.5 mean), then averaged across
+    valid records in the batch.
     """
     per_record_losses = []
     for accuracy_pred, stress_logit_pred, examples, is_valid in zip(
@@ -61,7 +65,7 @@ def word_loss(
         stress_bce = F.binary_cross_entropy_with_logits(
             stress_logit_pred, stress_targets, reduction="mean"
         )
-        per_record_losses.append((accuracy_huber + stress_bce) / 2)
+        per_record_losses.append(accuracy_weight * accuracy_huber + stress_weight * stress_bce)
 
     if not per_record_losses:
         return torch.zeros((), device=word_accuracy[0].device if word_accuracy else None)
@@ -89,13 +93,21 @@ def phone_loss(phone_accuracy: list[torch.Tensor], phone_examples: list[list]) -
     return F.huber_loss(torch.cat(predictions), torch.cat(targets), reduction="mean")
 
 
-def compute_total_loss(predictions: dict, batch: dict) -> dict[str, torch.Tensor]:
+def compute_total_loss(
+    predictions: dict,
+    batch: dict,
+    *,
+    word_accuracy_weight: float = 0.5,
+    word_stress_weight: float = 0.5,
+) -> dict[str, torch.Tensor]:
     l_sentence = sentence_loss(predictions["sentence_scores"], batch["sentence_targets"])
     l_word = word_loss(
         predictions["word_accuracy"],
         predictions["word_stress_logit"],
         batch["word_examples"],
         batch["word_alignment_valid"],
+        accuracy_weight=word_accuracy_weight,
+        stress_weight=word_stress_weight,
     )
     l_phone = phone_loss(predictions["phone_accuracy"], batch["phone_examples"])
 
