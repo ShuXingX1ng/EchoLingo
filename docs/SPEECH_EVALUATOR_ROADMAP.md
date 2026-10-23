@@ -550,7 +550,7 @@ LLM 不得：
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
 | M2.5 A0 基线修复 | 完成（2026-10-23） | `speech/docs/m25-diagnostics-report.md` 第 12 节 |
-| M3 候选改进 | 未开始 | — |
+| M3 候选改进 | 进行中（2026-10-24 起，A0-Rater 代码完成，待 GPU 训练） | 第 18.3 节步骤 4 |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
 | M6 反馈与诊断 | 未开始 | — |
@@ -610,6 +610,12 @@ LLM 不得：
 **步骤 4：M3 候选改进**
 
 按成本从低到高：A0-Rater → A0-Aug → 成人目标域 → A1 Loquacious CTC Adapter 与 A1 Scorer。每个候选都与修复后的基线（M2.5 候选，`a0-rebalance-acnorm-phones-layers.yaml`）在同一封存基准上比较；候选之间先在 Validation 上用单词/音素 average precision 和句子 Pearson 比较，Test 只给定稿候选看一次。
+
+A0-Rater 的数据事实（2026-10-24，对照 `scores-detail.json` 与 manifest）：5000 条录音每项都有 5 名专家评分；`scores.json` 的句子与单词分是 5 人中位数，音素分是 5 人平均。Train 上句子 Accuracy 的专家标准差约 0.9 分（满分 10），16% 的单词专家对"是否错误"意见不一。训练只改 Train 的目标，Validation/Test 始终用官方标签，早停用的验证损失也不含分歧项。
+
+1. 专家一致性参考（只读标签）。— 完成（2026-10-24）：Validation 上单个专家对其余四人聚合的 Pearson，句子 Accuracy 0.84、Fluency 0.79、Prosodic 0.77，单词 Accuracy 0.81（错误检测 Macro F1 0.88），音素 0.77（0.84）。M2.5 候选的句子级已接近这一参考，单词/音素级差距仍大。
+2. 3.1a 专家平均目标：`m3-rater-mean.yaml`（句子与单词用 5 人平均，Stress 用判为正确的专家比例）。— 代码完成，待 GPU。
+3. 3.1b 分歧辅助头：`m3-rater-mean-spread.yaml`，在 3.1a 与 M2.5 候选中较好者之上加预测专家标准差的辅助头（只内部使用）。— 代码完成，待 GPU。
 
 ### 18.4 实验纪律
 
