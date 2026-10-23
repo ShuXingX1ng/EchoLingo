@@ -549,7 +549,7 @@ LLM 不得：
 | M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
-| M2.5 A0 基线修复 | 未开始（前置的步骤 1 环境重建已完成） | 本节 |
+| M2.5 A0 基线修复 | 进行中：步骤 2 诊断完成，步骤 3 修复未开始 | 本节、`speech/docs/m25-diagnostics-report.md` |
 | M3 候选改进 | 未开始 | — |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
@@ -585,7 +585,9 @@ LLM 不得：
 5. 完成标准：句子 Accuracy 与 Fluency Pearson 与验收报告相差不超过 0.02；否则先查清差异来源，不继续后续步骤。
 6. 把 manifest、`mlruns`、检查点备份到实例之外。
 
-**步骤 2：M2.5 诊断**（不改模型）
+**步骤 2：M2.5 诊断**（不改模型）— 完成（2026-10-23）
+
+结果（只用 Validation，见 `speech/docs/m25-diagnostics-report.md`）：问题 #2 证实，单词预测最低 0.60，从不判"错误"，但错误类 average precision 是随机水平的约 2.3 倍（音素约 3 倍），在 Validation 上选阈值后 Macro F1 上限约 0.63；问题 #3 证实，几乎学不到的 Stress BCE 占验证损失约 48%，句子项只占 8%；问题 #6 的 Mask 覆盖率不是瓶颈（单词约 100%，音素约 90%）；问题 #7 成人与儿童差距很大（成人句子 Accuracy Pearson 约 0.85，儿童 0.31–0.46）。
 
 1. 单词/音素级混淆矩阵、预测分布与标签分布。
 2. 句子、单词 Accuracy、单词 Stress、音素四项损失的分项数值。

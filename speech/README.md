@@ -117,6 +117,15 @@ differs from what the run started with. A resumed run is logged as a new
 MLflow run (its `resumed_from_epoch` param says where it picked up), so the
 metric history of an interrupted run spans two MLflow runs.
 
+M2.5 diagnostics (validation only; see `docs/m25-diagnostics-report.md`):
+
+```bash
+uv run python -m echolingo_speech.evaluation.diagnostics --config configs/speech.yaml --training-config configs/training/a0.yaml --manifest $MANIFEST \
+  --checkpoint a0-seed42=$SPEECH_HOME/artifacts/checkpoints/a0-seed42/best.pt \
+  --checkpoint a0-seed1337=$SPEECH_HOME/artifacts/checkpoints/a0-seed1337/best.pt \
+  --partition validation --out-dir $SPEECH_HOME/reports/m25-diagnostics-validation
+```
+
 To score a saved checkpoint without retraining (for example the sealed test
 partition once a candidate is final):
 
