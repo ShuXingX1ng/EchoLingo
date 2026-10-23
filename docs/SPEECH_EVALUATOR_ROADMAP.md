@@ -549,7 +549,7 @@ LLM 不得：
 | M0 环境与骨架 | 完成（2026-07-23） | `DEVELOPMENT_LOG.md` |
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
-| M2.5 A0 基线修复 | 进行中：步骤 2 诊断完成，步骤 3 修复未开始 | 本节、`speech/docs/m25-diagnostics-report.md` |
+| M2.5 A0 基线修复 | 进行中：步骤 2 诊断与步骤 3.1 完成，3.2 起未开始 | 本节、`speech/docs/m25-diagnostics-report.md` |
 | M3 候选改进 | 未开始 | — |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
@@ -597,7 +597,7 @@ LLM 不得：
 
 **步骤 3：M2.5 修复**（每项单独对照 A0，只用 Validation 做选择）
 
-1. 评估方式：在 Validation 上选择预测阈值，并增加不依赖阈值的指标（如 PR 曲线下面积）。这只改变度量方式，不改变模型。
+1. 评估方式：在 Validation 上选择预测阈值，并增加不依赖阈值的指标（如 PR 曲线下面积）。这只改变度量方式，不改变模型。— 完成（2026-10-23）：阈值随检查点保存为 `prediction_thresholds.json`，报告新增 average precision；后续候选在 Validation 上用单词/音素 average precision 比较（A0 参照：单词 0.311 / 0.312，音素 0.260 / 0.265），F1 只在最终候选的封存 Test 上报告一次。
 2. 损失平衡：拆开并重新加权 Accuracy 与 Stress。
 3. 声学特征标准化。
 4. 规范音素/单词身份嵌入（针对问题 1，预期收益最大）。

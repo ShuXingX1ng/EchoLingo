@@ -60,17 +60,25 @@ def score_band_error(preds: list[float], targets: list[float], band_width: float
 
 
 def error_detection_metrics(
-    preds: list[float], targets: list[float], threshold: float = 0.6
+    preds: list[float],
+    targets: list[float],
+    threshold: float = 0.6,
+    prediction_threshold: float | None = None,
 ) -> dict[str, float]:
     """Threshold continuous accuracy scores into a binary error/correct label,
     then report Precision/Recall/F1 for the "error" class plus the
     macro-average F1 across both classes (roadmap SS7.1's "错误检测
     Precision/Recall/Macro F1"). `threshold` is on the same [0, 1]-normalized
-    scale `training/labels.py` produces (0.6 == 6/10 on the original scale).
+    scale `training/labels.py` produces (0.6 == 6/10 on the original scale)
+    and defines which *labels* are errors. Predictions are split at
+    `prediction_threshold`, which defaults to the same value; a threshold
+    chosen on validation (`select_prediction_threshold`) replaces it, since a
+    regression output shrunk toward the mean rarely crosses the label cut.
     """
     preds_arr = np.asarray(preds, dtype=float)
     targets_arr = np.asarray(targets, dtype=float)
-    pred_error = preds_arr < threshold
+    cut = threshold if prediction_threshold is None else prediction_threshold
+    pred_error = preds_arr < cut
     target_error = targets_arr < threshold
 
     error_f1, error_precision, error_recall = _binary_f1(pred_error, target_error)
@@ -82,6 +90,56 @@ def error_detection_metrics(
         "f1": error_f1,
         "macro_f1": (error_f1 + correct_f1) / 2,
     }
+
+
+def average_precision(preds: list[float], targets: list[float], threshold: float = 0.6) -> float:
+    """Threshold-free area under the precision-recall curve for the "error"
+    class (labels below `threshold`), ranking by `1 - pred` so a lower
+    predicted accuracy means "more likely an error". Tied scores are one
+    operating point, as in sklearn's `average_precision_score`, so a constant
+    predictor scores exactly the error base rate.
+    """
+    scores = 1.0 - np.asarray(preds, dtype=float)
+    positives = np.asarray(targets, dtype=float) < threshold
+    total_positive = int(positives.sum())
+    if total_positive == 0:
+        return 0.0
+    order = np.argsort(-scores, kind="stable")
+    sorted_scores = scores[order]
+    true_positive = np.cumsum(positives[order])
+    # Last index of each run of equal scores = one threshold on the curve.
+    boundaries = np.r_[np.nonzero(np.diff(sorted_scores))[0], len(sorted_scores) - 1]
+    tp = true_positive[boundaries]
+    precision = tp / (boundaries + 1)
+    recall = tp / total_positive
+    recall_steps = np.diff(np.r_[0.0, recall])
+    return float(np.sum(recall_steps * precision))
+
+
+def select_prediction_threshold(
+    preds: list[float], targets: list[float], threshold: float = 0.6
+) -> float:
+    """The prediction cut that maximizes macro F1 against labels split at
+    `threshold`. Candidates are midpoints between adjacent distinct
+    predictions (plus both ends), so the result separates the predictions it
+    was chosen on rather than sitting exactly on one of them. Choose it on
+    validation only; scoring it on the same partition overstates F1.
+    """
+    preds_arr = np.asarray(preds, dtype=float)
+    target_error = np.asarray(targets, dtype=float) < threshold
+    distinct = np.unique(preds_arr)
+    if distinct.size == 0:
+        return threshold
+    candidates = np.r_[distinct[0] - 1e-6, (distinct[:-1] + distinct[1:]) / 2, distinct[-1] + 1e-6]
+    best_cut, best_macro_f1 = threshold, -1.0
+    for cut in candidates:
+        pred_error = preds_arr < cut
+        error_f1, _, _ = _binary_f1(pred_error, target_error)
+        correct_f1, _, _ = _binary_f1(~pred_error, ~target_error)
+        macro_f1 = (error_f1 + correct_f1) / 2
+        if macro_f1 > best_macro_f1:
+            best_cut, best_macro_f1 = float(cut), macro_f1
+    return best_cut
 
 
 def _binary_f1(

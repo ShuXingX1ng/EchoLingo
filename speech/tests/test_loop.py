@@ -11,6 +11,8 @@ from echolingo_speech.models.scorer import SpeechEvaluatorA0
 from echolingo_speech.training.dataset import PhoneExample, ScoringExample, WordExample, collate_fn
 from echolingo_speech.training.loop import TrainingConfig, evaluate, train_one_epoch
 
+ERROR_DETECTION_KEYS = {"precision", "recall", "f1", "macro_f1", "prediction_threshold"}
+
 
 class _ListDataset(Dataset):
     def __init__(self, examples: list[ScoringExample]) -> None:
@@ -79,7 +81,7 @@ def test_evaluate_returns_every_expected_metric_key():
     assert "word_accuracy_pearson" in metrics
     assert "word_accuracy_mae" in metrics
     assert "word_error_detection" in metrics
-    assert set(metrics["word_error_detection"]) == {"precision", "recall", "f1", "macro_f1"}
+    assert set(metrics["word_error_detection"]) == ERROR_DETECTION_KEYS
 
     assert "phone_accuracy_pearson" in metrics
     assert "phone_accuracy_mae" in metrics

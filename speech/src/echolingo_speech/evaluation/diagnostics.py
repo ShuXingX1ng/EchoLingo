@@ -33,7 +33,11 @@ from torch.utils.data import DataLoader
 
 from echolingo_speech.config import load_config
 from echolingo_speech.data.manifest import read_jsonl
-from echolingo_speech.evaluation.metrics import error_detection_metrics
+from echolingo_speech.evaluation.metrics import (
+    average_precision,
+    error_detection_metrics,
+    select_prediction_threshold,
+)
 from echolingo_speech.evaluation.report import ScorePairs, assemble_metrics
 from echolingo_speech.models.scorer import SpeechEvaluatorA0
 from echolingo_speech.training.checkpoint import load_model
@@ -150,60 +154,26 @@ def confusion_matrix(preds: Sequence[float], targets: Sequence[float], threshold
     }
 
 
-def average_precision(scores: Sequence[float], positives: Sequence[bool]) -> float:
-    """Area under the precision-recall curve (step-wise, as sklearn's
-    `average_precision_score`); higher `scores` mean "more likely positive".
-    Ties are broken by input order, which is deterministic for a fixed run.
-    """
-    scores_arr = np.asarray(scores, dtype=float)
-    positives_arr = np.asarray(positives, dtype=bool)
-    total_positive = int(positives_arr.sum())
-    if total_positive == 0:
-        return 0.0
-    order = np.argsort(-scores_arr, kind="stable")
-    hits = positives_arr[order]
-    true_positive = np.cumsum(hits)
-    precision = true_positive / np.arange(1, len(hits) + 1)
-    return float(np.sum(precision[hits]) / total_positive)
-
-
-def best_threshold(
-    preds: Sequence[float], targets: Sequence[float], label_threshold: float
-) -> dict:
-    """The prediction threshold that maximizes macro F1 on *these* examples,
-    with labels still split at `label_threshold`. Diagnostic only: it shows
-    how much signal the fixed threshold hides, and is not a tuned setting.
-    """
-    preds_arr = np.asarray(preds, dtype=float)
-    target_error = np.asarray(targets, dtype=float) < label_threshold
-    best = {"threshold": label_threshold, "macro_f1": -1.0}
-    for candidate in np.unique(preds_arr):
-        macro_f1 = _macro_f1(preds_arr <= candidate, target_error)
-        if macro_f1 > best["macro_f1"]:
-            best = {"threshold": float(candidate), "macro_f1": macro_f1}
-    return best
-
-
-def _macro_f1(pred_error: np.ndarray, target_error: np.ndarray) -> float:
-    def f1(pred: np.ndarray, target: np.ndarray) -> float:
-        tp = int(np.sum(pred & target))
-        fp = int(np.sum(pred & ~target))
-        fn = int(np.sum(~pred & target))
-        return 2 * tp / (2 * tp + fp + fn) if tp else 0.0
-
-    return (f1(pred_error, target_error) + f1(~pred_error, ~target_error)) / 2
-
-
 def error_detection_diagnostics(
     preds: Sequence[float], targets: Sequence[float], threshold: float
 ) -> dict:
-    target_error = [target < threshold for target in targets]
+    """`best_threshold_on_this_partition` is chosen and scored on the same
+    examples: it shows how much signal the fixed threshold hides, and is an
+    optimistic upper bound, not a tuned setting.
+    """
+    preds, targets = list(preds), list(targets)
+    best_cut = select_prediction_threshold(preds, targets, threshold)
     return {
-        "at_threshold": error_detection_metrics(list(preds), list(targets), threshold),
+        "at_threshold": error_detection_metrics(preds, targets, threshold),
         "confusion": confusion_matrix(preds, targets, threshold),
-        "average_precision": average_precision([1.0 - pred for pred in preds], target_error),
-        "chance_average_precision": float(np.mean(target_error)) if target_error else 0.0,
-        "best_threshold_on_this_partition": best_threshold(preds, targets, threshold),
+        "average_precision": average_precision(preds, targets, threshold),
+        "chance_average_precision": (
+            float(np.mean([target < threshold for target in targets])) if targets else 0.0
+        ),
+        "best_threshold_on_this_partition": {
+            "threshold": best_cut,
+            "macro_f1": error_detection_metrics(preds, targets, threshold, best_cut)["macro_f1"],
+        },
         "prediction_distribution": distribution(preds, threshold),
         "label_distribution": distribution(targets, threshold),
     }

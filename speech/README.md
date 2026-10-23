@@ -126,6 +126,11 @@ uv run python -m echolingo_speech.evaluation.diagnostics --config configs/speech
   --partition validation --out-dir $SPEECH_HOME/reports/m25-diagnostics-validation
 ```
 
+Training also chooses word/phone prediction thresholds on validation and saves
+them as `prediction_thresholds.json` beside the checkpoints; `evaluate` uses
+that file. For a checkpoint trained before this existed, pass
+`--select-thresholds` (chooses on validation, writes the file).
+
 To score a saved checkpoint without retraining (for example the sealed test
 partition once a candidate is final):
 

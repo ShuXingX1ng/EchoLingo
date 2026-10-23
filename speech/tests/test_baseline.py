@@ -10,6 +10,8 @@ import torch
 from echolingo_speech.evaluation.baseline import constant_mean_baseline_metrics
 from echolingo_speech.training.dataset import PhoneExample, ScoringExample, WordExample
 
+ERROR_DETECTION_KEYS = {"precision", "recall", "f1", "macro_f1", "prediction_threshold"}
+
 
 def _make_example(
     sample_id: str, accuracy: float, *, word_alignment_valid: bool = True
@@ -58,5 +60,5 @@ def test_baseline_reports_error_detection_for_word_and_phone_levels():
         train_examples, test_examples, score_band_width=1.0, error_detection_threshold=0.6
     )
 
-    assert set(metrics["word_error_detection"]) == {"precision", "recall", "f1", "macro_f1"}
-    assert set(metrics["phone_error_detection"]) == {"precision", "recall", "f1", "macro_f1"}
+    assert set(metrics["word_error_detection"]) == ERROR_DETECTION_KEYS
+    assert set(metrics["phone_error_detection"]) == ERROR_DETECTION_KEYS

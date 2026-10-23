@@ -17,7 +17,13 @@ from echolingo_speech.training.checkpoint import (
 )
 from echolingo_speech.training.config import TrainingConfig
 from echolingo_speech.training.dataset import PhoneExample, ScoringExample, WordExample, collate_fn
-from echolingo_speech.training.loop import evaluate, fit
+from echolingo_speech.training.loop import (
+    evaluate,
+    fit,
+    read_prediction_thresholds,
+    select_prediction_thresholds,
+    write_prediction_thresholds,
+)
 from echolingo_speech.training.tracking import InMemoryTracker
 
 SEED = 7
@@ -277,3 +283,23 @@ def test_resume_allows_training_for_more_epochs(tmp_path):
     )
 
     assert summary["resumed_from_epoch"] == 1
+
+
+def test_selected_prediction_thresholds_round_trip_and_feed_evaluate(tmp_path):
+    torch.manual_seed(SEED)
+    _, val_loader = _loaders()
+    config = _config()
+    model = SpeechEvaluatorA0()
+
+    thresholds = select_prediction_thresholds(model, val_loader, "cpu", config)
+    assert set(thresholds) == {"word", "phone"}
+
+    path = write_prediction_thresholds(tmp_path / "run", thresholds)
+    assert read_prediction_thresholds(path.parent) == thresholds
+    assert read_prediction_thresholds(tmp_path / "missing") is None
+
+    metrics = evaluate(model, val_loader, "cpu", config, prediction_thresholds=thresholds)
+    assert metrics["word_error_detection"]["prediction_threshold"] == thresholds["word"]
+    assert metrics["phone_error_detection"]["prediction_threshold"] == thresholds["phone"]
+    assert "word_error_detection_average_precision" in metrics
+    assert "phone_error_detection_average_precision" in metrics

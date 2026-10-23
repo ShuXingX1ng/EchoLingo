@@ -28,6 +28,7 @@ from torch.utils.data import DataLoader
 
 from echolingo_speech.config import load_config
 from echolingo_speech.data.manifest import read_jsonl
+from echolingo_speech.evaluation.metrics import select_prediction_threshold
 from echolingo_speech.evaluation.report import ScorePairs, assemble_metrics
 from echolingo_speech.models.scorer import SpeechEvaluatorA0
 from echolingo_speech.training.checkpoint import (
@@ -50,6 +51,7 @@ from echolingo_speech.training.losses import (
 from echolingo_speech.training.tracking import InMemoryTracker, RunTracker, mlflow_run
 
 PARTITIONS = ("train", "validation", "test")
+PREDICTION_THRESHOLDS_NAME = "prediction_thresholds.json"
 
 
 def resolve_device(requested: str | None = None) -> str:
@@ -95,14 +97,11 @@ def train_one_epoch(
 
 
 @torch.no_grad()
-def evaluate(
-    model: SpeechEvaluatorA0, loader: DataLoader, device: str, training_config: TrainingConfig
-) -> dict:
-    """Runs one full pass without gradients, accumulating both the training
-    loss (for early stopping / LR scheduling) and every roadmap SS7.1 metric
-    (for us to read and reason about) -- no single metric here decides
-    anything on its own.
-    """
+def _score_pass(
+    model: SpeechEvaluatorA0, loader: DataLoader, device: str
+) -> tuple[float, ScorePairs]:
+    """One pass without gradients: mean training loss plus every mask-valid
+    prediction/target pair."""
     model.eval()
     total_loss = 0.0
     num_batches = 0
@@ -135,15 +134,50 @@ def evaluate(
             pairs.phone_accuracy_preds.extend(pred_tensor.cpu().tolist())
             pairs.phone_accuracy_targets.extend(example.accuracy for example in examples)
 
-    metrics: dict = {"loss": total_loss / max(1, num_batches)}
+    return total_loss / max(1, num_batches), pairs
+
+
+def evaluate(
+    model: SpeechEvaluatorA0,
+    loader: DataLoader,
+    device: str,
+    training_config: TrainingConfig,
+    *,
+    prediction_thresholds: dict[str, float] | None = None,
+) -> dict:
+    """Runs one full pass without gradients, accumulating both the training
+    loss (for early stopping / LR scheduling) and every roadmap SS7.1 metric
+    (for us to read and reason about) -- no single metric here decides
+    anything on its own.
+    """
+    loss, pairs = _score_pass(model, loader, device)
+    metrics: dict = {"loss": loss}
     metrics.update(
         assemble_metrics(
             pairs,
             score_band_width=training_config.score_band_width,
             error_detection_threshold=training_config.error_detection_threshold,
+            prediction_thresholds=prediction_thresholds,
         )
     )
     return metrics
+
+
+def select_prediction_thresholds(
+    model: SpeechEvaluatorA0, loader: DataLoader, device: str, training_config: TrainingConfig
+) -> dict[str, float]:
+    """Word and phone prediction cuts that maximize macro F1 on `loader`,
+    which must be the validation partition (roadmap SS18.3 step 3.1)."""
+    _, pairs = _score_pass(model, loader, device)
+    label_threshold = training_config.error_detection_threshold
+    return {
+        "word": select_prediction_threshold(
+            pairs.word_accuracy_preds, pairs.word_accuracy_targets, label_threshold
+        ),
+        "phone": select_prediction_threshold(
+            pairs.phone_accuracy_preds, pairs.phone_accuracy_targets, label_threshold
+        ),
+    }
 
 
 def _flatten_metrics(metrics: dict) -> dict[str, float]:
@@ -353,13 +387,34 @@ def run_training(
         resume=resume,
     )
 
+    thresholds = select_prediction_thresholds(model, val_loader, resolved_device, training_config)
+    result["prediction_thresholds"] = thresholds
+    if checkpoint_dir is not None:
+        write_prediction_thresholds(checkpoint_dir, thresholds)
+
     if evaluate_test:
         test_loader = _partition_loader(
             manifest_path, processed_root, "test", batch_size, shuffle=False
         )
-        result["test_metrics"] = evaluate(model, test_loader, resolved_device, training_config)
+        result["test_metrics"] = evaluate(
+            model, test_loader, resolved_device, training_config, prediction_thresholds=thresholds
+        )
 
     return model, result
+
+
+def write_prediction_thresholds(checkpoint_dir: Path, thresholds: dict[str, float]) -> Path:
+    path = checkpoint_dir / PREDICTION_THRESHOLDS_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(thresholds, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def read_prediction_thresholds(checkpoint_dir: Path) -> dict[str, float] | None:
+    path = checkpoint_dir / PREDICTION_THRESHOLDS_NAME
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def evaluate_checkpoint(
@@ -370,17 +425,35 @@ def evaluate_checkpoint(
     partition: str,
     *,
     device: str | None = None,
+    select_thresholds: bool = False,
 ) -> dict:
     """Score a saved checkpoint on one manifest partition without training,
     so the sealed test partition can be evaluated once a candidate is final
     (roadmap SS18.4) rather than as a side effect of a training run.
+
+    Prediction thresholds come from `prediction_thresholds.json` beside the
+    checkpoint. `select_thresholds=True` first chooses them on validation and
+    writes that file (for checkpoints trained before thresholds were saved).
     """
     resolved_device = resolve_device(device)
     model = load_model(checkpoint_path, resolved_device)
+    checkpoint_dir = checkpoint_path.parent
+    if select_thresholds:
+        val_loader = _partition_loader(
+            manifest_path, processed_root, "validation", training_config.batch_size, shuffle=False
+        )
+        thresholds = select_prediction_thresholds(
+            model, val_loader, resolved_device, training_config
+        )
+        write_prediction_thresholds(checkpoint_dir, thresholds)
+    else:
+        thresholds = read_prediction_thresholds(checkpoint_dir)
     loader = _partition_loader(
         manifest_path, processed_root, partition, training_config.batch_size, shuffle=False
     )
-    return evaluate(model, loader, resolved_device, training_config)
+    return evaluate(
+        model, loader, resolved_device, training_config, prediction_thresholds=thresholds
+    )
 
 
 def _git_commit_sha(repo_root: Path) -> str:
@@ -450,6 +523,12 @@ def _cli_train(args: argparse.Namespace) -> int:
             resume=args.resume,
         )
 
+        tracker.log_metrics(
+            {
+                f"selected_{level}_prediction_threshold": value
+                for level, value in result["prediction_thresholds"].items()
+            }
+        )
         if "test_metrics" in result:
             tracker.log_metrics(
                 {
@@ -480,6 +559,7 @@ def _cli_evaluate(args: argparse.Namespace) -> int:
         training_config,
         args.partition,
         device=args.device,
+        select_thresholds=args.select_thresholds,
     )
     for key, value in _flatten_metrics(metrics).items():
         print(f"{key} = {value}")
@@ -516,6 +596,11 @@ def _cli(argv: list[str] | None = None) -> int:
     evaluate_parser.add_argument("--checkpoint", type=Path, required=True)
     evaluate_parser.add_argument("--partition", choices=PARTITIONS, default="validation")
     evaluate_parser.add_argument("--out", type=Path, default=None, help="also write metrics JSON")
+    evaluate_parser.add_argument(
+        "--select-thresholds",
+        action="store_true",
+        help="choose prediction thresholds on validation and save them beside the checkpoint",
+    )
 
     args = parser.parse_args(argv)
     if args.command == "train":

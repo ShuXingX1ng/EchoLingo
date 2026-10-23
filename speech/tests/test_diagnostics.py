@@ -7,8 +7,6 @@ import pytest
 import torch
 
 from echolingo_speech.evaluation.diagnostics import (
-    average_precision,
-    best_threshold,
     collect_outputs,
     confusion_matrix,
     diagnose_records,
@@ -40,25 +38,6 @@ def _make_example(
 def test_confusion_matrix_counts_error_class_below_threshold():
     confusion = confusion_matrix([0.1, 0.9, 0.2, 0.8], [0.1, 0.1, 0.9, 0.9], threshold=0.5)
     assert confusion == {"true_error": 1, "false_error": 1, "missed_error": 1, "true_correct": 1}
-
-
-def test_average_precision_is_one_for_perfect_ranking_and_matches_hand_value():
-    assert average_precision([0.9, 0.8, 0.1], [True, True, False]) == pytest.approx(1.0)
-    # Ranked: neg, pos, pos -> precision at the two hits is 1/2 and 2/3.
-    assert average_precision([0.9, 0.8, 0.7], [False, True, True]) == pytest.approx(
-        (1 / 2 + 2 / 3) / 2
-    )
-    assert average_precision([0.5], [False]) == 0.0
-
-
-def test_best_threshold_finds_split_a_fixed_threshold_misses():
-    # Every prediction sits above 0.6, so the fixed threshold never flags an
-    # error, yet the predictions still rank the errors first.
-    preds = [0.70, 0.72, 0.90, 0.95]
-    targets = [0.2, 0.3, 0.9, 1.0]
-    best = best_threshold(preds, targets, label_threshold=0.6)
-    assert best["threshold"] == pytest.approx(0.72)
-    assert best["macro_f1"] == pytest.approx(1.0)
 
 
 def test_distribution_reports_fraction_below_threshold_and_histogram():

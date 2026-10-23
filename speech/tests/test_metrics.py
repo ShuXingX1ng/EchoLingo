@@ -6,10 +6,12 @@ from __future__ import annotations
 import pytest
 
 from echolingo_speech.evaluation.metrics import (
+    average_precision,
     error_detection_metrics,
     mean_absolute_error,
     pearson_correlation,
     score_band_error,
+    select_prediction_threshold,
     spearman_correlation,
 )
 
@@ -65,3 +67,35 @@ def test_error_detection_metrics_penalizes_false_positive():
 
     assert metrics["precision"] == pytest.approx(0.0)  # the predicted error was a false positive
     assert metrics["recall"] == pytest.approx(0.0)  # no actual errors to recall (0/0 -> 0.0)
+
+
+def test_error_detection_splits_predictions_at_their_own_threshold():
+    # Labels split at 0.6, predictions at 0.75: the 0.7 prediction now flags.
+    preds = [0.70, 0.90]
+    targets = [0.20, 0.90]
+    assert error_detection_metrics(preds, targets, threshold=0.6)["recall"] == 0.0
+    metrics = error_detection_metrics(preds, targets, threshold=0.6, prediction_threshold=0.75)
+    assert metrics["macro_f1"] == pytest.approx(1.0)
+
+
+def test_average_precision_ranks_low_predictions_as_errors():
+    # Errors (targets < 0.6) get the lowest predictions -> perfect ranking.
+    assert average_precision([0.1, 0.2, 0.9], [0.3, 0.4, 1.0]) == pytest.approx(1.0)
+    # Ranked by 1 - pred: correct, error, error -> precision 1/2 then 2/3.
+    assert average_precision([0.1, 0.2, 0.3], [1.0, 0.4, 0.4]) == pytest.approx(
+        (1 / 2 + 2 / 3) / 2
+    )
+    assert average_precision([0.5], [1.0]) == 0.0
+
+
+def test_average_precision_of_a_constant_predictor_is_the_error_rate():
+    assert average_precision([0.8] * 4, [0.2, 1.0, 1.0, 1.0]) == pytest.approx(0.25)
+
+
+def test_select_prediction_threshold_separates_predictions_above_the_label_cut():
+    # Every prediction is above 0.6, yet they still rank the errors first.
+    preds = [0.70, 0.72, 0.90, 0.95]
+    targets = [0.2, 0.3, 0.9, 1.0]
+    cut = select_prediction_threshold(preds, targets, threshold=0.6)
+    assert 0.72 < cut < 0.90
+    assert error_detection_metrics(preds, targets, 0.6, cut)["macro_f1"] == pytest.approx(1.0)

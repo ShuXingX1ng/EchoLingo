@@ -117,3 +117,27 @@ Findings:
 | 3.5 Multi-layer hidden states | Not addressed here. |
 
 Masking (SS1) does not need a fix before step 3.
+
+## 6. Step 3.1 applied: validation-chosen thresholds + average precision
+
+Measurement change only; the A0 checkpoints are unchanged. Labels still
+count as errors below 0.6. Predictions are now split at a per-level cut that
+maximizes macro F1 on validation (`select_prediction_threshold`), saved as
+`prediction_thresholds.json` beside each checkpoint and used for any later
+evaluation. Every report now also carries
+`{word,phone}_error_detection_average_precision`.
+
+| Validation | Seed 42 | Seed 1337 |
+|---|---|---|
+| Word cut / phone cut | 0.881 / 0.844 | 0.859 / 0.864 |
+| Word macro F1 (precision / recall) | 0.632 (0.329 / 0.455) | 0.625 (0.343 / 0.366) |
+| Phone macro F1 (precision / recall) | 0.626 (0.299 / 0.352) | 0.627 (0.281 / 0.413) |
+| Word / phone average precision | 0.311 / 0.260 | 0.312 / 0.265 |
+
+The macro F1 figures are chosen and measured on the same partition, so they
+are optimistic. The honest number is the sealed test score of the final
+candidate with its saved cut, measured once. For comparing M2.5 candidates,
+use word and phone **average precision on validation**, which does not depend
+on a cut; A0's reference is 0.311 / 0.312 (word) and 0.260 / 0.265 (phone).
+
+Rerunning the diagnostics with the shared metric code reproduced SS2 exactly.

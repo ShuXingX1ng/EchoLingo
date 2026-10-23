@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from echolingo_speech.evaluation.metrics import (
+    average_precision,
     error_detection_metrics,
     mean_absolute_error,
     pearson_correlation,
@@ -54,10 +55,14 @@ def assemble_metrics(
     score_band_width: float,
     error_detection_threshold: float,
     include_correlation: bool = True,
+    prediction_thresholds: dict[str, float] | None = None,
 ) -> dict:
     """`include_correlation=False` is for constant predictors, which have no
-    defined Pearson/Spearman agreement.
+    defined Pearson/Spearman agreement. `prediction_thresholds` maps "word" /
+    "phone" to a validation-chosen prediction cut; a level without one splits
+    predictions at `error_detection_threshold`, like its labels.
     """
+    prediction_thresholds = prediction_thresholds or {}
     metrics: dict = {}
 
     for key in SENTENCE_TARGET_KEYS:
@@ -84,7 +89,12 @@ def assemble_metrics(
         metrics[f"{level}_accuracy_mae"] = mean_absolute_error(
             _to_raw_scale(preds, scale), _to_raw_scale(targets, scale)
         )
-        metrics[f"{level}_error_detection"] = error_detection_metrics(
+        cut = prediction_thresholds.get(level, error_detection_threshold)
+        metrics[f"{level}_error_detection"] = {
+            **error_detection_metrics(preds, targets, error_detection_threshold, cut),
+            "prediction_threshold": cut,
+        }
+        metrics[f"{level}_error_detection_average_precision"] = average_precision(
             preds, targets, error_detection_threshold
         )
 
