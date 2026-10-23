@@ -18,6 +18,7 @@ from echolingo_speech.training.checkpoint import (
 from echolingo_speech.training.config import TrainingConfig
 from echolingo_speech.training.dataset import PhoneExample, ScoringExample, WordExample, collate_fn
 from echolingo_speech.training.loop import (
+    acoustic_feature_statistics,
     evaluate,
     fit,
     read_prediction_thresholds,
@@ -303,3 +304,16 @@ def test_selected_prediction_thresholds_round_trip_and_feed_evaluate(tmp_path):
     assert metrics["phone_error_detection"]["prediction_threshold"] == thresholds["phone"]
     assert "word_error_detection_average_precision" in metrics
     assert "phone_error_detection_average_precision" in metrics
+
+
+def test_fit_stores_training_acoustic_statistics_in_the_checkpoint(tmp_path):
+    train_loader, val_loader = _loaders()
+    config = _config(max_epochs=1, normalize_acoustic_features=True)
+
+    fit(train_loader, val_loader, config, SEED, device="cpu", checkpoint_dir=tmp_path)
+    reloaded = load_model(tmp_path / BEST_CHECKPOINT_NAME, "cpu")
+
+    mean, std = acoustic_feature_statistics(train_loader)
+    assert reloaded.config["normalize_acoustic_features"] is True
+    assert torch.allclose(reloaded.acoustic_mean, mean)
+    assert torch.allclose(reloaded.acoustic_std, std)

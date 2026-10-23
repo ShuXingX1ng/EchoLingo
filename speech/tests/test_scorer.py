@@ -68,3 +68,31 @@ def test_forward_is_differentiable_end_to_end():
 
     assert model.sentence_pooling.attention.weight.grad is not None
     assert model.word_accuracy_head.weight.grad is not None
+
+
+def test_acoustic_normalization_equals_feeding_standardized_features():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    mean = torch.full((9,), 2.0)
+    std = torch.full((9,), 4.0)
+
+    normalized = SpeechEvaluatorA0(dropout=0.0, normalize_acoustic_features=True)
+    normalized.set_acoustic_normalization(mean, std)
+    plain = SpeechEvaluatorA0(dropout=0.0)
+    plain.load_state_dict(
+        {k: v for k, v in normalized.state_dict().items() if not k.startswith("acoustic_")}
+    )
+    normalized.eval()
+    plain.eval()
+
+    standardized = dict(batch, acoustic_features=(batch["acoustic_features"] - mean) / std)
+    with torch.no_grad():
+        expected = plain(standardized)["sentence_scores"]
+        actual = normalized(batch)["sentence_scores"]
+    assert torch.allclose(actual, expected)
+
+
+def test_acoustic_normalization_is_off_by_default():
+    model = SpeechEvaluatorA0()
+    assert model.config["normalize_acoustic_features"] is False
+    assert not any(key.startswith("acoustic_") for key in model.state_dict())

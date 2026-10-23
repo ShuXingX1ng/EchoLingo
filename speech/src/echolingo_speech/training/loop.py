@@ -208,6 +208,13 @@ def _flatten_metrics(metrics: dict) -> dict[str, float]:
     return flat
 
 
+def acoustic_feature_statistics(loader: DataLoader) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-feature mean and std of the explicit acoustic features over every
+    example `loader` yields; called on the training partition only."""
+    features = torch.cat([batch["acoustic_features"] for batch in loader])
+    return features.mean(dim=0), features.std(dim=0, unbiased=False)
+
+
 def fit(
     train_loader: DataLoader,
     val_loader: DataLoader,
@@ -234,7 +241,13 @@ def fit(
     total_epochs = max_epochs or training_config.max_epochs
 
     _set_seed(seed)
-    model = SpeechEvaluatorA0(dropout=training_config.dropout).to(resolved_device)
+    model = SpeechEvaluatorA0(
+        dropout=training_config.dropout,
+        normalize_acoustic_features=training_config.normalize_acoustic_features,
+    ).to(resolved_device)
+    if training_config.normalize_acoustic_features:
+        mean, std = acoustic_feature_statistics(train_loader)
+        model.set_acoustic_normalization(mean.to(resolved_device), std.to(resolved_device))
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=training_config.learning_rate,

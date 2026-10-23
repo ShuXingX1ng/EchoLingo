@@ -60,6 +60,7 @@ class SpeechEvaluatorA0(nn.Module):
         word_trunk_dim: int = 128,
         phone_trunk_dim: int = 64,
         dropout: float = 0.3,
+        normalize_acoustic_features: bool = False,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -71,7 +72,14 @@ class SpeechEvaluatorA0(nn.Module):
             "word_trunk_dim": word_trunk_dim,
             "phone_trunk_dim": phone_trunk_dim,
             "dropout": dropout,
+            "normalize_acoustic_features": normalize_acoustic_features,
         }
+        # Training-partition mean/std of the explicit acoustic features (Hz,
+        # seconds, counts on very different scales), stored as buffers so a
+        # checkpoint carries them; set by `set_acoustic_normalization`.
+        if normalize_acoustic_features:
+            self.register_buffer("acoustic_mean", torch.zeros(num_acoustic_features))
+            self.register_buffer("acoustic_std", torch.ones(num_acoustic_features))
         self.sentence_pooling = AttentiveStatisticsPooling(hidden_dim)
         sentence_input_dim = hidden_dim * 2 + num_acoustic_features
         self.sentence_trunk = nn.Sequential(
@@ -94,12 +102,22 @@ class SpeechEvaluatorA0(nn.Module):
         )
         self.phone_accuracy_head = nn.Linear(phone_trunk_dim, 1)
 
+    def set_acoustic_normalization(self, mean: torch.Tensor, std: torch.Tensor) -> None:
+        if not self.config["normalize_acoustic_features"]:
+            raise ValueError("model was built with normalize_acoustic_features=False")
+        self.acoustic_mean.copy_(mean)
+        # A feature constant over the training set would divide by zero.
+        self.acoustic_std.copy_(std.clamp(min=1e-6))
+
     def forward(self, batch: dict) -> dict:
         hidden_states = batch["hidden_states"]
         frame_mask = batch["frame_mask"]
 
+        acoustic = batch["acoustic_features"]
+        if self.config["normalize_acoustic_features"]:
+            acoustic = (acoustic - self.acoustic_mean) / self.acoustic_std
         sentence_pooled = self.sentence_pooling(hidden_states, frame_mask)
-        sentence_input = torch.cat([sentence_pooled, batch["acoustic_features"]], dim=-1)
+        sentence_input = torch.cat([sentence_pooled, acoustic], dim=-1)
         sentence_trunk_out = self.sentence_trunk(sentence_input)
         sentence_scores = torch.cat(
             [

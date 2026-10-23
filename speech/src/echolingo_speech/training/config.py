@@ -25,6 +25,8 @@ class TrainingConfig(BaseModel):
     # Within the word loss: accuracy Huber vs stress BCE (A0: equal 0.5 / 0.5).
     word_accuracy_weight: float = 0.5
     word_stress_weight: float = 0.5
+    # Standardize the explicit acoustic features with training-partition stats.
+    normalize_acoustic_features: bool = False
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

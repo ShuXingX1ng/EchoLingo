@@ -1,0 +1,24 @@
+# M2.5 step 3.3 (roadmap SS18.3): the current reference (a0-rebalance.yaml)
+# plus standardized acoustic features. The 9 explicit features (Hz, seconds,
+# counts) are scaled with training-partition mean/std, stored in the model so
+# inference applies the same statistics. Only that one factor changes.
+# Two runs use this file with --seed 42 and --seed 1337 (--run-name a0rn-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0
