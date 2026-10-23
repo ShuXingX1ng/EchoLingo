@@ -317,3 +317,20 @@ def test_fit_stores_training_acoustic_statistics_in_the_checkpoint(tmp_path):
     assert reloaded.config["normalize_acoustic_features"] is True
     assert torch.allclose(reloaded.acoustic_mean, mean)
     assert torch.allclose(reloaded.acoustic_std, std)
+
+
+def test_canonical_phone_model_round_trips_through_a_checkpoint(tmp_path):
+    train_loader, val_loader = _loaders()
+    config = _config(max_epochs=1, use_canonical_phones=True)
+
+    model, _ = fit(train_loader, val_loader, config, SEED, device="cpu", checkpoint_dir=tmp_path)
+    reloaded = load_model(tmp_path / BEST_CHECKPOINT_NAME, "cpu")
+
+    assert reloaded.config["use_canonical_phones"] is True
+    batch = next(iter(val_loader))
+    model.eval()
+    reloaded.eval()
+    with torch.no_grad():
+        expected = model(batch)["word_accuracy"][0]
+        actual = reloaded(batch)["word_accuracy"][0]
+    assert torch.allclose(actual, expected)

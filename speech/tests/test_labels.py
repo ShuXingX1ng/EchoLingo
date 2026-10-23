@@ -69,3 +69,17 @@ def test_word_alignment_is_valid_requires_exact_count_match():
 def test_phone_alignment_is_valid_requires_exact_count_match():
     assert phone_alignment_is_valid(mfa_phone_count=3, canonical_phone_count=3)
     assert not phone_alignment_is_valid(mfa_phone_count=2, canonical_phone_count=3)
+
+
+def test_canonical_phone_id_strips_stress_and_reserves_zero_for_unknown():
+    from echolingo_speech.training.labels import (
+        NUM_PHONE_IDS,
+        UNKNOWN_PHONE_ID,
+        canonical_phone_id,
+    )
+
+    assert NUM_PHONE_IDS == 40
+    assert canonical_phone_id("AH0") == canonical_phone_id("AH1") == canonical_phone_id("AH")
+    assert canonical_phone_id("AH0") != canonical_phone_id("T")
+    assert canonical_phone_id("T") != UNKNOWN_PHONE_ID
+    assert canonical_phone_id("XX") == UNKNOWN_PHONE_ID

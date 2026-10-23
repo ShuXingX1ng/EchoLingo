@@ -23,6 +23,19 @@ PHONE_SCALE = 2.0
 STRESS_MISPLACED_RAW = 5
 STRESS_CORRECT_RAW = 10
 
+# The 39 ARPAbet base phones. SpeechOcean762's canonical phones carry stress
+# digits (AH0/AH1/AH2) and a few bare vowels (IH, UH); identity embeddings key
+# on the base phone so rare stress variants share one well-trained vector.
+# Index 0 is reserved for anything outside this fixed, split-independent set.
+ARPABET_BASE_PHONES = (
+    "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY",
+    "F", "G", "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P",
+    "R", "S", "SH", "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
+)
+UNKNOWN_PHONE_ID = 0
+NUM_PHONE_IDS = len(ARPABET_BASE_PHONES) + 1
+_PHONE_TO_ID = {phone: index + 1 for index, phone in enumerate(ARPABET_BASE_PHONES)}
+
 
 def normalize_sentence_scores(sentence: dict) -> dict[str, float]:
     """Map the four sentence-level regression targets to [0, 1]."""
@@ -49,6 +62,11 @@ def normalize_word_score(word: dict) -> dict[str, float]:
 def normalize_phone_accuracy(raw: float) -> float:
     """Map a single phone's continuous 0-2 accuracy score to [0, 1]."""
     return raw / PHONE_SCALE
+
+
+def canonical_phone_id(phone: str) -> int:
+    """Map a canonical phone label (e.g. `AH0`, `IH`) to its base-phone id."""
+    return _PHONE_TO_ID.get(phone.rstrip("012"), UNKNOWN_PHONE_ID)
 
 
 def word_alignment_is_valid(mfa_word_count: int, reference_word_count: int) -> bool:

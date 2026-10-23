@@ -27,6 +27,7 @@ from echolingo_speech.training.dataset import (
     _time_to_frame,
     collate_fn,
 )
+from echolingo_speech.training.labels import canonical_phone_id
 
 _TEXTGRID_TEMPLATE = """File type = "ooTextFile"
 Object class = "TextGrid"
@@ -137,6 +138,11 @@ def test_match_words_and_phones_valid_case_produces_word_and_phone_examples():
     assert word_examples[1].stress == pytest.approx(0.0)  # stress=5 -> misplaced
     assert len(phone_examples) == 4
     assert phone_examples[-1].accuracy == pytest.approx(0.5)  # 1.0 / 2.0
+    # Canonical (expected) identities, not MFA's recognized IY1 / AO0 labels.
+    assert word_examples[0].phone_ids == [canonical_phone_id("W"), canonical_phone_id("IY0")]
+    assert [phone.phone_id for phone in phone_examples] == [
+        canonical_phone_id(label) for label in ("W", "IY0", "K", "AO0")
+    ]
 
 
 def test_match_words_and_phones_masks_whole_record_on_word_count_mismatch():

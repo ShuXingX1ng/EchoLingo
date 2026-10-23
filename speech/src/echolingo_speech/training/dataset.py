@@ -11,7 +11,7 @@ never runs Wav2Vec2 itself.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +23,7 @@ from echolingo_speech.data.manifest import ManifestRecord, read_jsonl
 from echolingo_speech.features.acoustic import compute_acoustic_features, feature_vector
 from echolingo_speech.training.labels import (
     SENTENCE_TARGET_KEYS,
+    canonical_phone_id,
     normalize_phone_accuracy,
     normalize_sentence_scores,
     normalize_word_score,
@@ -37,6 +38,8 @@ class WordExample:
     frame_end: int
     accuracy: float
     stress: float
+    # Canonical (expected) phone ids of the word, from `canonical_phone_id`.
+    phone_ids: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -44,6 +47,8 @@ class PhoneExample:
     frame_start: int
     frame_end: int
     accuracy: float
+    # Canonical (expected) phone id at this position, from `canonical_phone_id`.
+    phone_id: int = 0
 
 
 @dataclass
@@ -112,24 +117,33 @@ def _match_words_and_phones(
             word_span.start, word_span.end, duration_sec, num_frames
         )
         normalized_word = normalize_word_score(canonical_word)
+        canonical_phones = canonical_word["phones"]
         word_examples.append(
             WordExample(
-                frame_start, frame_end, normalized_word["accuracy"], normalized_word["stress"]
+                frame_start,
+                frame_end,
+                normalized_word["accuracy"],
+                normalized_word["stress"],
+                [canonical_phone_id(phone) for phone in canonical_phones],
             )
         )
 
-        canonical_phones = canonical_word["phones"]
         phones_accuracy = canonical_word["phones-accuracy"]
         mfa_phones_in_word = _phones_for_word(word_span, phone_spans)
         if not phone_alignment_is_valid(len(mfa_phones_in_word), len(canonical_phones)):
             continue
-        for phone_span, raw_accuracy in zip(mfa_phones_in_word, phones_accuracy):
+        for phone_span, raw_accuracy, canonical_phone in zip(
+            mfa_phones_in_word, phones_accuracy, canonical_phones
+        ):
             phone_frame_start, phone_frame_end = _span_to_frame_range(
                 phone_span.start, phone_span.end, duration_sec, num_frames
             )
             phone_examples.append(
                 PhoneExample(
-                    phone_frame_start, phone_frame_end, normalize_phone_accuracy(raw_accuracy)
+                    phone_frame_start,
+                    phone_frame_end,
+                    normalize_phone_accuracy(raw_accuracy),
+                    canonical_phone_id(canonical_phone),
                 )
             )
 

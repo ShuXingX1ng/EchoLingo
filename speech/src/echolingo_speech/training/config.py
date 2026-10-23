@@ -27,6 +27,8 @@ class TrainingConfig(BaseModel):
     word_stress_weight: float = 0.5
     # Standardize the explicit acoustic features with training-partition stats.
     normalize_acoustic_features: bool = False
+    # Give word/phone heads the canonical (expected) phone identities.
+    use_canonical_phones: bool = False
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

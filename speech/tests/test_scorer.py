@@ -96,3 +96,32 @@ def test_acoustic_normalization_is_off_by_default():
     model = SpeechEvaluatorA0()
     assert model.config["normalize_acoustic_features"] is False
     assert not any(key.startswith("acoustic_") for key in model.state_dict())
+
+
+def test_canonical_phones_feed_word_and_phone_heads():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    model = SpeechEvaluatorA0(dropout=0.0, use_canonical_phones=True)
+    model.eval()
+
+    with torch.no_grad():
+        before = model(batch)
+        for word in batch["word_examples"][0]:
+            word.phone_ids = [3, 7]
+        for phone in batch["phone_examples"][0]:
+            phone.phone_id = 5
+        after = model(batch)
+
+    assert after["word_accuracy"][0].shape == (2,)
+    assert after["phone_accuracy"][0].shape == (3,)
+    assert after["word_accuracy"][1].shape == (0,)
+    assert not torch.allclose(before["word_accuracy"][0], after["word_accuracy"][0])
+    assert not torch.allclose(before["phone_accuracy"][0], after["phone_accuracy"][0])
+    # Sentence heads never see phone identities.
+    assert torch.allclose(before["sentence_scores"], after["sentence_scores"])
+
+
+def test_canonical_phones_are_off_by_default():
+    model = SpeechEvaluatorA0()
+    assert model.config["use_canonical_phones"] is False
+    assert not hasattr(model, "phone_embedding")

@@ -13,7 +13,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from echolingo_speech.training.labels import SENTENCE_TARGET_KEYS
+from echolingo_speech.training.labels import NUM_PHONE_IDS, SENTENCE_TARGET_KEYS
 
 
 class AttentiveStatisticsPooling(nn.Module):
@@ -61,6 +61,8 @@ class SpeechEvaluatorA0(nn.Module):
         phone_trunk_dim: int = 64,
         dropout: float = 0.3,
         normalize_acoustic_features: bool = False,
+        use_canonical_phones: bool = False,
+        phone_embedding_dim: int = 32,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -73,6 +75,8 @@ class SpeechEvaluatorA0(nn.Module):
             "phone_trunk_dim": phone_trunk_dim,
             "dropout": dropout,
             "normalize_acoustic_features": normalize_acoustic_features,
+            "use_canonical_phones": use_canonical_phones,
+            "phone_embedding_dim": phone_embedding_dim,
         }
         # Training-partition mean/std of the explicit acoustic features (Hz,
         # seconds, counts on very different scales), stored as buffers so a
@@ -91,14 +95,22 @@ class SpeechEvaluatorA0(nn.Module):
             {key: nn.Linear(sentence_trunk_dim, 1) for key in SENTENCE_TARGET_KEYS}
         )
 
+        # With canonical phones, word and phone spans are paired with what
+        # *should* have been said: the phone's own identity embedding, or the
+        # mean of a word's phone embeddings (which also covers words never seen
+        # in training, unlike a per-word embedding).
+        span_input_dim = hidden_dim
+        if use_canonical_phones:
+            self.phone_embedding = nn.Embedding(NUM_PHONE_IDS, phone_embedding_dim)
+            span_input_dim += phone_embedding_dim
         self.word_trunk = nn.Sequential(
-            nn.Linear(hidden_dim, word_trunk_dim), nn.ReLU(), nn.Dropout(dropout)
+            nn.Linear(span_input_dim, word_trunk_dim), nn.ReLU(), nn.Dropout(dropout)
         )
         self.word_accuracy_head = nn.Linear(word_trunk_dim, 1)
         self.word_stress_head = nn.Linear(word_trunk_dim, 1)
 
         self.phone_trunk = nn.Sequential(
-            nn.Linear(hidden_dim, phone_trunk_dim), nn.ReLU(), nn.Dropout(dropout)
+            nn.Linear(span_input_dim, phone_trunk_dim), nn.ReLU(), nn.Dropout(dropout)
         )
         self.phone_accuracy_head = nn.Linear(phone_trunk_dim, 1)
 
@@ -108,6 +120,21 @@ class SpeechEvaluatorA0(nn.Module):
         self.acoustic_mean.copy_(mean)
         # A feature constant over the training set would divide by zero.
         self.acoustic_std.copy_(std.clamp(min=1e-6))
+
+    def _word_phone_context(self, words: list) -> torch.Tensor:
+        """Mean canonical-phone embedding per word, `(len(words), dim)`; a
+        word with no canonical phones gets the zero vector."""
+        weight = self.phone_embedding.weight
+        rows = []
+        for word in words:
+            if word.phone_ids:
+                ids = torch.tensor(word.phone_ids, dtype=torch.long, device=weight.device)
+                rows.append(self.phone_embedding(ids).mean(dim=0))
+            else:
+                rows.append(weight.new_zeros(weight.shape[1]))
+        if not rows:
+            return weight.new_zeros((0, weight.shape[1]))
+        return torch.stack(rows)
 
     def forward(self, batch: dict) -> dict:
         hidden_states = batch["hidden_states"]
@@ -133,6 +160,10 @@ class SpeechEvaluatorA0(nn.Module):
 
         for b in range(hidden_states.shape[0]):
             word_pooled = _pool_spans(hidden_states[b], batch["word_examples"][b])
+            if self.config["use_canonical_phones"]:
+                word_pooled = torch.cat(
+                    [word_pooled, self._word_phone_context(batch["word_examples"][b])], dim=-1
+                )
             word_trunk_out = self.word_trunk(word_pooled)
             word_accuracy.append(
                 torch.sigmoid(self.word_accuracy_head(word_trunk_out)).squeeze(-1)
@@ -140,6 +171,13 @@ class SpeechEvaluatorA0(nn.Module):
             word_stress_logit.append(self.word_stress_head(word_trunk_out).squeeze(-1))
 
             phone_pooled = _pool_spans(hidden_states[b], batch["phone_examples"][b])
+            if self.config["use_canonical_phones"]:
+                phone_ids = torch.tensor(
+                    [phone.phone_id for phone in batch["phone_examples"][b]],
+                    dtype=torch.long,
+                    device=phone_pooled.device,
+                )
+                phone_pooled = torch.cat([phone_pooled, self.phone_embedding(phone_ids)], dim=-1)
             phone_trunk_out = self.phone_trunk(phone_pooled)
             phone_accuracy.append(
                 torch.sigmoid(self.phone_accuracy_head(phone_trunk_out)).squeeze(-1)

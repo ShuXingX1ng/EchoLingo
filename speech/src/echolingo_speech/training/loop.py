@@ -244,6 +244,7 @@ def fit(
     model = SpeechEvaluatorA0(
         dropout=training_config.dropout,
         normalize_acoustic_features=training_config.normalize_acoustic_features,
+        use_canonical_phones=training_config.use_canonical_phones,
     ).to(resolved_device)
     if training_config.normalize_acoustic_features:
         mean, std = acoustic_feature_statistics(train_loader)

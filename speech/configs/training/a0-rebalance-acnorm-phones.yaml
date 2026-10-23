@@ -1,0 +1,26 @@
+# M2.5 step 3.4 (roadmap SS18.3): the current reference
+# (a0-rebalance-acnorm.yaml) plus canonical phone identities. Phone heads get
+# the expected phone's embedding; word heads get the mean embedding of the
+# word's canonical phones (a per-word embedding would be untrained for the
+# ~40% of test word types unseen in train). Only that one factor changes.
+# Two runs use this file with --seed 42 and --seed 1337 (--run-name a0rnp-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0
