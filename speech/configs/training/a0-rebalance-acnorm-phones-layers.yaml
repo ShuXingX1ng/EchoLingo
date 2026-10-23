@@ -1,0 +1,27 @@
+# M2.5 step 3.5 (roadmap SS18.3): the current reference
+# (a0-rebalance-acnorm-phones.yaml) reading five cached Wav2Vec2 layers
+# instead of the last one, mixed by learned softmax weights. Requires
+# `features.cache extract-layers --layers 4,6,8,10,12`. Only that one factor
+# changes. Two runs use this file with --seed 42 and --seed 1337
+# (--run-name a0rnpl-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0
