@@ -112,6 +112,17 @@ def test_a_frozen_ctc_model_builds_no_graph_through_the_cnn(tiny_wav2vec2_config
     assert all((p.grad is not None) == (id(p) in trainable) for p in model.parameters())
 
 
+def test_a_frozen_ctc_model_never_writes_the_mask_embedding(tiny_wav2vec2_config):
+    from transformers import Wav2Vec2ForCTC
+
+    tiny_wav2vec2_config.mask_time_prob = 0.5
+    model = Wav2Vec2ForCTC(tiny_wav2vec2_config)
+    with torch.no_grad():  # what the pinned checkpoint leaves behind
+        model.wav2vec2.masked_spec_embed.fill_(float("nan"))
+    model = freeze_ctc_model(model).train()
+    assert torch.isfinite(model(torch.randn(2, 4000)).logits).all()
+
+
 def _prepared(tmp_path: Path, char_vocab, write_loquacious_shard, name: str, count: int) -> Path:
     texts = ["WE CALL IT BEAR", "IT'S A DOG", "GOOD MORNING", "THANK YOU"]
     rows = [(f"{name}-{i}", 1.5, 16000, texts[i % len(texts)]) for i in range(count)]

@@ -122,10 +122,17 @@ def freeze_ctc_model(model):
     """Freeze every weight. `freeze_feature_encoder` also stops the CNN from
     marking its input as requiring grad in train mode, which would keep the
     CNN's (large, raw-audio-rate) activations for a backward pass that only
-    the LoRA layers above it need."""
+    the LoRA layers above it need.
+
+    SpecAugment is switched off: the pinned checkpoint has no
+    `masked_spec_embed`, which transformers 5.14 then leaves uninitialized
+    (NaNs on the instance, 2026-10-24), and train mode writes it into the
+    masked frames. Eval mode never masks, so the feature caches never used it.
+    """
     for parameter in model.parameters():
         parameter.requires_grad = False
     model.freeze_feature_encoder()
+    model.config.apply_spec_augment = False
     return model
 
 
@@ -343,8 +350,8 @@ def train_adapter(
     audio_seconds = 0.0
     while state["step"] < total_steps:
         train_sampler.set_epoch(state["epoch"], skip_batches=state["epoch_step"])
-        # Train mode keeps the base model's own regularization from its CTC
-        # fine-tuning (dropout, LayerDrop 0.1, SpecAugment time masks); only the
+        # Train mode keeps the base model's dropout and LayerDrop 0.1 from its
+        # CTC fine-tuning (not SpecAugment, see `freeze_ctc_model`); only the
         # LoRA updates learn under it.
         model.train()
         for batch in train_loader:

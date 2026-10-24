@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import multiprocessing
 import random
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
@@ -150,11 +151,16 @@ def prepare(
     max_seconds: float = 20.0,
     workers: int = 4,
 ) -> dict[str, int]:
-    """Decode every parquet shard into `out_dir`; resumable per shard."""
+    """Decode every parquet shard into `out_dir`; resumable per shard.
+
+    Workers are spawned, not forked: a child forked from a process whose
+    torch (OpenMP) or Arrow thread pools already ran can deadlock in them,
+    as `torchaudio` resampling did in a forked worker on Linux."""
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs = [(p, out_dir, vocab.token_to_id, min_seconds, max_seconds) for p in parquet_files]
     totals: dict[str, int] = {}
-    with ProcessPoolExecutor(max_workers=workers) as pool:
+    context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
         for counts in pool.map(_prepare_shard, jobs):
             for key, value in counts.items():
                 totals[key] = totals.get(key, 0) + value
