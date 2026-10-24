@@ -288,6 +288,21 @@ def test_resume_allows_training_for_more_epochs(tmp_path):
     assert summary["resumed_from_epoch"] == 1
 
 
+def test_resume_accepts_a_checkpoint_from_before_a_new_model_config_key(tmp_path):
+    train_loader, val_loader = _run_one_epoch(tmp_path)
+    last = tmp_path / "last.pt"
+    payload = torch.load(last, weights_only=False)
+    del payload["model_config"]["encoder_adapter"]  # saved before M3 A1 added it
+    torch.save(payload, last)
+
+    _, summary = fit(
+        train_loader, val_loader, _config(), SEED, device="cpu", checkpoint_dir=tmp_path,
+        resume=True,
+    )
+
+    assert summary["resumed_from_epoch"] == 1
+
+
 def test_selected_prediction_thresholds_round_trip_and_feed_evaluate(tmp_path):
     torch.manual_seed(SEED)
     _, val_loader = _loaders()

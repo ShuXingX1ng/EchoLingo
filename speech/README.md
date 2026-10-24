@@ -226,6 +226,55 @@ uv run python -m echolingo_speech.training.loop evaluate --config configs/speech
   --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0aa-seed42/best.pt --partition validation --feature-variant validation-noisy-1 --out a0aa-seed42-validation-noisy.json
 ```
 
+M3 A1 (validation only until a candidate is final). The A1-Encoder is a CTC
+LoRA adapter on the pinned encoder (rank 16 on every layer's attention
+`q_proj`/`v_proj`, everything else frozen), trained on Loquacious `small`
+from the Hugging Face dataset `speechbrain/LoquaciousSet` (72 train parquet
+shards, 22.9 GB; dev 6 shards, 1.7 GB; the test split is never downloaded).
+Its transcripts only supervise recognition, never scoring. `encoder.loquacious`
+decodes each shard once into 16 kHz int16 audio plus a JSONL index (~30 GB for
+`small`, resumable per shard). `encoder.ctc_adapter train` computes CTC over
+each utterance's own frames, keeps the adapter with the best greedy WER on a
+fixed 1500-utterance dev subset, and continues from `last.pt` with `--resume`.
+Layers extracted with the adapter merged into the encoder go to separate
+`-adapter-<name>` caches whose `adapter.json` records the adapter's SHA-256.
+Checkpoints record `encoder_adapter`, evaluation refuses the other cache, and
+loading refuses clean and augmented caches from two different adapters. An
+adapter name stands for one trained adapter, so retrain under a new name.
+
+```bash
+LQ=$SPEECH_HOME/data/raw/loquacious; LQP=$SPEECH_HOME/data/processed/loquacious
+A=$SPEECH_HOME/artifacts/adapters/a1-loquacious-small
+ADAPTER_CONFIG=configs/adapter/a1-loquacious-small.yaml
+uv run python -c "from huggingface_hub import snapshot_download; snapshot_download('speechbrain/LoquaciousSet', repo_type='dataset', revision='0e84cdb9e4b826afaabca5d33ec9453b11aacef3', allow_patterns=['small/*.parquet', 'dev/*.parquet'], local_dir='$LQ')"
+VOCAB=$(uv run python -c "from huggingface_hub import hf_hub_download; print(hf_hub_download('facebook/wav2vec2-base-960h', 'vocab.json', revision='22aad52d435eb6dbaf354bdad9b0da84ce7d6156', cache_dir='$SPEECH_HOME/artifacts/hf-cache'))")
+for split in small dev; do
+  uv run python -m echolingo_speech.encoder.loquacious --parquet-dir $LQ/$split --out-dir $LQP/$split --vocab $VOCAB --workers 6
+done
+uv run python -m echolingo_speech.encoder.ctc_adapter train --speech-config configs/speech.yaml --adapter-config $ADAPTER_CONFIG \
+  --train-dir $LQP/small --dev-dir $LQP/dev --out-dir $A
+
+# Greedy WER of the adapted encoder (drop --adapter-dir for the base one):
+# full Loquacious dev, then SpeechOcean validation, clean and noisy
+uv run python -m echolingo_speech.encoder.ctc_adapter wer --speech-config configs/speech.yaml --adapter-config $ADAPTER_CONFIG --data-dir $LQP/dev --adapter-dir $A/best
+uv run python -m echolingo_speech.encoder.ctc_adapter speechocean-wer --speech-config configs/speech.yaml --adapter-config $ADAPTER_CONFIG --manifest $MANIFEST --adapter-dir $A/best
+uv run python -m echolingo_speech.encoder.ctc_adapter speechocean-wer --speech-config configs/speech.yaml --adapter-config $ADAPTER_CONFIG --manifest $MANIFEST --adapter-dir $A/best --feature-variant validation-noisy-1
+
+# A1-Scorer: 3.2c on the adapter's layers. Without --layers-only the train-aug
+# copies are written again from the same seeds (same effects.json as 3.2c).
+uv run python -m echolingo_speech.features.cache extract-layers --manifest $MANIFEST --speech-config configs/speech.yaml --layers 4,6,8,10,12 --adapter-dir $A/best
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition train --profile train --copies 4 --seed 0 --name train-aug --layers 4,6,8,10,12 --adapter-dir $A/best
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition validation --profile robustness --copies 1 --seed 1 --name validation-noisy --layers 4,6,8,10,12 --layers-only --adapter-dir $A/best
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-a1-scorer.yaml --manifest $MANIFEST --seed $seed --run-name a1s-seed$seed
+done
+# Each checkpoint is scored on its own cache (3.2c raw, A1-Scorer adapted)
+uv run python -m echolingo_speech.evaluation.paired_bootstrap --config configs/speech.yaml --training-config configs/training/m3-a1-scorer.yaml --manifest $MANIFEST \
+  --reference a0ama-seed42=$SPEECH_HOME/artifacts/checkpoints/a0ama-seed42/best.pt \
+  --candidate a1s-seed42=$SPEECH_HOME/artifacts/checkpoints/a1s-seed42/best.pt \
+  --age-group adult --out bootstrap-a1-adult-seed42.json
+```
+
 Reproducibility checks before trusting the rebuild:
 
 - the tarball SHA-256 equals `tarball_sha256` in `configs/datasets/speechocean762.yaml`;
@@ -279,6 +328,9 @@ extraction ~2 min, each A0 seed ~10 min including dataset assembly, baseline
   ```
 
   The full sync then took under 30 s instead of over 40 min.
+- Hugging Face downloads were faster through that proxy (~34 MB/s on
+  2026-10-24), so keep it for those only, e.g. by saving `http_proxy` and
+  `https_proxy` before unsetting them and passing them to the download.
 
 ## Notes
 

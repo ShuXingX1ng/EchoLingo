@@ -4,6 +4,7 @@ real corpus data)."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -534,3 +535,48 @@ def test_datasets_read_the_requested_input_normalization_cache(tmp_path: Path):
         SpeechOceanScoringDataset(
             manifest_path, tmp_path, partition="train", encoder_input_normalized=True
         )
+
+
+def test_datasets_read_the_requested_adapter_cache(tmp_path: Path):
+    from echolingo_speech.features.cache import layer_cache_dir_name
+    from echolingo_speech.training.dataset import AugmentedTrainingDataset
+
+    manifest_path = _raw_and_normalized_caches(tmp_path)
+    # Adapter caches beside the raw (1.0 / 2.0) and normalized ones: 3.0
+    # clean and 4.0 for the augmented copy.
+    variant = tmp_path / "features" / "variants" / "train-aug-1"
+    variant_dir = variant / layer_cache_dir_name("abc", (4, 12), adapter="a1")
+    for root, value in ((tmp_path / "features", 3.0), (variant, 4.0)):
+        directory = root / layer_cache_dir_name("abc", (4, 12), adapter="a1")
+        directory.mkdir(parents=True)
+        np.save(directory / "SAMPLE_A.npy", np.full((2, 50, 768), value, dtype=np.float16))
+        (directory / "adapter.json").write_text(json.dumps({"name": "a1", "sha256": "f" * 64}))
+
+    def dataset(adapter: str | None) -> SpeechOceanScoringDataset:
+        return SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12],
+            encoder_adapter=adapter,
+        )
+
+    assert torch.all(dataset(None)[0].hidden_states == 1.0)
+    assert torch.all(dataset("a1")[0].hidden_states == 3.0)
+    augmented = AugmentedTrainingDataset(
+        dataset("a1"), tmp_path, [4, 12], ["train-aug-1"], 1.0, encoder_adapter="a1"
+    )
+    assert torch.all(augmented[0].hidden_states == 4.0)
+    with pytest.raises(FileNotFoundError):
+        dataset("a2")
+
+    # The variant's layers come from another adapter under the same name.
+    (variant_dir / "adapter.json").write_text(json.dumps({"name": "a1", "sha256": "e" * 64}))
+    with pytest.raises(ValueError, match="train-aug-1's 'a1' layers come from adapter eeee"):
+        AugmentedTrainingDataset(
+            dataset("a1"), tmp_path, [4, 12], ["train-aug-1"], 1.0, encoder_adapter="a1"
+        )
+    with pytest.raises(ValueError, match="from adapter eeee"):
+        SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12],
+            feature_variant="train-aug-1", encoder_adapter="a1",
+        )
+    with pytest.raises(ValueError, match="hidden_state_layers"):
+        SpeechOceanScoringDataset(manifest_path, tmp_path, partition="train", encoder_adapter="a1")

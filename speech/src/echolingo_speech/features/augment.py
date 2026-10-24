@@ -229,6 +229,13 @@ def _cli(argv: list[str] | None = None) -> int:
         action="store_true",
         help="reuse the copies' existing waveforms and only (re)extract their layers",
     )
+    parser.add_argument(
+        "--adapter-dir",
+        type=Path,
+        default=None,
+        help="cache the layers of the encoder with this CTC LoRA adapter merged in "
+        "(a separate -adapter-<name> cache)",
+    )
     args = parser.parse_args(argv)
 
     config = load_config(args.speech_config)
@@ -260,6 +267,7 @@ def _cli(argv: list[str] | None = None) -> int:
             hf_cache_dir=config.artifact_root / "hf-cache",
             device=args.device,
             normalize_input=args.normalize_input,
+            adapter_dir=args.adapter_dir,
         )
         if args.layers_only:
             print(f"OK: {variant}: layers re-extracted at {root}")

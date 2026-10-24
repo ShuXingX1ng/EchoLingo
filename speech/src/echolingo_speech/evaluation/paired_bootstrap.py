@@ -6,8 +6,9 @@ checkpoints can come from which speakers happen to be in it. This resamples
 the same resample, and reports the candidate-minus-reference difference with
 a percentile interval. Records are paired by sample id, so both checkpoints
 are always scored on exactly the same words and phones, each on the feature
-cache it was trained on (raw or normalized encoder input). The training
-config only supplies the layers, batch size and error threshold.
+cache it was trained on (raw or normalized encoder input, with or without an
+adapter). The training config only supplies the layers, batch size and error
+threshold.
 
 Validation or train only; the sealed test stays untouched (roadmap SS18.4).
 
@@ -193,7 +194,7 @@ def _cli(argv: list[str] | None = None) -> int:
 
     def loader_for(model: SpeechEvaluatorA0) -> DataLoader:
         # Each checkpoint reads the cache it was trained on (raw or normalized
-        # encoder input); records and targets are the same in both.
+        # encoder input, adapter or not); records and targets are the same.
         return _partition_loader(
             args.manifest, processed_root, args.partition, training_config.batch_size,
             shuffle=False,
@@ -201,6 +202,7 @@ def _cli(argv: list[str] | None = None) -> int:
             feature_variant=args.feature_variant,
             age_groups=[args.age_group] if args.age_group else None,
             encoder_input_normalized=model.config.get("encoder_input_normalized", False),
+            encoder_adapter=model.config.get("encoder_adapter"),
         )
 
     speakers = {record.sample_id: record.speaker_id for record in read_jsonl(args.manifest)}

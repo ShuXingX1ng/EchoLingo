@@ -12,6 +12,7 @@ CLI: `python -m echolingo_speech.features.cache extract`
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 from pathlib import Path
 
@@ -21,8 +22,10 @@ import torchaudio
 
 from echolingo_speech.config import load_config
 from echolingo_speech.data.manifest import FeatureInfo, ManifestRecord, read_jsonl, write_jsonl
+from echolingo_speech.encoder.lora import adapter_sha256, apply_adapter
 
 TARGET_SAMPLE_RATE = 16000
+ADAPTER_PROVENANCE_NAME = "adapter.json"
 
 
 def _git_commit_sha(repo_root: Path) -> str:
@@ -114,13 +117,65 @@ def layer_cache_dir_name(
     encoder_revision: str,
     layers: tuple[int, ...] | list[int],
     normalized_input: bool = False,
+    adapter: str | None = None,
 ) -> str:
     """Directory (under the feature cache root) holding the multi-layer cache
     for one encoder revision and layer selection, with a `-norm` suffix when
-    the encoder saw normalized input. `training/dataset.py` finds the files
+    the encoder saw normalized input and an `-adapter-<name>` suffix when it
+    carried a trained adapter (M3 A1). `training/dataset.py` finds the files
     through this same function, so the manifest is unchanged."""
     name = f"wav2vec2-layers-{encoder_revision[:12]}-l{'-'.join(str(i) for i in layers)}"
-    return f"{name}-norm" if normalized_input else name
+    if normalized_input:
+        name += "-norm"
+    if adapter:
+        name += f"-adapter-{adapter}"
+    return name
+
+
+def _claim_adapter_cache(layer_dir: Path, provenance: dict) -> None:
+    """One trained adapter per cache directory: layers from two adapters that
+    share a name are never mixed (a retrained adapter needs a new name)."""
+    path = layer_dir / ADAPTER_PROVENANCE_NAME
+    if path.is_file():
+        existing = json.loads(path.read_text(encoding="utf-8"))
+        if existing["sha256"] != provenance["sha256"]:
+            raise ValueError(
+                f"{layer_dir} holds layers of another adapter named {provenance['name']!r} "
+                f"(sha256 {existing['sha256'][:12]}, now {provenance['sha256'][:12]}); "
+                f"give the new adapter its own name"
+            )
+        return
+    path.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+
+
+def adapter_cache_sha256(layer_dir: Path) -> str:
+    """SHA-256 of the adapter whose layers `layer_dir` holds."""
+    path = layer_dir / ADAPTER_PROVENANCE_NAME
+    if not path.is_file():
+        raise FileNotFoundError(f"{path} is missing; extract these layers with --adapter-dir")
+    return json.loads(path.read_text(encoding="utf-8"))["sha256"]
+
+
+def check_adapter_caches(
+    feature_root: Path,
+    encoder_revision: str,
+    layers: tuple[int, ...] | list[int],
+    adapter: str,
+    variants: list[str],
+) -> str:
+    """The clean adapter cache and each variant's must hold the layers of one
+    trained adapter (the shared name alone does not guarantee it, e.g. when
+    `best/` moved on between extractions); returns its SHA-256."""
+    name = layer_cache_dir_name(encoder_revision, layers, adapter=adapter)
+    expected = adapter_cache_sha256(feature_root / name)
+    for variant in variants:
+        actual = adapter_cache_sha256(variant_feature_root(feature_root, variant) / name)
+        if actual != expected:
+            raise ValueError(
+                f"{variant}'s {adapter!r} layers come from adapter {actual[:12]}, the clean "
+                f"ones from {expected[:12]}; extract both with the same --adapter-dir"
+            )
+    return expected
 
 
 def extract_layer_features(
@@ -133,6 +188,7 @@ def extract_layer_features(
     hf_cache_dir: Path | None = None,
     device: str = "cpu",
     normalize_input: bool = False,
+    adapter_dir: Path | None = None,
 ) -> Path:
     """Cache several Wav2Vec2 layers per utterance as one `(L, T, 768)` fp16
     array (roadmap SS18.3 step 3.5). Index 0 is the CNN feature projection and
@@ -140,17 +196,39 @@ def extract_layer_features(
     `extract_features` already resampled, so it must run after it.
     `normalize_input` feeds the encoder `normalize_encoder_input(waveform)`
     and writes a separate `-norm` cache (M3 input normalization candidate).
+    `adapter_dir` merges a trained CTC LoRA adapter (`encoder/ctc_adapter.py`,
+    M3 A1) into the encoder and writes a separate `-adapter-<name>` cache,
+    recording which adapter it holds in `adapter.json`.
     """
     from transformers import Wav2Vec2Model
 
+    if adapter_dir is not None and normalize_input:
+        raise ValueError("adapters are trained on the raw waveform; drop normalize_input")
     model = Wav2Vec2Model.from_pretrained(
         encoder_model_id, revision=encoder_revision, cache_dir=hf_cache_dir
     )
+    adapter = None
+    if adapter_dir is not None:
+        metadata = apply_adapter(model, adapter_dir, encoder_model_id=encoder_model_id,
+                                 encoder_revision=encoder_revision)
+        if not metadata.get("name"):
+            raise ValueError(f"{adapter_dir} has no adapter name in its config")
+        adapter = {
+            "name": metadata["name"],
+            "sha256": adapter_sha256(adapter_dir),
+            "source": str(adapter_dir),
+            "step": metadata.get("step"),
+            "dev_wer_subset": metadata.get("dev_wer_subset"),
+        }
     model.to(device)
     model.eval()
 
-    layer_dir = cache_root / layer_cache_dir_name(encoder_revision, layers, normalize_input)
+    layer_dir = cache_root / layer_cache_dir_name(
+        encoder_revision, layers, normalize_input, adapter["name"] if adapter else None
+    )
     layer_dir.mkdir(parents=True, exist_ok=True)
+    if adapter is not None:
+        _claim_adapter_cache(layer_dir, adapter)
     for record in records:
         assert record.features is not None, f"{record.sample_id} has no waveform cache yet"
         waveform = torch.from_numpy(np.load(cache_root / record.features.waveform_cache_path))
@@ -189,6 +267,12 @@ def _cli(argv: list[str] | None = None) -> int:
         action="store_true",
         help="zero-mean/unit-variance encoder input (writes a separate -norm cache)",
     )
+    layers_parser.add_argument(
+        "--adapter-dir",
+        type=Path,
+        default=None,
+        help="merge this trained CTC LoRA adapter (writes a separate -adapter-<name> cache)",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "extract-layers":
@@ -203,6 +287,7 @@ def _cli(argv: list[str] | None = None) -> int:
             hf_cache_dir=config.artifact_root / "hf-cache",
             device=args.device,
             normalize_input=args.normalize_input,
+            adapter_dir=args.adapter_dir,
         )
         print(f"OK: cached layers {list(layers)} at {layer_dir}")
         return 0

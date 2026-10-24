@@ -99,3 +99,16 @@ def test_select_prediction_threshold_separates_predictions_above_the_label_cut()
     cut = select_prediction_threshold(preds, targets, threshold=0.6)
     assert 0.72 < cut < 0.90
     assert error_detection_metrics(preds, targets, 0.6, cut)["macro_f1"] == pytest.approx(1.0)
+
+
+def test_word_error_rate_counts_edits_over_reference_words():
+    from echolingo_speech.evaluation.metrics import word_error_rate
+
+    assert word_error_rate(["WE CALL IT BEAR"], ["WE CALL IT BEAR"]) == 0.0
+    # One substitution, one deletion, one insertion over 4 + 2 reference words.
+    references = ["WE CALL IT BEAR", "GOOD MORNING"]
+    hypotheses = ["WE CALL A", "GOOD MORNING SIR"]
+    assert word_error_rate(references, hypotheses) == pytest.approx(3 / 6)
+    assert word_error_rate(["A B"], [""]) == 1.0
+    with pytest.raises(ValueError, match="differ in length"):
+        word_error_rate(["A"], [])

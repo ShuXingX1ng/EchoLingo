@@ -155,3 +155,26 @@ def _binary_f1(
     recall = true_positive / actual_positive if actual_positive else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
     return f1, precision, recall
+
+
+def _edit_distance(reference: list[str], hypothesis: list[str]) -> int:
+    previous = list(range(len(hypothesis) + 1))
+    for i, ref_word in enumerate(reference, start=1):
+        current = [i] + [0] * len(hypothesis)
+        for j, hyp_word in enumerate(hypothesis, start=1):
+            current[j] = min(
+                previous[j] + 1,  # deletion
+                current[j - 1] + 1,  # insertion
+                previous[j - 1] + (ref_word != hyp_word),  # substitution / match
+            )
+        previous = current
+    return previous[-1]
+
+
+def word_error_rate(references: list[str], hypotheses: list[str]) -> float:
+    """Corpus WER: total word edits over total reference words (M3 A1)."""
+    if len(references) != len(hypotheses):
+        raise ValueError("references and hypotheses differ in length")
+    edits = sum(_edit_distance(r.split(), h.split()) for r, h in zip(references, hypotheses))
+    words = sum(len(r.split()) for r in references)
+    return edits / words if words else 0.0

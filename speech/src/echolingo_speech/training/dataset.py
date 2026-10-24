@@ -21,7 +21,11 @@ from torch.utils.data import Dataset
 from echolingo_speech.alignment.mfa import TextGridSpan, parse_textgrid_spans
 from echolingo_speech.data.manifest import ManifestRecord, read_jsonl
 from echolingo_speech.features.acoustic import compute_acoustic_features, feature_vector
-from echolingo_speech.features.cache import layer_cache_dir_name, variant_feature_root
+from echolingo_speech.features.cache import (
+    check_adapter_caches,
+    layer_cache_dir_name,
+    variant_feature_root,
+)
 from echolingo_speech.training.labels import (
     SENTENCE_TARGET_KEYS,
     canonical_phone_id,
@@ -211,6 +215,7 @@ def _build_example(
     rater_targets: bool = False,
     feature_variant: str | None = None,
     encoder_input_normalized: bool = False,
+    encoder_adapter: str | None = None,
 ) -> ScoringExample:
     feature_root = processed_root / "features"
     assert record.features is not None, f"{record.sample_id} has no cached features"
@@ -223,12 +228,15 @@ def _build_example(
         feature_root = variant_feature_root(feature_root, feature_variant)
     if encoder_input_normalized and not hidden_state_layers:
         raise ValueError("a normalized-input cache exists only for hidden_state_layers")
+    if encoder_adapter and not hidden_state_layers:
+        raise ValueError("an adapter cache exists only for hidden_state_layers")
 
     if hidden_state_layers:
         # Kept fp16 in memory (5 layers x 2500 records would not fit as fp32
         # alongside the other partitions); `collate_fn` casts each batch.
         layer_dir = layer_cache_dir_name(
-            record.features.encoder_revision, hidden_state_layers, encoder_input_normalized
+            record.features.encoder_revision, hidden_state_layers, encoder_input_normalized,
+            encoder_adapter,
         )
         hidden_states = torch.from_numpy(
             np.load(feature_root / layer_dir / f"{record.sample_id}.npy")
@@ -309,6 +317,7 @@ class SpeechOceanScoringDataset(Dataset):
         feature_variant: str | None = None,
         age_groups: list[str] | None = None,
         encoder_input_normalized: bool = False,
+        encoder_adapter: str | None = None,
     ) -> None:
         self.records = [
             record
@@ -319,10 +328,15 @@ class SpeechOceanScoringDataset(Dataset):
         if not self.records:
             raise ValueError(f"no {partition} records for age groups {age_groups}")
         layers = tuple(hidden_state_layers) if hidden_state_layers else None
+        if encoder_adapter and layers:
+            check_adapter_caches(
+                processed_root / "features", self.records[0].features.encoder_revision, layers,
+                encoder_adapter, [feature_variant] if feature_variant else [],
+            )
         self.examples = [
             _build_example(
                 record, processed_root, layers, rater_targets, feature_variant,
-                encoder_input_normalized,
+                encoder_input_normalized, encoder_adapter,
             )
             for record in self.records
         ]
@@ -355,12 +369,18 @@ class AugmentedTrainingDataset(Dataset):
         variants: list[str],
         augmentation_prob: float,
         encoder_input_normalized: bool = False,
+        encoder_adapter: str | None = None,
     ) -> None:
         if not variants:
             raise ValueError("AugmentedTrainingDataset needs at least one variant")
         self.clean = clean
         self.augmentation_prob = augmentation_prob
         feature_root = processed_root / "features"
+        if encoder_adapter:
+            check_adapter_caches(
+                feature_root, clean.records[0].features.encoder_revision,
+                tuple(hidden_state_layers), encoder_adapter, variants,
+            )
         self.hidden_state_paths: list[list[Path]] = []
         self.acoustic_features: list[list[torch.Tensor]] = []
         for variant in variants:
@@ -372,6 +392,7 @@ class AugmentedTrainingDataset(Dataset):
                     record.features.encoder_revision,
                     tuple(hidden_state_layers),
                     encoder_input_normalized,
+                    encoder_adapter,
                 )
                 path = root / layer_dir / f"{record.sample_id}.npy"
                 if not path.is_file():

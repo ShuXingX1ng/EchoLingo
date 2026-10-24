@@ -128,3 +128,74 @@ def speechocean_mini_corpus(tmp_path: Path) -> Path:
     (corpus_dir / "scores.json").write_text(json.dumps(scores), encoding="utf-8")
     (corpus_dir / "scores-detail.json").write_text(json.dumps(scores_detail), encoding="utf-8")
     return corpus_dir
+
+
+@pytest.fixture
+def tiny_wav2vec2_config():
+    """A random Wav2Vec2 small enough for CPU tests, laid out like the pinned
+    `wav2vec2-base-960h` (group-norm CNN, post-norm encoder, 32-token CTC
+    vocabulary with blank = 0) but with 20x instead of 320x downsampling."""
+    transformers = pytest.importorskip("transformers")
+    return transformers.Wav2Vec2Config(
+        vocab_size=32,
+        pad_token_id=0,
+        hidden_size=32,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        intermediate_size=64,
+        conv_dim=(16, 16, 16),
+        conv_stride=(5, 2, 2),
+        conv_kernel=(10, 3, 3),
+        num_conv_pos_embeddings=16,
+        num_conv_pos_embedding_groups=2,
+        feat_extract_norm="group",
+        do_stable_layer_norm=False,
+        layerdrop=0.0,
+        mask_time_length=2,
+    )
+
+
+# The pinned wav2vec2-base-960h `vocab.json` (revision 22aad52d435e).
+WAV2VEC2_VOCAB = {
+    "<pad>": 0, "<s>": 1, "</s>": 2, "<unk>": 3, "|": 4, "E": 5, "T": 6, "A": 7, "O": 8,
+    "N": 9, "I": 10, "H": 11, "S": 12, "R": 13, "D": 14, "L": 15, "U": 16, "M": 17, "W": 18,
+    "C": 19, "F": 20, "G": 21, "Y": 22, "P": 23, "B": 24, "V": 25, "K": 26, "'": 27, "X": 28,
+    "J": 29, "Q": 30, "Z": 31,
+}
+
+
+@pytest.fixture
+def write_loquacious_shard():
+    """Writes a synthetic Loquacious parquet shard (the real columns: `ID`,
+    `duration`, `wav` = {bytes, path}, `spk_id`, `sex`, `text`) from
+    (id, seconds, sample_rate, text) rows of sine tones."""
+    import io
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    def write(path: Path, rows: list[tuple[str, float, int, str]]) -> Path:
+        table = {"ID": [], "duration": [], "wav": [], "spk_id": [], "sex": [], "text": []}
+        for utt_id, seconds, sample_rate, text in rows:
+            t = np.arange(int(seconds * sample_rate)) / sample_rate
+            buffer = io.BytesIO()
+            sf.write(buffer, (0.2 * np.sin(2 * np.pi * 220 * t)).astype(np.float32),
+                     sample_rate, format="WAV")
+            table["ID"].append(utt_id)
+            table["duration"].append(seconds)
+            table["wav"].append({"bytes": buffer.getvalue(), "path": f"{utt_id}.wav"})
+            table["spk_id"].append("spk")
+            table["sex"].append("F")
+            table["text"].append(text)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(pa.table(table), path)
+        return path
+
+    return write
+
+
+@pytest.fixture
+def char_vocab():
+    from echolingo_speech.encoder.loquacious import CharVocab
+
+    return CharVocab(WAV2VEC2_VOCAB)

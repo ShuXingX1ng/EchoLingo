@@ -1,0 +1,36 @@
+# M3 A1-Scorer (roadmap SS6, SS18.3): the 3.2c candidate
+# (m3-aug-mask-audio.yaml) on layer caches extracted with the A1 CTC LoRA
+# adapter (configs/adapter/a1-loquacious-small.yaml) merged into the frozen
+# encoder. Needs `features.cache extract-layers --adapter-dir` and
+# `features.augment ... --layers-only --adapter-dir` for the train-aug and
+# validation-noisy copies. The scorer, targets, masks and augmentation are
+# 3.2c's; only the encoder's layers change. Two runs use this file with
+# --seed 42 and --seed 1337 (--run-name a1s-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+encoder_adapter: a1-loquacious-small
+rater_mean_targets: true
+augmentation_variants: [train-aug-1, train-aug-2, train-aug-3, train-aug-4]
+augmentation_prob: 0.5
+time_mask_prob: 0.05
+time_mask_max_width: 2
+channel_mask_ratio: 0.1
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

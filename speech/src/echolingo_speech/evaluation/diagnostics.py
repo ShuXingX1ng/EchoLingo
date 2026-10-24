@@ -385,6 +385,7 @@ def _cli(argv: list[str] | None = None) -> int:
         partition: SpeechOceanScoringDataset(
             args.manifest, processed_root, partition, training_config.hidden_state_layers,
             encoder_input_normalized=training_config.normalize_encoder_input,
+            encoder_adapter=training_config.encoder_adapter,
         )
         for partition in COVERAGE_PARTITIONS
     }

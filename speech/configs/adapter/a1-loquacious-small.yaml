@@ -1,0 +1,30 @@
+# M3 A1-Encoder (roadmap SS6, SS18.3): a CTC LoRA adapter for the pinned
+# wav2vec2-base-960h, trained on Loquacious `small` train (107,303 utterances)
+# with its transcripts; `encoder/ctc_adapter.py` reads this file. LoRA on every
+# layer's attention q_proj and v_proj, B zero-initialized, CNN and lm_head
+# frozen; raw 16 kHz input (no do_normalize), as in the feature caches.
+# Model selection uses Loquacious dev only, never its test split. The
+# transcripts only supervise recognition, never scoring.
+
+# Suffix of the adapted layer caches and the scorer's `encoder_adapter`.
+name: a1-loquacious-small
+seed: 0
+
+lora_rank: 16
+lora_alpha: 32.0
+lora_dropout: 0.05
+lora_target_modules: [q_proj, v_proj]
+
+learning_rate: 0.0005
+weight_decay: 0.0
+warmup_steps: 500
+epochs: 2
+# Audio per batch, padding included (one RTX 4090, bf16).
+max_batch_seconds: 200.0
+grad_clip: 1.0
+
+eval_every_steps: 1000
+dev_eval_utterances: 1500
+eval_batch_seconds: 300.0
+num_workers: 4
+bf16: true

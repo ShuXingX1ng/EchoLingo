@@ -126,7 +126,10 @@ def restore_training(
         raise ValueError(
             f"cannot resume from {path}: it was started with seed {payload['seed']}, not {seed}"
         )
-    if payload["model_config"] != dict(model.config):
+    # Rebuilt through the constructor so that keys added since the run started
+    # (e.g. `encoder_adapter`) take their defaults, as in `load_model`.
+    saved_model_config = SpeechEvaluatorA0(**payload["model_config"]).config
+    if saved_model_config != dict(model.config):
         raise ValueError(f"cannot resume from {path}: model configuration differs")
     saved_config = payload["training_config"]
     changed = sorted(

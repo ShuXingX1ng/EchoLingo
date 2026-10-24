@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class TrainingConfig(BaseModel):
@@ -37,6 +37,11 @@ class TrainingConfig(BaseModel):
     # feature extractor does (`do_normalize`). Recorded in the model config,
     # so a checkpoint is never scored on the other cache.
     normalize_encoder_input: bool = False
+    # M3 A1-Scorer: read the layer cache extracted with this trained CTC LoRA
+    # adapter merged into the encoder (`extract-layers --adapter-dir`; the
+    # adapter config's `name`). Recorded in the model config like
+    # `normalize_encoder_input`. Adapters are trained on the raw waveform.
+    encoder_adapter: str | None = None
     # M3 A0-Rater: train on the five experts' mean (`scores["raters"]`) instead
     # of the official aggregate. Validation and test always keep the official
     # labels, so early stopping, thresholds and metrics stay comparable.
@@ -69,6 +74,12 @@ class TrainingConfig(BaseModel):
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"
+
+    @model_validator(mode="after")
+    def _adapter_on_raw_input(self) -> TrainingConfig:
+        if self.encoder_adapter and self.normalize_encoder_input:
+            raise ValueError("encoder_adapter caches exist only for the raw encoder input")
+        return self
 
 
 def load_training_config(path: Path) -> TrainingConfig:
