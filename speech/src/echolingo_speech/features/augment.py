@@ -219,6 +219,16 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--layers", required=True, help="comma-separated, e.g. 4,6,8,10,12")
     default_device = "cuda" if torch.cuda.is_available() else "cpu"
     parser.add_argument("--device", type=str, default=default_device)
+    parser.add_argument(
+        "--normalize-input",
+        action="store_true",
+        help="cache the layers from normalized encoder input (a separate -norm cache)",
+    )
+    parser.add_argument(
+        "--layers-only",
+        action="store_true",
+        help="reuse the copies' existing waveforms and only (re)extract their layers",
+    )
     args = parser.parse_args(argv)
 
     config = load_config(args.speech_config)
@@ -228,14 +238,19 @@ def _cli(argv: list[str] | None = None) -> int:
     profile = PROFILES[args.profile]
     for copy in range(1, args.copies + 1):
         variant = variant_name(args.name, copy)
-        root = write_augmented_waveforms(
-            records,
-            feature_root=feature_root,
-            variant=variant,
-            profile=profile,
-            seed=args.seed,
-            copy=copy,
-        )
+        if args.layers_only:
+            root = variant_feature_root(feature_root, variant)
+            if not (root / "effects.json").is_file():
+                raise FileNotFoundError(f"{root} has no augmented waveforms to reuse")
+        else:
+            root = write_augmented_waveforms(
+                records,
+                feature_root=feature_root,
+                variant=variant,
+                profile=profile,
+                seed=args.seed,
+                copy=copy,
+            )
         extract_layer_features(
             records,
             cache_root=root,
@@ -244,7 +259,11 @@ def _cli(argv: list[str] | None = None) -> int:
             layers=layers,
             hf_cache_dir=config.artifact_root / "hf-cache",
             device=args.device,
+            normalize_input=args.normalize_input,
         )
+        if args.layers_only:
+            print(f"OK: {variant}: layers re-extracted at {root}")
+            continue
         metadata = {
             "partition": args.partition,
             "records": len(records),

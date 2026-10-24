@@ -44,7 +44,11 @@ from echolingo_speech.training.checkpoint import load_model
 from echolingo_speech.training.config import TrainingConfig, load_training_config
 from echolingo_speech.training.dataset import ScoringExample, SpeechOceanScoringDataset, collate_fn
 from echolingo_speech.training.labels import SENTENCE_TARGET_KEYS
-from echolingo_speech.training.loop import _move_batch_to_device, resolve_device
+from echolingo_speech.training.loop import (
+    _move_batch_to_device,
+    check_feature_cache,
+    resolve_device,
+)
 from echolingo_speech.training.losses import PHONE_WEIGHT, SENTENCE_WEIGHT, WORD_WEIGHT
 
 DIAGNOSABLE_PARTITIONS = ("train", "validation")
@@ -379,7 +383,8 @@ def _cli(argv: list[str] | None = None) -> int:
 
     datasets = {
         partition: SpeechOceanScoringDataset(
-            args.manifest, processed_root, partition, training_config.hidden_state_layers
+            args.manifest, processed_root, partition, training_config.hidden_state_layers,
+            encoder_input_normalized=training_config.normalize_encoder_input,
         )
         for partition in COVERAGE_PARTITIONS
     }
@@ -394,6 +399,7 @@ def _cli(argv: list[str] | None = None) -> int:
     runs = {}
     for name, checkpoint_path in args.checkpoint:
         model = load_model(checkpoint_path, device)
+        check_feature_cache(model, training_config, checkpoint_path)
         records = collect_outputs(
             model,
             datasets[args.partition].examples,

@@ -5,7 +5,9 @@ checkpoints can come from which speakers happen to be in it. This resamples
 *speakers* with replacement, recomputes each metric for both checkpoints on
 the same resample, and reports the candidate-minus-reference difference with
 a percentile interval. Records are paired by sample id, so both checkpoints
-are always scored on exactly the same words and phones.
+are always scored on exactly the same words and phones, each on the feature
+cache it was trained on (raw or normalized encoder input). The training
+config only supplies the layers, batch size and error threshold.
 
 Validation or train only; the sealed test stays untouched (roadmap SS18.4).
 
@@ -188,18 +190,27 @@ def _cli(argv: list[str] | None = None) -> int:
     training_config: TrainingConfig = load_training_config(args.training_config)
     processed_root = speech_config.data_root / "processed" / "speechocean762"
     device = resolve_device(args.device)
-    loader = _partition_loader(
-        args.manifest, processed_root, args.partition, training_config.batch_size, shuffle=False,
-        hidden_state_layers=training_config.hidden_state_layers,
-        feature_variant=args.feature_variant,
-        age_groups=[args.age_group] if args.age_group else None,
-    )
+
+    def loader_for(model: SpeechEvaluatorA0) -> DataLoader:
+        # Each checkpoint reads the cache it was trained on (raw or normalized
+        # encoder input); records and targets are the same in both.
+        return _partition_loader(
+            args.manifest, processed_root, args.partition, training_config.batch_size,
+            shuffle=False,
+            hidden_state_layers=training_config.hidden_state_layers,
+            feature_variant=args.feature_variant,
+            age_groups=[args.age_group] if args.age_group else None,
+            encoder_input_normalized=model.config.get("encoder_input_normalized", False),
+        )
+
     speakers = {record.sample_id: record.speaker_id for record in read_jsonl(args.manifest)}
     (reference_name, reference_path), (candidate_name, candidate_path) = (
         args.reference, args.candidate
     )
-    reference = collect_record_outputs(load_model(reference_path, device), loader, device)
-    candidate = collect_record_outputs(load_model(candidate_path, device), loader, device)
+    reference_model = load_model(reference_path, device)
+    candidate_model = load_model(candidate_path, device)
+    reference = collect_record_outputs(reference_model, loader_for(reference_model), device)
+    candidate = collect_record_outputs(candidate_model, loader_for(candidate_model), device)
     result = paired_bootstrap(
         reference, candidate, speakers,
         error_threshold=training_config.error_detection_threshold,

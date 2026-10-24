@@ -298,6 +298,7 @@ def fit(
         time_mask_prob=training_config.time_mask_prob,
         time_mask_max_width=training_config.time_mask_max_width,
         channel_mask_ratio=training_config.channel_mask_ratio,
+        encoder_input_normalized=training_config.normalize_encoder_input,
     ).to(resolved_device)
     if init_checkpoint is not None:
         initial = load_model(init_checkpoint, resolved_device)
@@ -451,6 +452,7 @@ def _partition_loader(
     augmentation_variants: list[str] | None = None,
     augmentation_prob: float = 0.0,
     age_groups: list[str] | None = None,
+    encoder_input_normalized: bool = False,
 ) -> DataLoader:
     dataset: Dataset = SpeechOceanScoringDataset(
         manifest_path,
@@ -460,12 +462,14 @@ def _partition_loader(
         rater_targets=rater_targets,
         feature_variant=feature_variant,
         age_groups=age_groups,
+        encoder_input_normalized=encoder_input_normalized,
     )
     if augmentation_variants:
         if not hidden_state_layers:
             raise ValueError("augmentation_variants need hidden_state_layers")
         dataset = AugmentedTrainingDataset(
-            dataset, processed_root, hidden_state_layers, augmentation_variants, augmentation_prob
+            dataset, processed_root, hidden_state_layers, augmentation_variants,
+            augmentation_prob, encoder_input_normalized,
         )
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
@@ -495,6 +499,7 @@ def run_training(
     train_loader = _partition_loader(
         manifest_path, processed_root, "train", batch_size, shuffle=True,
         hidden_state_layers=training_config.hidden_state_layers,
+        encoder_input_normalized=training_config.normalize_encoder_input,
         rater_targets=training_config.rater_mean_targets,
         augmentation_variants=training_config.augmentation_variants,
         augmentation_prob=training_config.augmentation_prob,
@@ -503,6 +508,7 @@ def run_training(
     val_loader = _partition_loader(
         manifest_path, processed_root, "validation", batch_size, shuffle=False,
         hidden_state_layers=training_config.hidden_state_layers,
+        encoder_input_normalized=training_config.normalize_encoder_input,
         age_groups=training_config.validation_age_groups,
     )
 
@@ -528,6 +534,7 @@ def run_training(
         test_loader = _partition_loader(
             manifest_path, processed_root, "test", batch_size, shuffle=False,
             hidden_state_layers=training_config.hidden_state_layers,
+            encoder_input_normalized=training_config.normalize_encoder_input,
         )
         result["test_metrics"] = evaluate(
             model, test_loader, resolved_device, training_config, prediction_thresholds=thresholds
@@ -548,6 +555,20 @@ def read_prediction_thresholds(checkpoint_dir: Path) -> dict[str, float] | None:
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def check_feature_cache(
+    model: SpeechEvaluatorA0, training_config: TrainingConfig, checkpoint_path: Path
+) -> None:
+    """Refuse to score a checkpoint on a feature cache other than the one it
+    was trained on (normalized vs raw encoder input)."""
+    trained = model.config.get("encoder_input_normalized", False)
+    if trained != training_config.normalize_encoder_input:
+        raise ValueError(
+            f"{checkpoint_path} was trained with encoder_input_normalized={trained}, but the "
+            f"training config reads the cache with normalize_encoder_input="
+            f"{training_config.normalize_encoder_input}"
+        )
 
 
 def evaluate_checkpoint(
@@ -576,11 +597,13 @@ def evaluate_checkpoint(
     """
     resolved_device = resolve_device(device)
     model = load_model(checkpoint_path, resolved_device)
+    check_feature_cache(model, training_config, checkpoint_path)
     checkpoint_dir = checkpoint_path.parent
     if select_thresholds:
         val_loader = _partition_loader(
             manifest_path, processed_root, "validation", training_config.batch_size, shuffle=False,
             hidden_state_layers=training_config.hidden_state_layers,
+            encoder_input_normalized=training_config.normalize_encoder_input,
         )
         thresholds = select_prediction_thresholds(
             model, val_loader, resolved_device, training_config
@@ -591,6 +614,7 @@ def evaluate_checkpoint(
     loader = _partition_loader(
         manifest_path, processed_root, partition, training_config.batch_size, shuffle=False,
         hidden_state_layers=training_config.hidden_state_layers,
+        encoder_input_normalized=training_config.normalize_encoder_input,
         feature_variant=feature_variant,
         age_groups=age_groups,
     )

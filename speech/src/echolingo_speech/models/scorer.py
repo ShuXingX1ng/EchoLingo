@@ -102,6 +102,7 @@ class SpeechEvaluatorA0(nn.Module):
         time_mask_prob: float = 0.0,
         time_mask_max_width: int = 2,
         channel_mask_ratio: float = 0.0,
+        encoder_input_normalized: bool = False,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -121,6 +122,9 @@ class SpeechEvaluatorA0(nn.Module):
             "time_mask_prob": time_mask_prob,
             "time_mask_max_width": time_mask_max_width,
             "channel_mask_ratio": channel_mask_ratio,
+            # Which feature cache the model was trained on (no effect on the
+            # forward pass): `training/loop.py` refuses to score it on the other.
+            "encoder_input_normalized": encoder_input_normalized,
         }
         # Several cached encoder layers are mixed by a learned softmax weight
         # per layer (initially uniform) before any pooling.

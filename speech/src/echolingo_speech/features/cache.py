@@ -97,11 +97,30 @@ def variant_feature_root(feature_root: Path, variant: str) -> Path:
     return feature_root / "variants" / variant
 
 
-def layer_cache_dir_name(encoder_revision: str, layers: tuple[int, ...] | list[int]) -> str:
+# Same epsilon as transformers' `Wav2Vec2FeatureExtractor.zero_mean_unit_var_norm`.
+_NORMALIZE_EPSILON = 1e-7
+
+
+def normalize_encoder_input(waveform: torch.Tensor) -> torch.Tensor:
+    """Zero-mean, unit-variance per utterance: what the pinned encoder's
+    feature extractor does when `do_normalize` is true (it is for
+    `wav2vec2-base-960h`). Applied to the encoder input only; the cached
+    waveform and the explicit acoustic features stay unnormalized."""
+    centered = waveform - waveform.mean()
+    return centered / torch.sqrt(centered.pow(2).mean() + _NORMALIZE_EPSILON)
+
+
+def layer_cache_dir_name(
+    encoder_revision: str,
+    layers: tuple[int, ...] | list[int],
+    normalized_input: bool = False,
+) -> str:
     """Directory (under the feature cache root) holding the multi-layer cache
-    for one encoder revision and layer selection. `training/dataset.py` finds
-    the files through this same function, so the manifest is unchanged."""
-    return f"wav2vec2-layers-{encoder_revision[:12]}-l{'-'.join(str(i) for i in layers)}"
+    for one encoder revision and layer selection, with a `-norm` suffix when
+    the encoder saw normalized input. `training/dataset.py` finds the files
+    through this same function, so the manifest is unchanged."""
+    name = f"wav2vec2-layers-{encoder_revision[:12]}-l{'-'.join(str(i) for i in layers)}"
+    return f"{name}-norm" if normalized_input else name
 
 
 def extract_layer_features(
@@ -113,11 +132,14 @@ def extract_layer_features(
     layers: tuple[int, ...],
     hf_cache_dir: Path | None = None,
     device: str = "cpu",
+    normalize_input: bool = False,
 ) -> Path:
     """Cache several Wav2Vec2 layers per utterance as one `(L, T, 768)` fp16
     array (roadmap SS18.3 step 3.5). Index 0 is the CNN feature projection and
     index 12 the final layer (== `last_hidden_state`). Reads the waveforms
     `extract_features` already resampled, so it must run after it.
+    `normalize_input` feeds the encoder `normalize_encoder_input(waveform)`
+    and writes a separate `-norm` cache (M3 input normalization candidate).
     """
     from transformers import Wav2Vec2Model
 
@@ -127,11 +149,13 @@ def extract_layer_features(
     model.to(device)
     model.eval()
 
-    layer_dir = cache_root / layer_cache_dir_name(encoder_revision, layers)
+    layer_dir = cache_root / layer_cache_dir_name(encoder_revision, layers, normalize_input)
     layer_dir.mkdir(parents=True, exist_ok=True)
     for record in records:
         assert record.features is not None, f"{record.sample_id} has no waveform cache yet"
         waveform = torch.from_numpy(np.load(cache_root / record.features.waveform_cache_path))
+        if normalize_input:
+            waveform = normalize_encoder_input(waveform.float())
         with torch.no_grad():
             output = model(waveform.float().to(device), output_hidden_states=True)
         stacked = torch.stack([output.hidden_states[i].squeeze(0) for i in layers])
@@ -160,6 +184,11 @@ def _cli(argv: list[str] | None = None) -> int:
     layers_parser.add_argument("--speech-config", type=Path, required=True)
     layers_parser.add_argument("--layers", required=True, help="comma-separated, e.g. 4,6,8,10,12")
     layers_parser.add_argument("--device", type=str, default=default_device)
+    layers_parser.add_argument(
+        "--normalize-input",
+        action="store_true",
+        help="zero-mean/unit-variance encoder input (writes a separate -norm cache)",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "extract-layers":
@@ -173,6 +202,7 @@ def _cli(argv: list[str] | None = None) -> int:
             layers=layers,
             hf_cache_dir=config.artifact_root / "hf-cache",
             device=args.device,
+            normalize_input=args.normalize_input,
         )
         print(f"OK: cached layers {list(layers)} at {layer_dir}")
         return 0

@@ -32,6 +32,11 @@ class TrainingConfig(BaseModel):
     # Wav2Vec2 layers to mix (needs `features.cache extract-layers`); None
     # means the last layer from the original cache.
     hidden_state_layers: list[int] | None = None
+    # Read the layer cache extracted from zero-mean/unit-variance encoder
+    # input (`extract-layers --normalize-input`), as the pinned encoder's
+    # feature extractor does (`do_normalize`). Recorded in the model config,
+    # so a checkpoint is never scored on the other cache.
+    normalize_encoder_input: bool = False
     # M3 A0-Rater: train on the five experts' mean (`scores["raters"]`) instead
     # of the official aggregate. Validation and test always keep the official
     # labels, so early stopping, thresholds and metrics stay comparable.

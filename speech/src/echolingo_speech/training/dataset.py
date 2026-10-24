@@ -210,6 +210,7 @@ def _build_example(
     hidden_state_layers: tuple[int, ...] | None = None,
     rater_targets: bool = False,
     feature_variant: str | None = None,
+    encoder_input_normalized: bool = False,
 ) -> ScoringExample:
     feature_root = processed_root / "features"
     assert record.features is not None, f"{record.sample_id} has no cached features"
@@ -220,11 +221,15 @@ def _build_example(
         if not hidden_state_layers:
             raise ValueError("feature variants are only cached for hidden_state_layers")
         feature_root = variant_feature_root(feature_root, feature_variant)
+    if encoder_input_normalized and not hidden_state_layers:
+        raise ValueError("a normalized-input cache exists only for hidden_state_layers")
 
     if hidden_state_layers:
         # Kept fp16 in memory (5 layers x 2500 records would not fit as fp32
         # alongside the other partitions); `collate_fn` casts each batch.
-        layer_dir = layer_cache_dir_name(record.features.encoder_revision, hidden_state_layers)
+        layer_dir = layer_cache_dir_name(
+            record.features.encoder_revision, hidden_state_layers, encoder_input_normalized
+        )
         hidden_states = torch.from_numpy(
             np.load(feature_root / layer_dir / f"{record.sample_id}.npy")
         )
@@ -303,6 +308,7 @@ class SpeechOceanScoringDataset(Dataset):
         rater_targets: bool = False,
         feature_variant: str | None = None,
         age_groups: list[str] | None = None,
+        encoder_input_normalized: bool = False,
     ) -> None:
         self.records = [
             record
@@ -314,7 +320,10 @@ class SpeechOceanScoringDataset(Dataset):
             raise ValueError(f"no {partition} records for age groups {age_groups}")
         layers = tuple(hidden_state_layers) if hidden_state_layers else None
         self.examples = [
-            _build_example(record, processed_root, layers, rater_targets, feature_variant)
+            _build_example(
+                record, processed_root, layers, rater_targets, feature_variant,
+                encoder_input_normalized,
+            )
             for record in self.records
         ]
 
@@ -345,6 +354,7 @@ class AugmentedTrainingDataset(Dataset):
         hidden_state_layers: tuple[int, ...] | list[int],
         variants: list[str],
         augmentation_prob: float,
+        encoder_input_normalized: bool = False,
     ) -> None:
         if not variants:
             raise ValueError("AugmentedTrainingDataset needs at least one variant")
@@ -359,7 +369,9 @@ class AugmentedTrainingDataset(Dataset):
             for record in clean.records:
                 assert record.features is not None, f"{record.sample_id} has no cached features"
                 layer_dir = layer_cache_dir_name(
-                    record.features.encoder_revision, tuple(hidden_state_layers)
+                    record.features.encoder_revision,
+                    tuple(hidden_state_layers),
+                    encoder_input_normalized,
                 )
                 path = root / layer_dir / f"{record.sample_id}.npy"
                 if not path.is_file():

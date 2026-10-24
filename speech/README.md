@@ -210,6 +210,17 @@ uv run python -m echolingo_speech.evaluation.paired_bootstrap --config configs/s
   --candidate a0amaft-seed42=$SPEECH_HOME/artifacts/checkpoints/a0amaft-seed42/best.pt \
   --age-group adult --out bootstrap-adult-seed42.json
 
+# Input normalization: the pinned encoder's feature extractor has
+# do_normalize: true, the caches above were extracted from the raw waveform.
+# Normalized-input layers go to separate "-norm" caches (augmented copies keep
+# their waveforms, --layers-only); checkpoints record which cache they used.
+uv run python -m echolingo_speech.features.cache extract-layers --manifest $MANIFEST --speech-config configs/speech.yaml --layers 4,6,8,10,12 --normalize-input
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition train --profile train --copies 4 --seed 0 --name train-aug --layers 4,6,8,10,12 --layers-only --normalize-input
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition validation --profile robustness --copies 1 --seed 1 --name validation-noisy --layers 4,6,8,10,12 --layers-only --normalize-input
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-input-norm.yaml --manifest $MANIFEST --seed $seed --run-name a0aman-seed$seed
+done
+
 # Robustness: any checkpoint on the noisy validation copy (clean-validation thresholds)
 uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST \
   --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0aa-seed42/best.pt --partition validation --feature-variant validation-noisy-1 --out a0aa-seed42-validation-noisy.json

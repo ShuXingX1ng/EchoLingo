@@ -488,3 +488,49 @@ def test_dataset_keeps_only_the_requested_age_groups(tmp_path: Path):
     assert ids(["child"]) == ["SAMPLE_B"]
     with pytest.raises(ValueError, match="no train records"):
         ids(["senior"])
+
+
+def _raw_and_normalized_caches(tmp_path: Path) -> Path:
+    """One training record with a raw-input cache (1.0) and a normalized-input
+    cache (5.0), clean and for one augmented copy (2.0 / 6.0)."""
+    from echolingo_speech.features.cache import layer_cache_dir_name
+
+    record = _write_record_assets(
+        tmp_path, sample_id="SAMPLE_A", num_frames=50,
+        words=[(0.0, 0.5, "we"), (0.5, 1.0, "call")],
+        phones=[(0.0, 0.25, "W"), (0.25, 0.5, "IY1"), (0.5, 0.75, "K"), (0.75, 1.0, "AO0")],
+    )
+    variant = tmp_path / "features" / "variants" / "train-aug-1"
+    (variant / "waveform").mkdir(parents=True)
+    np.save(variant / "waveform" / "SAMPLE_A.npy", np.full((1, 16000), 0.1, dtype=np.float32))
+    for root, raw, norm in ((tmp_path / "features", 1.0, 5.0), (variant, 2.0, 6.0)):
+        for normalized, value in ((False, raw), (True, norm)):
+            directory = root / layer_cache_dir_name("abc", (4, 12), normalized)
+            directory.mkdir(parents=True, exist_ok=True)
+            np.save(directory / "SAMPLE_A.npy", np.full((2, 50, 768), value, dtype=np.float16))
+    manifest_path = tmp_path / "manifest.jsonl"
+    write_jsonl(manifest_path, [record])
+    return manifest_path
+
+
+def test_datasets_read_the_requested_input_normalization_cache(tmp_path: Path):
+    from echolingo_speech.training.dataset import AugmentedTrainingDataset
+
+    manifest_path = _raw_and_normalized_caches(tmp_path)
+
+    def dataset(normalized: bool) -> SpeechOceanScoringDataset:
+        return SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12],
+            encoder_input_normalized=normalized,
+        )
+
+    assert torch.all(dataset(False)[0].hidden_states == 1.0)
+    assert torch.all(dataset(True)[0].hidden_states == 5.0)
+    augmented = AugmentedTrainingDataset(
+        dataset(True), tmp_path, [4, 12], ["train-aug-1"], 1.0, encoder_input_normalized=True
+    )
+    assert torch.all(augmented[0].hidden_states == 6.0)
+    with pytest.raises(ValueError, match="hidden_state_layers"):
+        SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", encoder_input_normalized=True
+        )
