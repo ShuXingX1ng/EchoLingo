@@ -460,3 +460,31 @@ def test_partition_loader_wraps_training_with_augmented_copies(tmp_path: Path):
     assert isinstance(loader.dataset, AugmentedTrainingDataset)
     batch = next(iter(loader))
     assert torch.all(batch["hidden_states"][0, :, :50] == 2.0)
+
+
+def test_dataset_keeps_only_the_requested_age_groups(tmp_path: Path):
+    records = []
+    for sample_id, age_group in (("SAMPLE_A", "adult"), ("SAMPLE_B", "child")):
+        record = _write_record_assets(
+            tmp_path,
+            sample_id=sample_id,
+            num_frames=50,
+            words=[(0.0, 0.5, "we"), (0.5, 1.0, "call")],
+            phones=[(0.0, 0.25, "W"), (0.25, 0.5, "IY1"), (0.5, 0.75, "K"), (0.75, 1.0, "AO0")],
+        )
+        record.speaker_age_group = age_group
+        records.append(record)
+    manifest_path = tmp_path / "manifest.jsonl"
+    write_jsonl(manifest_path, records)
+
+    def ids(age_groups):
+        dataset = SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", age_groups=age_groups
+        )
+        return [example.sample_id for example in dataset.examples]
+
+    assert ids(None) == ["SAMPLE_A", "SAMPLE_B"]
+    assert ids(["adult"]) == ["SAMPLE_A"]
+    assert ids(["child"]) == ["SAMPLE_B"]
+    with pytest.raises(ValueError, match="no train records"):
+        ids(["senior"])

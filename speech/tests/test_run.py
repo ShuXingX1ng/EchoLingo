@@ -348,3 +348,37 @@ def test_fit_with_feature_masks_trains_and_reloads_them(tmp_path):
     reloaded = load_model(result["best_checkpoint"], "cpu")
     assert reloaded.config["time_mask_prob"] == 0.2
     assert reloaded.config["channel_mask_ratio"] == 0.1
+
+
+def test_fit_from_an_init_checkpoint_keeps_its_weights_and_normalization(tmp_path):
+    train_loader, val_loader = _loaders()
+    config = _config(normalize_acoustic_features=True, max_epochs=2)
+    _, base = fit(
+        train_loader, val_loader, config, seed=SEED, device="cpu", checkpoint_dir=tmp_path / "base"
+    )
+    initial = load_model(base["best_checkpoint"], "cpu")
+
+    # A zero learning rate leaves the starting weights untouched, so the
+    # fine-tuned model must equal the checkpoint it started from, buffers too.
+    frozen = config.model_copy(update={"learning_rate": 0.0, "max_epochs": 1})
+    tracker = InMemoryTracker()
+    tuned, _ = fit(
+        train_loader, val_loader, frozen, seed=SEED, device="cpu",
+        tracker=tracker, init_checkpoint=base["best_checkpoint"],
+    )
+    for key, value in initial.state_dict().items():
+        assert torch.equal(tuned.state_dict()[key], value), key
+    assert tracker.params["init_checkpoint"] == str(base["best_checkpoint"])
+
+
+def test_fit_refuses_an_init_checkpoint_with_another_model_shape(tmp_path):
+    train_loader, val_loader = _loaders()
+    _, base = fit(
+        train_loader, val_loader, _config(max_epochs=1), seed=SEED, device="cpu",
+        checkpoint_dir=tmp_path / "base",
+    )
+    with pytest.raises(ValueError, match="model config"):
+        fit(
+            train_loader, val_loader, _config(max_epochs=1, use_canonical_phones=True),
+            seed=SEED, device="cpu", init_checkpoint=base["best_checkpoint"],
+        )

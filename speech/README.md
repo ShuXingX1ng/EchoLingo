@@ -195,6 +195,21 @@ for seed in 42 1337; do
   uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-aug-mask-audio.yaml --manifest $MANIFEST --seed $seed --run-name a0ama-seed$seed
 done
 
+# 3.2c both together (see below), then the adult target domain:
+# 4.0 per-age metrics and a speaker-level paired bootstrap (validation has 7
+# adult and 6 child speakers, so differences need an interval), and 4.2 a
+# light adult-only fine-tune of each 3.2c seed. Age only selects data.
+uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/m3-aug-mask-audio.yaml --manifest $MANIFEST \
+  --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0ama-seed42/best.pt --partition validation --age-group adult --out a0ama-seed42-validation-adult.json
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-adult-finetune.yaml --manifest $MANIFEST --seed $seed --run-name a0amaft-seed$seed \
+    --init-checkpoint $SPEECH_HOME/artifacts/checkpoints/a0ama-seed$seed/best.pt
+done
+uv run python -m echolingo_speech.evaluation.paired_bootstrap --config configs/speech.yaml --training-config configs/training/m3-adult-finetune.yaml --manifest $MANIFEST \
+  --reference a0ama-seed42=$SPEECH_HOME/artifacts/checkpoints/a0ama-seed42/best.pt \
+  --candidate a0amaft-seed42=$SPEECH_HOME/artifacts/checkpoints/a0amaft-seed42/best.pt \
+  --age-group adult --out bootstrap-adult-seed42.json
+
 # Robustness: any checkpoint on the noisy validation copy (clean-validation thresholds)
 uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST \
   --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0aa-seed42/best.pt --partition validation --feature-variant validation-noisy-1 --out a0aa-seed42-validation-noisy.json

@@ -302,10 +302,16 @@ class SpeechOceanScoringDataset(Dataset):
         hidden_state_layers: tuple[int, ...] | list[int] | None = None,
         rater_targets: bool = False,
         feature_variant: str | None = None,
+        age_groups: list[str] | None = None,
     ) -> None:
         self.records = [
-            record for record in read_jsonl(manifest_path) if record.partition == partition
+            record
+            for record in read_jsonl(manifest_path)
+            if record.partition == partition
+            and (age_groups is None or record.speaker_age_group in age_groups)
         ]
+        if not self.records:
+            raise ValueError(f"no {partition} records for age groups {age_groups}")
         layers = tuple(hidden_state_layers) if hidden_state_layers else None
         self.examples = [
             _build_example(record, processed_root, layers, rater_targets, feature_variant)

@@ -55,6 +55,12 @@ class TrainingConfig(BaseModel):
     # else the clean audio. Validation and test stay clean.
     augmentation_variants: list[str] | None = None
     augmentation_prob: float = 0.5
+    # M3 adult target domain: restrict the training partition, and the
+    # validation partition used for early stopping, the LR schedule and the
+    # prediction thresholds, to these `speaker_age_group`s (None = all). Age
+    # only selects data; it is never a model input.
+    train_age_groups: list[str] | None = None
+    validation_age_groups: list[str] | None = None
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

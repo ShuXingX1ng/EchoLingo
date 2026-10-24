@@ -1,0 +1,39 @@
+# M3 step 4.2 adult target domain (roadmap SS18.3): light adult-only
+# fine-tuning of the 3.2c candidate (m3-aug-mask-audio.yaml). Start from that
+# run's best checkpoint with `train --init-checkpoint`, train on adult
+# speakers only at a tenth of the learning rate for at most 20 epochs, and
+# early-stop, schedule and choose thresholds on adult validation speakers.
+# Masks and augmented audio stay as in 3.2c; the acoustic normalization comes
+# from the checkpoint. Age only selects data, it is never a model input.
+# Compared against 3.2c with `evaluation.paired_bootstrap` per age group.
+# Two runs: --seed 42 from a0ama-seed42, --seed 1337 from a0ama-seed1337
+# (--run-name a0amaft-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.0001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 20
+early_stopping_patience: 5
+lr_scheduler_patience: 3
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+rater_mean_targets: true
+augmentation_variants: [train-aug-1, train-aug-2, train-aug-3, train-aug-4]
+augmentation_prob: 0.5
+time_mask_prob: 0.05
+time_mask_max_width: 2
+channel_mask_ratio: 0.1
+train_age_groups: [adult]
+validation_age_groups: [adult]
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0
