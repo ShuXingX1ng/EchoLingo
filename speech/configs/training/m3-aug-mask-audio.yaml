@@ -1,0 +1,33 @@
+# M3 step 3.2c A0-Aug (roadmap SS18.3): both A0-Aug factors together, since
+# each improved on 3.1a by itself: the feature masks of m3-aug-mask.yaml
+# (3.2a) and the augmented training audio of m3-aug-audio.yaml (3.2b, same
+# four `train-aug` copies). Compared against 3.1a, 3.2a and 3.2b on clean and
+# noisy validation. Two runs use this file with --seed 42 and --seed 1337
+# (--run-name a0ama-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+rater_mean_targets: true
+augmentation_variants: [train-aug-1, train-aug-2, train-aug-3, train-aug-4]
+augmentation_prob: 0.5
+time_mask_prob: 0.05
+time_mask_max_width: 2
+channel_mask_ratio: 0.1
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

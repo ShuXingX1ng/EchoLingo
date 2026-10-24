@@ -190,6 +190,11 @@ for seed in 42 1337; do
   uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST --seed $seed --run-name a0aa-seed$seed
 done
 
+# 3.2c both together (same train-aug copies)
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-aug-mask-audio.yaml --manifest $MANIFEST --seed $seed --run-name a0ama-seed$seed
+done
+
 # Robustness: any checkpoint on the noisy validation copy (clean-validation thresholds)
 uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST \
   --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0aa-seed42/best.pt --partition validation --feature-variant validation-noisy-1 --out a0aa-seed42-validation-noisy.json
@@ -231,6 +236,23 @@ extraction ~2 min, each A0 seed ~10 min including dataset assembly, baseline
 - sshd reads public keys from `~/work/.ssh/authorized_keys`, not
   `~/.ssh/authorized_keys`; a key placed there also persists across instances.
 - The base image's Miniconda is found automatically for the `aligner` env.
+- Instances may set `http_proxy`/`https_proxy` to an academic proxy. On
+  2026-10-24 it dropped TLS to `pypi.org` and `files.pythonhosted.org`
+  (`tls handshake eof`), and direct downloads from `files.pythonhosted.org`
+  ran at ~50 KB/s. What worked: unset the proxy (pypi, the PyTorch index,
+  hf-mirror and openslr are all reachable directly), point the locked wheel
+  URLs at the Tsinghua mirror for the sync only (same `/packages/` paths; uv
+  still checks every wheel against the hashes in `uv.lock`), then restore the
+  lock and keep it frozen:
+
+  ```bash
+  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+  export UV_FROZEN=1
+  sed -i 's#https://files.pythonhosted.org/packages/#https://pypi.tuna.tsinghua.edu.cn/packages/#g' uv.lock
+  uv sync; git checkout -- uv.lock
+  ```
+
+  The full sync then took under 30 s instead of over 40 min.
 
 ## Notes
 
