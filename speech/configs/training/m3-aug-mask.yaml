@@ -1,0 +1,32 @@
+# M3 step 3.2a A0-Aug (roadmap SS18.3): the 3.1a candidate (m3-rater-mean.yaml)
+# with conservative training-only masks on the cached hidden states. Each
+# frame starts a time mask with probability 0.05, 1-2 frames (20-40 ms) wide,
+# about 7% of frames; masked frames are left out of pooling, but never all of
+# a word's or phone's frames. 10% of the channels are zeroed per utterance.
+# Evaluation never masks. Only that one factor changes. Two runs use this file
+# with --seed 42 and --seed 1337 (--run-name a0am-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+rater_mean_targets: true
+time_mask_prob: 0.05
+time_mask_max_width: 2
+channel_mask_ratio: 0.1
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

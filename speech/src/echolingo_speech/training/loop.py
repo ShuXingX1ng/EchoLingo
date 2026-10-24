@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from echolingo_speech.config import load_config
 from echolingo_speech.data.manifest import read_jsonl
@@ -40,7 +40,11 @@ from echolingo_speech.training.checkpoint import (
     save_training_checkpoint,
 )
 from echolingo_speech.training.config import TrainingConfig, load_training_config
-from echolingo_speech.training.dataset import SpeechOceanScoringDataset, collate_fn
+from echolingo_speech.training.dataset import (
+    AugmentedTrainingDataset,
+    SpeechOceanScoringDataset,
+    collate_fn,
+)
 from echolingo_speech.training.labels import SENTENCE_TARGET_KEYS
 from echolingo_speech.training.losses import (
     PHONE_WEIGHT,
@@ -284,6 +288,9 @@ def fit(
         use_canonical_phones=training_config.use_canonical_phones,
         num_hidden_layers=len(training_config.hidden_state_layers or [None]),
         predict_rater_spread=training_config.predict_rater_spread,
+        time_mask_prob=training_config.time_mask_prob,
+        time_mask_max_width=training_config.time_mask_max_width,
+        channel_mask_ratio=training_config.channel_mask_ratio,
     ).to(resolved_device)
     if training_config.normalize_acoustic_features:
         mean, std = acoustic_feature_statistics(train_loader)
@@ -424,14 +431,24 @@ def _partition_loader(
     shuffle: bool,
     hidden_state_layers: list[int] | None = None,
     rater_targets: bool = False,
+    feature_variant: str | None = None,
+    augmentation_variants: list[str] | None = None,
+    augmentation_prob: float = 0.0,
 ) -> DataLoader:
-    dataset = SpeechOceanScoringDataset(
+    dataset: Dataset = SpeechOceanScoringDataset(
         manifest_path,
         processed_root,
         partition=partition,
         hidden_state_layers=hidden_state_layers,
         rater_targets=rater_targets,
+        feature_variant=feature_variant,
     )
+    if augmentation_variants:
+        if not hidden_state_layers:
+            raise ValueError("augmentation_variants need hidden_state_layers")
+        dataset = AugmentedTrainingDataset(
+            dataset, processed_root, hidden_state_layers, augmentation_variants, augmentation_prob
+        )
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
 
@@ -458,6 +475,8 @@ def run_training(
         manifest_path, processed_root, "train", batch_size, shuffle=True,
         hidden_state_layers=training_config.hidden_state_layers,
         rater_targets=training_config.rater_mean_targets,
+        augmentation_variants=training_config.augmentation_variants,
+        augmentation_prob=training_config.augmentation_prob,
     )
     val_loader = _partition_loader(
         manifest_path, processed_root, "validation", batch_size, shuffle=False,
@@ -516,6 +535,7 @@ def evaluate_checkpoint(
     *,
     device: str | None = None,
     select_thresholds: bool = False,
+    feature_variant: str | None = None,
 ) -> dict:
     """Score a saved checkpoint on one manifest partition without training,
     so the sealed test partition can be evaluated once a candidate is final
@@ -524,6 +544,9 @@ def evaluate_checkpoint(
     Prediction thresholds come from `prediction_thresholds.json` beside the
     checkpoint. `select_thresholds=True` first chooses them on validation and
     writes that file (for checkpoints trained before thresholds were saved).
+    `feature_variant` scores an augmented copy of the partition's audio
+    (`features/augment.py`), e.g. a noisy validation copy for robustness;
+    thresholds are always the clean validation ones.
     """
     resolved_device = resolve_device(device)
     model = load_model(checkpoint_path, resolved_device)
@@ -542,6 +565,7 @@ def evaluate_checkpoint(
     loader = _partition_loader(
         manifest_path, processed_root, partition, training_config.batch_size, shuffle=False,
         hidden_state_layers=training_config.hidden_state_layers,
+        feature_variant=feature_variant,
     )
     return evaluate(
         model, loader, resolved_device, training_config, prediction_thresholds=thresholds
@@ -652,6 +676,7 @@ def _cli_evaluate(args: argparse.Namespace) -> int:
         args.partition,
         device=args.device,
         select_thresholds=args.select_thresholds,
+        feature_variant=args.feature_variant,
     )
     for key, value in _flatten_metrics(metrics).items():
         print(f"{key} = {value}")
@@ -692,6 +717,11 @@ def _cli(argv: list[str] | None = None) -> int:
         "--select-thresholds",
         action="store_true",
         help="choose prediction thresholds on validation and save them beside the checkpoint",
+    )
+    evaluate_parser.add_argument(
+        "--feature-variant",
+        default=None,
+        help="score an augmented copy of the partition (features.augment), e.g. validation-noisy-1",
     )
 
     args = parser.parse_args(argv)

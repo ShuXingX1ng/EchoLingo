@@ -40,6 +40,21 @@ class TrainingConfig(BaseModel):
     # weighted by `rater_spread_weight` in the total loss. Internal only.
     predict_rater_spread: bool = False
     rater_spread_weight: float = 1.0
+    # M3 A0-Aug feature masks on the cached hidden states, training only (the
+    # model ignores them in eval mode). Each frame starts a time mask with
+    # probability `time_mask_prob`, 1..`time_mask_max_width` frames wide;
+    # masked frames are left out of pooling, but never all of a word's or
+    # phone's frames. `channel_mask_ratio` of the channels are zeroed per
+    # utterance.
+    time_mask_prob: float = 0.0
+    time_mask_max_width: int = 2
+    channel_mask_ratio: float = 0.0
+    # M3 A0-Aug augmented audio: feature-cache variants of the training
+    # partition (`features/augment.py`, e.g. ["train-aug-1", "train-aug-2"]).
+    # Each training item is one of them with probability `augmentation_prob`,
+    # else the clean audio. Validation and test stay clean.
+    augmentation_variants: list[str] | None = None
+    augmentation_prob: float = 0.5
     error_detection_threshold: float = 0.6
     score_band_width: float = 1.0
     mlflow_experiment_name: str = "speech-evaluator-a0"

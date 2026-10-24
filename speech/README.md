@@ -167,6 +167,34 @@ for seed in 42 1337; do
 done
 ```
 
+M3 A0-Aug, both compared against 3.1a. 3.2a masks the cached hidden states
+during training only and needs nothing new. 3.2b trains on augmented copies
+of the training audio; `features.augment` writes each copy as its own
+feature cache under `$PROC/features/variants/<name>-<k>/` (augmented
+waveforms plus the five-layer cache, ~4 GB per training copy; needs the
+clean waveform cache). Every effect keeps the waveform's length, so the
+clean TextGrids and labels still apply and MFA is not rerun. A noisy
+validation copy is scored separately for robustness; model selection and
+thresholds stay on the clean validation partition.
+
+```bash
+# 3.2a feature masks
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-aug-mask.yaml --manifest $MANIFEST --seed $seed --run-name a0am-seed$seed
+done
+
+# 3.2b augmented audio: four training copies, one noisy validation copy
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition train --profile train --copies 4 --seed 0 --name train-aug --layers 4,6,8,10,12
+uv run python -m echolingo_speech.features.augment --manifest $MANIFEST --speech-config configs/speech.yaml --partition validation --profile robustness --copies 1 --seed 1 --name validation-noisy --layers 4,6,8,10,12
+for seed in 42 1337; do
+  uv run python -m echolingo_speech.training.loop train --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST --seed $seed --run-name a0aa-seed$seed
+done
+
+# Robustness: any checkpoint on the noisy validation copy (clean-validation thresholds)
+uv run python -m echolingo_speech.training.loop evaluate --config configs/speech.yaml --training-config configs/training/m3-aug-audio.yaml --manifest $MANIFEST \
+  --checkpoint $SPEECH_HOME/artifacts/checkpoints/a0aa-seed42/best.pt --partition validation --feature-variant validation-noisy-1 --out a0aa-seed42-validation-noisy.json
+```
+
 Reproducibility checks before trusting the rebuild:
 
 - the tarball SHA-256 equals `tarball_sha256` in `configs/datasets/speechocean762.yaml`;

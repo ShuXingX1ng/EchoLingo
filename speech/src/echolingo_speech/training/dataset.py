@@ -11,7 +11,7 @@ never runs Wav2Vec2 itself.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +21,7 @@ from torch.utils.data import Dataset
 from echolingo_speech.alignment.mfa import TextGridSpan, parse_textgrid_spans
 from echolingo_speech.data.manifest import ManifestRecord, read_jsonl
 from echolingo_speech.features.acoustic import compute_acoustic_features, feature_vector
-from echolingo_speech.features.cache import layer_cache_dir_name
+from echolingo_speech.features.cache import layer_cache_dir_name, variant_feature_root
 from echolingo_speech.training.labels import (
     SENTENCE_TARGET_KEYS,
     canonical_phone_id,
@@ -183,14 +183,43 @@ def _match_words_and_phones(
     return word_examples, phone_examples, True
 
 
+def _record_spans(
+    record: ManifestRecord, processed_root: Path
+) -> tuple[list[TextGridSpan], list[TextGridSpan]]:
+    """The record's MFA word and phone spans; empty without an alignment."""
+    if record.alignment is None or not record.alignment.textgrid_relative_path:
+        return [], []
+    return parse_textgrid_spans(processed_root / record.alignment.textgrid_relative_path)
+
+
+def _acoustic_feature_tensor(
+    record: ManifestRecord, waveform: torch.Tensor, word_spans: list[TextGridSpan]
+) -> torch.Tensor:
+    acoustic = compute_acoustic_features(
+        waveform,
+        word_spans,
+        duration_sec=record.audio.duration_sec,
+        reference_word_count=len(record.scores["words"]),
+    )
+    return torch.tensor(feature_vector(acoustic), dtype=torch.float32)
+
+
 def _build_example(
     record: ManifestRecord,
     processed_root: Path,
     hidden_state_layers: tuple[int, ...] | None = None,
     rater_targets: bool = False,
+    feature_variant: str | None = None,
 ) -> ScoringExample:
     feature_root = processed_root / "features"
     assert record.features is not None, f"{record.sample_id} has no cached features"
+    if feature_variant is not None:
+        # An augmented copy of the audio (`features/augment.py`): only its
+        # waveform and layer cache differ, the TextGrid and labels are the
+        # clean ones.
+        if not hidden_state_layers:
+            raise ValueError("feature variants are only cached for hidden_state_layers")
+        feature_root = variant_feature_root(feature_root, feature_variant)
 
     if hidden_state_layers:
         # Kept fp16 in memory (5 layers x 2500 records would not fit as fp32
@@ -205,11 +234,7 @@ def _build_example(
         ).float()
     waveform = torch.from_numpy(np.load(feature_root / record.features.waveform_cache_path)).float()
 
-    word_spans: list[TextGridSpan] = []
-    phone_spans: list[TextGridSpan] = []
-    if record.alignment is not None and record.alignment.textgrid_relative_path:
-        textgrid_path = processed_root / record.alignment.textgrid_relative_path
-        word_spans, phone_spans = parse_textgrid_spans(textgrid_path)
+    word_spans, phone_spans = _record_spans(record, processed_root)
 
     canonical_words = record.scores["words"]
     num_frames = hidden_states.shape[-2]
@@ -244,13 +269,7 @@ def _build_example(
         [sentence_normalized[key] for key in SENTENCE_TARGET_KEYS], dtype=torch.float32
     )
 
-    acoustic = compute_acoustic_features(
-        waveform,
-        word_spans,
-        duration_sec=duration_sec,
-        reference_word_count=len(canonical_words),
-    )
-    acoustic_features = torch.tensor(feature_vector(acoustic), dtype=torch.float32)
+    acoustic_features = _acoustic_feature_tensor(record, waveform, word_spans)
 
     return ScoringExample(
         sample_id=record.sample_id,
@@ -282,13 +301,15 @@ class SpeechOceanScoringDataset(Dataset):
         partition: str,
         hidden_state_layers: tuple[int, ...] | list[int] | None = None,
         rater_targets: bool = False,
+        feature_variant: str | None = None,
     ) -> None:
-        records = [
+        self.records = [
             record for record in read_jsonl(manifest_path) if record.partition == partition
         ]
         layers = tuple(hidden_state_layers) if hidden_state_layers else None
         self.examples = [
-            _build_example(record, processed_root, layers, rater_targets) for record in records
+            _build_example(record, processed_root, layers, rater_targets, feature_variant)
+            for record in self.records
         ]
 
     def __len__(self) -> int:
@@ -296,6 +317,77 @@ class SpeechOceanScoringDataset(Dataset):
 
     def __getitem__(self, index: int) -> ScoringExample:
         return self.examples[index]
+
+
+class AugmentedTrainingDataset(Dataset):
+    """The training partition with augmented copies of its audio (M3 A0-Aug,
+    `features/augment.py`). Each item is an augmented copy with probability
+    `augmentation_prob` (the copy drawn uniformly), else the clean example,
+    drawn afresh every time it is fetched, so every epoch sees a new mix.
+
+    A copy shares the clean example's spans and targets (the augmentation
+    keeps every waveform's length); only its hidden states and explicit
+    acoustic features differ. The acoustic features are computed up front;
+    the copies' hidden states are read from disk per item, since holding
+    several fp16 copies of the training cache in memory would not fit.
+    """
+
+    def __init__(
+        self,
+        clean: SpeechOceanScoringDataset,
+        processed_root: Path,
+        hidden_state_layers: tuple[int, ...] | list[int],
+        variants: list[str],
+        augmentation_prob: float,
+    ) -> None:
+        if not variants:
+            raise ValueError("AugmentedTrainingDataset needs at least one variant")
+        self.clean = clean
+        self.augmentation_prob = augmentation_prob
+        feature_root = processed_root / "features"
+        self.hidden_state_paths: list[list[Path]] = []
+        self.acoustic_features: list[list[torch.Tensor]] = []
+        for variant in variants:
+            root = variant_feature_root(feature_root, variant)
+            paths, acoustic = [], []
+            for record in clean.records:
+                assert record.features is not None, f"{record.sample_id} has no cached features"
+                layer_dir = layer_cache_dir_name(
+                    record.features.encoder_revision, tuple(hidden_state_layers)
+                )
+                path = root / layer_dir / f"{record.sample_id}.npy"
+                if not path.is_file():
+                    raise FileNotFoundError(
+                        f"{path} is missing; run `python -m echolingo_speech.features.augment`"
+                    )
+                paths.append(path)
+                waveform = torch.from_numpy(
+                    np.load(root / record.features.waveform_cache_path)
+                ).float()
+                word_spans, _ = _record_spans(record, processed_root)
+                acoustic.append(_acoustic_feature_tensor(record, waveform, word_spans))
+            self.hidden_state_paths.append(paths)
+            self.acoustic_features.append(acoustic)
+
+    def __len__(self) -> int:
+        return len(self.clean)
+
+    def __getitem__(self, index: int) -> ScoringExample:
+        example = self.clean[index]
+        if torch.rand(()).item() >= self.augmentation_prob:
+            return example
+        copy = int(torch.randint(len(self.hidden_state_paths), ()).item())
+        hidden_states = torch.from_numpy(np.load(self.hidden_state_paths[copy][index]))
+        if hidden_states.shape != example.hidden_states.shape:
+            raise ValueError(
+                f"{example.sample_id}: augmented copy has shape {tuple(hidden_states.shape)}, "
+                f"clean has {tuple(example.hidden_states.shape)}"
+            )
+        return replace(
+            example,
+            hidden_states=hidden_states,
+            acoustic_features=self.acoustic_features[copy][index],
+        )
 
 
 def collate_fn(batch: list[ScoringExample]) -> dict:

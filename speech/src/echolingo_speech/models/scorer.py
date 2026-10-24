@@ -4,7 +4,8 @@ Three pooling levels over frozen Wav2Vec2 hidden states feed six heads:
 sentence accuracy/fluency/prosodic/completeness (attentive statistics pooling
 + explicit acoustic features), word accuracy/stress (mean-pooled word spans),
 and phoneme accuracy (mean-pooled phone spans), plus optional heads for the
-experts' score spread at each level (M3 A0-Rater). The encoder itself never
+experts' score spread at each level (M3 A0-Rater) and optional training-only
+masks on the hidden states (M3 A0-Aug). The encoder itself never
 appears here -- `training/dataset.py` already loads its frozen hidden states
 from M1's cache, so this module only ever sees `(T, 768)` tensors.
 """
@@ -39,17 +40,49 @@ class AttentiveStatisticsPooling(nn.Module):
         return torch.cat([mean, std], dim=-1)  # (B, 2H)
 
 
-def _pool_spans(hidden_states: torch.Tensor, spans: list) -> torch.Tensor:
+def _pool_spans(
+    hidden_states: torch.Tensor, spans: list, keep: torch.Tensor | None = None
+) -> torch.Tensor:
     """Mean-pool frames inside each span for one utterance. Returns a
     `(0, hidden_dim)` tensor when `spans` is empty (e.g. a record whose word
     alignment was masked invalid) -- every downstream Linear/head handles a
-    zero-length batch dimension without special-casing.
+    zero-length batch dimension without special-casing. `keep` (`(T,)` bool)
+    leaves time-masked frames out, but never all of a span's frames: a span
+    the mask covers entirely is pooled over all of them, so every label keeps
+    the evidence it was given for.
     """
     if not spans:
         return hidden_states.new_zeros((0, hidden_states.shape[-1]))
-    return torch.stack(
-        [hidden_states[span.frame_start : span.frame_end].mean(dim=0) for span in spans]
-    )
+    pooled = []
+    for span in spans:
+        frames = hidden_states[span.frame_start : span.frame_end]
+        if keep is not None:
+            span_keep = keep[span.frame_start : span.frame_end]
+            if span_keep.any():
+                frames = frames[span_keep]
+        pooled.append(frames.mean(dim=0))
+    return torch.stack(pooled)
+
+
+def _time_mask(frame_mask: torch.Tensor, start_prob: float, max_width: int) -> torch.Tensor:
+    """Frames to keep, `(B, T)` bool: each frame starts a mask with
+    probability `start_prob`, of a width drawn from 1..`max_width` frames."""
+    batch_size, num_frames = frame_mask.shape
+    starts = torch.rand(batch_size, num_frames, device=frame_mask.device) < start_prob
+    widths = torch.randint(1, max_width + 1, (batch_size, num_frames), device=frame_mask.device)
+    masked = torch.zeros_like(frame_mask)
+    for offset in range(min(max_width, num_frames)):
+        covers = starts & (widths > offset)
+        masked[:, offset:] |= covers[:, : num_frames - offset]
+    return ~masked
+
+
+def _channel_mask(batch_size: int, hidden_dim: int, ratio: float, device) -> torch.Tensor:
+    """Channels to keep, `(B, H)` bool, with exactly `round(ratio * H)`
+    channels dropped per utterance."""
+    dropped = round(ratio * hidden_dim)
+    ranks = torch.rand(batch_size, hidden_dim, device=device).argsort(dim=1).argsort(dim=1)
+    return ranks >= dropped
 
 
 class SpeechEvaluatorA0(nn.Module):
@@ -66,6 +99,9 @@ class SpeechEvaluatorA0(nn.Module):
         phone_embedding_dim: int = 32,
         num_hidden_layers: int = 1,
         predict_rater_spread: bool = False,
+        time_mask_prob: float = 0.0,
+        time_mask_max_width: int = 2,
+        channel_mask_ratio: float = 0.0,
     ) -> None:
         super().__init__()
         # Constructor arguments, recorded so a checkpoint can rebuild this
@@ -82,6 +118,9 @@ class SpeechEvaluatorA0(nn.Module):
             "phone_embedding_dim": phone_embedding_dim,
             "num_hidden_layers": num_hidden_layers,
             "predict_rater_spread": predict_rater_spread,
+            "time_mask_prob": time_mask_prob,
+            "time_mask_max_width": time_mask_max_width,
+            "channel_mask_ratio": channel_mask_ratio,
         }
         # Several cached encoder layers are mixed by a learned softmax weight
         # per layer (initially uniform) before any pooling.
@@ -160,10 +199,31 @@ class SpeechEvaluatorA0(nn.Module):
             weights = torch.softmax(self.layer_weights, dim=0)
             hidden_states = torch.einsum("l,bltd->btd", weights, hidden_states)
 
+        # M3 A0-Aug feature masks, training only: time-masked frames are left
+        # out of every pooling, masked channels are zeroed for the whole
+        # utterance.
+        keep = None
+        pool_mask = frame_mask
+        if self.training and self.config["time_mask_prob"] > 0:
+            keep = _time_mask(
+                frame_mask, self.config["time_mask_prob"], self.config["time_mask_max_width"]
+            )
+            pool_mask = frame_mask & keep
+            emptied = ~pool_mask.any(dim=1)
+            pool_mask = torch.where(emptied.unsqueeze(1), frame_mask, pool_mask)
+        if self.training and self.config["channel_mask_ratio"] > 0:
+            channel_keep = _channel_mask(
+                hidden_states.shape[0],
+                hidden_states.shape[-1],
+                self.config["channel_mask_ratio"],
+                hidden_states.device,
+            )
+            hidden_states = hidden_states * channel_keep.unsqueeze(1).to(hidden_states.dtype)
+
         acoustic = batch["acoustic_features"]
         if self.config["normalize_acoustic_features"]:
             acoustic = (acoustic - self.acoustic_mean) / self.acoustic_std
-        sentence_pooled = self.sentence_pooling(hidden_states, frame_mask)
+        sentence_pooled = self.sentence_pooling(hidden_states, pool_mask)
         sentence_input = torch.cat([sentence_pooled, acoustic], dim=-1)
         sentence_trunk_out = self.sentence_trunk(sentence_input)
         sentence_scores = torch.cat(
@@ -182,7 +242,8 @@ class SpeechEvaluatorA0(nn.Module):
         phone_spread: list[torch.Tensor] = []
 
         for b in range(hidden_states.shape[0]):
-            word_pooled = _pool_spans(hidden_states[b], batch["word_examples"][b])
+            sample_keep = keep[b] if keep is not None else None
+            word_pooled = _pool_spans(hidden_states[b], batch["word_examples"][b], sample_keep)
             if self.config["use_canonical_phones"]:
                 word_pooled = torch.cat(
                     [word_pooled, self._word_phone_context(batch["word_examples"][b])], dim=-1
@@ -197,7 +258,7 @@ class SpeechEvaluatorA0(nn.Module):
                     torch.sigmoid(self.word_spread_head(word_trunk_out)).squeeze(-1)
                 )
 
-            phone_pooled = _pool_spans(hidden_states[b], batch["phone_examples"][b])
+            phone_pooled = _pool_spans(hidden_states[b], batch["phone_examples"][b], sample_keep)
             if self.config["use_canonical_phones"]:
                 phone_ids = torch.tensor(
                     [phone.phone_id for phone in batch["phone_examples"][b]],

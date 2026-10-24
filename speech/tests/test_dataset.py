@@ -335,3 +335,128 @@ def test_layer_cache_dir_name_is_deterministic_per_revision_and_layers():
     name = layer_cache_dir_name("22aad52d435eb6dbaf354bdad9b0da84ce7d6156", [4, 6, 12])
     assert name == "wav2vec2-layers-22aad52d435e-l4-6-12"
     assert name != layer_cache_dir_name("22aad52d435eb6dbaf354bdad9b0da84ce7d6156", [4, 6])
+
+
+def _write_layer_cache(feature_root: Path, sample_id: str, num_frames: int, value: float) -> None:
+    from echolingo_speech.features.cache import layer_cache_dir_name
+
+    layer_dir = feature_root / layer_cache_dir_name("abc", (4, 12))
+    layer_dir.mkdir(parents=True, exist_ok=True)
+    stacked = np.full((2, num_frames, 768), value, dtype=np.float16)
+    np.save(layer_dir / f"{sample_id}.npy", stacked)
+
+
+def _augmented_fixture(tmp_path: Path, variants: list[str]) -> Path:
+    """Two training records with a clean 2-layer cache (value 1.0) and, per
+    variant k, an augmented copy (value k + 1, louder waveform)."""
+    from echolingo_speech.features.cache import variant_feature_root
+
+    records = []
+    for sample_id, num_frames in (("SAMPLE_A", 50), ("SAMPLE_B", 80)):
+        records.append(
+            _write_record_assets(
+                tmp_path,
+                sample_id=sample_id,
+                num_frames=num_frames,
+                words=[(0.0, 0.5, "we"), (0.5, 1.0, "call")],
+                phones=[(0.0, 0.25, "W"), (0.25, 0.5, "IY1"), (0.5, 0.75, "K"), (0.75, 1.0, "AO0")],
+            )
+        )
+        _write_layer_cache(tmp_path / "features", sample_id, num_frames, 1.0)
+        for k, variant in enumerate(variants, start=1):
+            root = variant_feature_root(tmp_path / "features", variant)
+            (root / "waveform").mkdir(parents=True, exist_ok=True)
+            waveform = np.full((1, 16000), 0.1 * k, dtype=np.float32)
+            np.save(root / "waveform" / f"{sample_id}.npy", waveform)
+            _write_layer_cache(root, sample_id, num_frames, float(k + 1))
+    manifest_path = tmp_path / "manifest.jsonl"
+    write_jsonl(manifest_path, records)
+    return manifest_path
+
+
+def test_dataset_reads_a_feature_variant_with_the_clean_spans(tmp_path: Path):
+    manifest_path = _augmented_fixture(tmp_path, ["validation-noisy-1"])
+    clean = SpeechOceanScoringDataset(
+        manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12]
+    )
+    noisy = SpeechOceanScoringDataset(
+        manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12],
+        feature_variant="validation-noisy-1",
+    )
+    assert torch.all(noisy[0].hidden_states == 2.0)
+    assert noisy[0].word_examples == clean[0].word_examples
+    assert torch.equal(noisy[0].sentence_targets, clean[0].sentence_targets)
+    assert not torch.equal(noisy[0].acoustic_features, clean[0].acoustic_features)
+
+
+def test_feature_variant_needs_a_layer_cache(tmp_path: Path):
+    manifest_path = _augmented_fixture(tmp_path, ["validation-noisy-1"])
+    with pytest.raises(ValueError, match="hidden_state_layers"):
+        SpeechOceanScoringDataset(
+            manifest_path, tmp_path, partition="train", feature_variant="validation-noisy-1"
+        )
+
+
+def test_augmented_training_dataset_mixes_clean_and_copies(tmp_path: Path):
+    from echolingo_speech.training.dataset import AugmentedTrainingDataset
+
+    variants = ["train-aug-1", "train-aug-2"]
+    manifest_path = _augmented_fixture(tmp_path, variants)
+    clean = SpeechOceanScoringDataset(
+        manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12]
+    )
+
+    never = AugmentedTrainingDataset(clean, tmp_path, [4, 12], variants, 0.0)
+    assert never[1] is clean[1]
+
+    always = AugmentedTrainingDataset(clean, tmp_path, [4, 12], variants, 1.0)
+    torch.manual_seed(0)
+    seen = set()
+    for _ in range(40):
+        example = always[1]
+        value = example.hidden_states[0, 0, 0].item()
+        assert value in (2.0, 3.0)
+        seen.add(value)
+        assert example.hidden_states.shape == clean[1].hidden_states.shape
+        assert example.word_examples == clean[1].word_examples
+        assert not torch.equal(example.acoustic_features, clean[1].acoustic_features)
+    assert seen == {2.0, 3.0}
+    # The clean example is never modified in place.
+    assert torch.all(clean[1].hidden_states == 1.0)
+
+    batch = collate_fn([always[0], always[1]])
+    assert batch["hidden_states"].shape == (2, 2, 80, 768)
+
+
+def test_augmented_training_dataset_rejects_a_missing_or_mismatched_copy(tmp_path: Path):
+    from echolingo_speech.features.cache import variant_feature_root
+    from echolingo_speech.training.dataset import AugmentedTrainingDataset
+
+    manifest_path = _augmented_fixture(tmp_path, ["train-aug-1"])
+    clean = SpeechOceanScoringDataset(
+        manifest_path, tmp_path, partition="train", hidden_state_layers=[4, 12]
+    )
+    with pytest.raises(FileNotFoundError, match="features.augment"):
+        AugmentedTrainingDataset(clean, tmp_path, [4, 12], ["train-aug-9"], 0.5)
+
+    root = variant_feature_root(tmp_path / "features", "train-aug-1")
+    _write_layer_cache(root, "SAMPLE_A", 49, 2.0)
+    shifted = AugmentedTrainingDataset(clean, tmp_path, [4, 12], ["train-aug-1"], 1.0)
+    with pytest.raises(ValueError, match="shape"):
+        shifted[0]
+
+
+def test_partition_loader_wraps_training_with_augmented_copies(tmp_path: Path):
+    from echolingo_speech.training.dataset import AugmentedTrainingDataset
+    from echolingo_speech.training.loop import _partition_loader
+
+    manifest_path = _augmented_fixture(tmp_path, ["train-aug-1"])
+    loader = _partition_loader(
+        manifest_path, tmp_path, "train", 2, shuffle=False,
+        hidden_state_layers=[4, 12],
+        augmentation_variants=["train-aug-1"],
+        augmentation_prob=1.0,
+    )
+    assert isinstance(loader.dataset, AugmentedTrainingDataset)
+    batch = next(iter(loader))
+    assert torch.all(batch["hidden_states"][0, :, :50] == 2.0)

@@ -1,0 +1,34 @@
+# M3 step 3.2b A0-Aug (roadmap SS18.3): the 3.1a candidate (m3-rater-mean.yaml)
+# trained on augmented copies of the training audio. Four copies come from
+# `python -m echolingo_speech.features.augment --partition train --profile train
+# --copies 4 --seed 0 --name train-aug` (light synthetic noise, room response,
+# telephone channel and gain; every waveform keeps its length, so the clean
+# alignments and labels still apply). Each training item is an augmented copy
+# with probability 0.5, else the clean audio. Validation and test stay clean;
+# a noisy validation copy (`--profile robustness`) is scored separately for
+# robustness. Only that one factor changes. Two runs use this file with
+# --seed 42 and --seed 1337 (--run-name a0aa-seed<seed>).
+
+seed: 42
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.01
+dropout: 0.3
+max_epochs: 150
+early_stopping_patience: 15
+lr_scheduler_patience: 7
+lr_scheduler_factor: 0.5
+
+word_accuracy_weight: 0.9
+word_stress_weight: 0.1
+normalize_acoustic_features: true
+use_canonical_phones: true
+hidden_state_layers: [4, 6, 8, 10, 12]
+rater_mean_targets: true
+augmentation_variants: [train-aug-1, train-aug-2, train-aug-3, train-aug-4]
+augmentation_prob: 0.5
+
+error_detection_threshold: 0.6
+score_band_width: 1.0
+
+mlflow_experiment_name: speech-evaluator-a0

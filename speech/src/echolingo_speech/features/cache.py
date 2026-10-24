@@ -89,6 +89,14 @@ def extract_features(
     return updated
 
 
+def variant_feature_root(feature_root: Path, variant: str) -> Path:
+    """Feature cache of one augmented copy of the audio (M3 A0-Aug,
+    `features/augment.py`). It mirrors the clean cache's layout (`waveform/`
+    and the layer directory), so a record's `waveform_cache_path` and
+    `layer_cache_dir_name` resolve under it unchanged."""
+    return feature_root / "variants" / variant
+
+
 def layer_cache_dir_name(encoder_revision: str, layers: tuple[int, ...] | list[int]) -> str:
     """Directory (under the feature cache root) holding the multi-layer cache
     for one encoder revision and layer selection. `training/dataset.py` finds

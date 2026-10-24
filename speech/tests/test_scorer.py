@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import torch
 
-from echolingo_speech.models.scorer import SpeechEvaluatorA0
+from echolingo_speech.models.scorer import SpeechEvaluatorA0, _channel_mask, _pool_spans, _time_mask
 from echolingo_speech.training.dataset import PhoneExample, WordExample
 
 
@@ -145,3 +145,76 @@ def test_multi_layer_input_is_mixed_by_learned_layer_weights():
         actual = layered(dict(batch, hidden_states=stacked))["sentence_scores"]
     assert torch.allclose(actual, expected, atol=1e-6)
     assert layered.layer_weights.requires_grad
+
+
+def test_feature_masks_are_ignored_in_eval_mode():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    masked = SpeechEvaluatorA0(time_mask_prob=0.5, channel_mask_ratio=0.5)
+    plain = SpeechEvaluatorA0()
+    plain.load_state_dict(masked.state_dict())
+    masked.eval()
+    plain.eval()
+    with torch.no_grad():
+        expected = plain(batch)
+        actual = masked(batch)
+    assert torch.equal(actual["sentence_scores"], expected["sentence_scores"])
+    assert torch.equal(actual["phone_accuracy"][0], expected["phone_accuracy"][0])
+
+
+def test_feature_masks_change_training_forward():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    masked = SpeechEvaluatorA0(dropout=0.0, time_mask_prob=0.3, channel_mask_ratio=0.2)
+    plain = SpeechEvaluatorA0(dropout=0.0)
+    plain.load_state_dict(masked.state_dict())
+    masked.train()
+    plain.train()
+    with torch.no_grad():
+        expected = plain(batch)["sentence_scores"]
+        actual = masked(batch)["sentence_scores"]
+    assert not torch.allclose(actual, expected)
+
+
+def test_time_mask_covering_everything_falls_back_to_all_frames():
+    torch.manual_seed(0)
+    batch = _synthetic_batch()
+    masked = SpeechEvaluatorA0(dropout=0.0, time_mask_prob=1.0)
+    plain = SpeechEvaluatorA0(dropout=0.0)
+    plain.load_state_dict(masked.state_dict())
+    masked.train()
+    plain.train()
+    with torch.no_grad():
+        expected = plain(batch)
+        actual = masked(batch)
+    # Every frame masked: sentence and span pooling see all frames again.
+    assert torch.allclose(actual["sentence_scores"], expected["sentence_scores"])
+    assert torch.allclose(actual["phone_accuracy"][0], expected["phone_accuracy"][0])
+
+
+def test_time_mask_width_and_rate():
+    torch.manual_seed(0)
+    frame_mask = torch.ones(4, 1000, dtype=torch.bool)
+    assert _time_mask(frame_mask, 0.0, 2).all()
+    keep = _time_mask(frame_mask, 0.05, 2)
+    # Starts at 5% of frames, widths 1..2 (mean 1.5): about 7% masked.
+    assert 0.04 < (~keep).float().mean().item() < 0.10
+    # A start on the last frame cannot run past the end.
+    assert _time_mask(torch.ones(1, 1, dtype=torch.bool), 1.0, 2).shape == (1, 1)
+
+
+def test_pool_spans_leaves_masked_frames_out_but_never_a_whole_span():
+    hidden_states = torch.arange(6, dtype=torch.float32).unsqueeze(-1)  # (T=6, H=1)
+    spans = [PhoneExample(0, 3, 1.0), PhoneExample(3, 5, 1.0)]
+    keep = torch.tensor([True, False, True, False, False, True])
+    pooled = _pool_spans(hidden_states, spans, keep)
+    assert pooled[0].item() == 1.0  # frames 0 and 2
+    assert pooled[1].item() == 3.5  # both masked -> frames 3 and 4
+
+
+def test_channel_mask_drops_an_exact_count_per_utterance():
+    torch.manual_seed(0)
+    keep = _channel_mask(3, 768, 0.1, "cpu")
+    assert keep.shape == (3, 768)
+    assert ((~keep).sum(dim=1) == round(0.1 * 768)).all()
+    assert not torch.equal(keep[0], keep[1])

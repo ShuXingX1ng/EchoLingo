@@ -4,6 +4,8 @@ dataset on CPU (no real data, no GPU, no MLflow)."""
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -334,3 +336,15 @@ def test_canonical_phone_model_round_trips_through_a_checkpoint(tmp_path):
         expected = model(batch)["word_accuracy"][0]
         actual = reloaded(batch)["word_accuracy"][0]
     assert torch.allclose(actual, expected)
+
+
+def test_fit_with_feature_masks_trains_and_reloads_them(tmp_path):
+    train_loader, val_loader = _loaders()
+    config = _config(time_mask_prob=0.2, time_mask_max_width=2, channel_mask_ratio=0.1)
+    _, result = fit(
+        train_loader, val_loader, config, seed=0, device="cpu", checkpoint_dir=tmp_path
+    )
+    assert all(math.isfinite(loss) for loss in _val_losses(result))
+    reloaded = load_model(result["best_checkpoint"], "cpu")
+    assert reloaded.config["time_mask_prob"] == 0.2
+    assert reloaded.config["channel_mask_ratio"] == 0.1
