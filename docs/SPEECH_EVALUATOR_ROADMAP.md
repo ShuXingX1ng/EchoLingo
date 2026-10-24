@@ -540,7 +540,7 @@ LLM 不得：
 
 ## 18. 当前进度与执行计划
 
-更新日期：2026-10-23。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
+更新日期：2026-10-25。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
 
 ### 18.1 里程碑状态
 
@@ -550,12 +550,12 @@ LLM 不得：
 | M1 SpeechOcean 数据管线 | 完成（2026-07-24） | commit `22ddfd5` |
 | M2 A0 冻结基线 | 完成，带已标记缺口（2026-07-31）；2026-10-23 在租用 GPU 上复现 | `speech/docs/m2-acceptance-report.md` 第 1–6 节 |
 | M2.5 A0 基线修复 | 完成（2026-10-23） | `speech/docs/m25-diagnostics-report.md` 第 12 节 |
-| M3 候选改进 | 进行中（2026-10-24 起；A0-Rater 完成，3.1a 采纳；A0-Aug 完成，3.2c 采纳；成人目标域完成，未采纳微调；输入归一化未采纳；下一步 A1） | 第 18.3 节步骤 4 |
+| M3 候选改进 | 完成（2026-10-25；采纳 3.1a 与 3.2c，未采纳分歧辅助头、成人微调、输入归一化与 A1；定稿候选 3.2c 在封存 Test 上评估一次） | 第 18.3 节步骤 4 |
 | M4 Bundle 与 Worker | 未开始 | — |
 | M5 FastAPI 与 Read Aloud | 未开始 | — |
 | M6 反馈与诊断 | 未开始 | — |
 
-原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`。
+原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`、`2026-10-25-m3-a1/`（A1 Adapter 权重、训练历史与 `last.pt`、A1-Scorer 检查点、各层缓存的 `adapter.json`；Loquacious 与 Adapter 层缓存可按 README 重建，不备份）、`2026-10-25-m3-final-test/`（3.2c 封存 Test 结果）。
 
 ### 18.2 A0 已知问题
 
@@ -630,6 +630,13 @@ A0-Aug 的依据（2026-10-24）：3.1a 两个种子的验证损失在第 19–2
 9. 输入归一化：`m3-input-norm.yaml`，3.2c 改用从归一化输入提取的层缓存（`extract-layers --normalize-input`，与 transformers 的 `zero_mean_unit_var_norm` 一致，另存 `-norm` 目录；增强副本复用原波形只重提层特征）。检查点在模型配置里记录 `encoder_input_normalized`，评估与诊断拒绝在另一套缓存上打分。原始与归一化输入的层特征余弦约 0.97–0.98。— 完成（2026-10-24）：两个种子方向不一致。句子 Accuracy 0.830 / 0.830（3.2c 0.812 / 0.817）；单词 AP 0.514 / 0.546（0.543 / 0.521），音素 AP 0.373 / 0.387（0.386 / 0.383）。按说话人 bootstrap：种子 42 成人单词 AP −0.038 [−0.064, −0.002]、音素 AP −0.017 [−0.022, −0.004]（显著变差），种子 1337 成人单词 AP +0.032 [−0.017, +0.072]（不显著）；带噪句子 Accuracy 在种子 1337 上 −0.036 [−0.083, +0.005]。没有一致的提升，**不采纳**，3.2c 仍是参照。由此确定的推理契约：编码器输入是重采样到 16 kHz 的原始波形，不做 `do_normalize`，导出 Checkpoint Bundle 时必须写入 `feature-schema.json`。
 
 已核实（2026-10-24）：特征缓存直接把原始波形送入 Wav2Vec2，而钉住的 `wav2vec2-base-960h` 版本 `preprocessor_config.json` 为 `do_normalize: true`，即缺少零均值、单位方差的输入归一化。训练与推理一致时不影响正确性，但可能损失编码器表现；见下方第 9 项的对照。
+
+A1 的数据事实（2026-10-25）：Loquacious `small`（Hugging Face `speechbrain/LoquaciousSet`，revision `0e84cdb9e4b8`）train 72 个 parquet 分片 107,303 条，去掉超过 20 秒的 3,443 条后保留 103,860 条、226.0 小时，另有 8 条转写比编码器输出帧数还长（CTC 不可行），训练时剔除；dev 保留 7,547 条、14.4 小时（212 条超过 20 秒）。转写只含大写字母、撇号和空格，与编码器的 CTC 字母表一致，没有条目因字符被过滤。只用 dev 选模型，Loquacious test 不下载；转写只监督识别，不作评分标签。A1 与 3.2c 在同一台 RTX 4090 上比较：先在重建的缓存上复评 3.2c 两个种子，干净与带噪 Validation 的各项指标与原结果差值均为 0；A1-Scorer 的四份 train-aug 副本按原种子重新生成，`effects.json` 与 3.2c 逐字节相同，只有编码器层不同。
+
+10. A1-Encoder：`configs/adapter/a1-loquacious-small.yaml` 与 `encoder/ctc_adapter.py`；在钉住编码器自带的 CTC 头下只训练 LoRA（每层注意力 `q_proj`/`v_proj`，rank 16，alpha 32，B 初始化为 0，共 589,824 个参数），CNN、lm_head 与其余权重冻结，输入为原始 16 kHz 波形，2 个 epoch（8,368 步），每 1000 步在固定的 1500 条 dev 子集上算贪心 WER 并保留最佳。训练时关闭 SpecAugment：钉住的 checkpoint 没有 `masked_spec_embed`，transformers 5.14 留下未初始化的值（含 NaN），train 模式会把它写进被遮的帧；eval 模式不遮挡，已有特征缓存从未用到它。— 完成（2026-10-25）：dev 子集 WER 0.198 → 0.173（第 6000 步最佳）；全量贪心 WER（base → Adapter）Loquacious dev 0.201 → 0.173，SpeechOcean Validation 干净 0.512 → 0.454（成人 0.517 → 0.470，儿童 0.505 → 0.429），带噪 0.596 → 0.531。SpeechOcean 上的 WER 只反映识别鲁棒性：读错的词在评分中本来就应当显得不对。Adapter 层与原始层的逐层余弦约 0.78–0.92（第 4/6/8/10/12 层；输入归一化时为 0.97–0.98）。
+11. A1-Scorer：`m3-a1-scorer.yaml`，即 3.2c 改用 Adapter 层缓存（`extract-layers --adapter-dir`，另存 `-adapter-a1-loquacious-small` 目录，`adapter.json` 记录 Adapter 的 SHA-256，评分时拒绝混用不同 Adapter 的缓存）。采纳标准（2026-10-24 确定）：成人单词与音素 AP 都不显著变差、至少一项显著变好（干净或带噪 Validation）、带噪句子级不差于 3.2c。— 完成（2026-10-25）：第二条不满足。按说话人 bootstrap，成人单词 AP 干净 +0.017 [−0.008, +0.040] / +0.063 [−0.020, +0.119]、带噪 −0.015 / +0.036，音素 AP 干净 +0.002 / +0.018、带噪 +0.007 / +0.002，区间都跨 0；唯一不含 0 的区间是种子 42 成人带噪 Prosodic +0.010 [+0.0004, +0.029]，种子 1337 没有复现（−0.005）。整体干净 Validation 单词 AP 0.543 / 0.521 → 0.564 / 0.576，但句子级两个种子都略降（Accuracy 0.812 / 0.817 → 0.802 / 0.803，Fluency 0.860 / 0.854 → 0.851 / 0.840，Prosodic 0.845 / 0.831 → 0.832 / 0.820），种子 1337 成人句子 Accuracy −0.028 [−0.064, +0.001]；带噪句子级差异在 ±0.01 内且区间跨 0。**不采纳**，3.2c 为 M3 定稿候选。判断：Adapter 确实改善了识别（WER 相对下降 11%–14%），但没有转化为可确认的评分收益；单词 AP 的正向趋势需要比 7 名成人更多的 Validation 说话人才能确认或排除。
+
+结果（2026-10-25，封存 Test 一次性评估，使用 3.2c 训练时在 Validation 上选好并保存的阈值；两个种子依次为 42 / 1337）：M3 定稿候选 3.2c（`m3-aug-mask-audio.yaml`）相对 M2.5 候选，单词与音素级全部提升：单词 Accuracy Pearson 0.397 / 0.399 → 0.437 / 0.413，单词错误检测 AP 0.321 / 0.320 → 0.364 / 0.333、Macro F1 0.638 / 0.628 → 0.680 / 0.667（无学习基线 0.4801），音素 Accuracy Pearson 0.369 / 0.372 → 0.415 / 0.393，音素错误检测 AP 0.201 / 0.206 → 0.251 / 0.228、Macro F1 0.621 / 0.621 → 0.628 / 0.628（基线 0.4888）。句子级持平：Accuracy 0.712 / 0.705 → 0.706 / 0.704，Fluency 0.788 / 0.789 → 0.786 / 0.787，Prosodic 0.783 / 0.784 → 0.780 / 0.781；Completeness Pearson 本来就接近 0（0.087 / 0.104 → −0.006 / 0.015）。首次在 Test 上分年龄报告：成人句子 Accuracy 0.813 / 0.818、Fluency 0.884 / 0.886，单词 AP 0.446 / 0.415、Macro F1 0.711 / 0.697；儿童句子 Accuracy 0.378 / 0.386、Fluency 0.540 / 0.545，单词 Macro F1 0.590 / 0.584。M2.5 没有 Test 分年龄结果，成人指标暂无 Test 上的对照。第 7.2 节中可由模型指标判断的门槛（句子 Accuracy 与 Fluency 至少 0.60、优于无学习基线、两次等价训练稳定）满足；异常音频处理与 Azure Compare 属于 M4–M5。**M3 完成**；本次 Test 评估后 3.2c 不再改动，儿童句子级明显偏弱作为已知限制带入后续阶段。
 
 ### 18.4 实验纪律
 
