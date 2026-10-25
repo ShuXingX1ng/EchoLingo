@@ -88,7 +88,7 @@ def _time_to_frame(t: float, duration_sec: float, num_frames: int) -> int:
     return max(0, min(num_frames - 1, idx))
 
 
-def _span_to_frame_range(
+def span_to_frame_range(
     start: float, end: float, duration_sec: float, num_frames: int
 ) -> tuple[int, int]:
     frame_start = _time_to_frame(start, duration_sec, num_frames)
@@ -98,7 +98,7 @@ def _span_to_frame_range(
     return frame_start, min(frame_end, num_frames)
 
 
-def _phones_for_word(
+def phones_for_word(
     word_span: TextGridSpan, phone_spans: list[TextGridSpan]
 ) -> list[TextGridSpan]:
     return [
@@ -137,7 +137,7 @@ def _match_words_and_phones(
     word_examples: list[WordExample] = []
     phone_examples: list[PhoneExample] = []
     for index, (word_span, canonical_word) in enumerate(zip(word_spans, canonical_words)):
-        frame_start, frame_end = _span_to_frame_range(
+        frame_start, frame_end = span_to_frame_range(
             word_span.start, word_span.end, duration_sec, num_frames
         )
         normalized_word = normalize_word_score(canonical_word)
@@ -165,13 +165,13 @@ def _match_words_and_phones(
             )
         )
 
-        mfa_phones_in_word = _phones_for_word(word_span, phone_spans)
+        mfa_phones_in_word = phones_for_word(word_span, phone_spans)
         if not phone_alignment_is_valid(len(mfa_phones_in_word), len(canonical_phones)):
             continue
         for phone_span, target, spread, canonical_phone in zip(
             mfa_phones_in_word, phone_targets, phone_spreads, canonical_phones
         ):
-            phone_frame_start, phone_frame_end = _span_to_frame_range(
+            phone_frame_start, phone_frame_end = span_to_frame_range(
                 phone_span.start, phone_span.end, duration_sec, num_frames
             )
             phone_examples.append(

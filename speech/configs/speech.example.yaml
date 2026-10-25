@@ -9,5 +9,7 @@ mlflow_tracking_uri: file:///home/zhe/echolingo-speech/mlruns
 
 worker_host: localhost
 worker_port: 8100
+# The bundle the Worker serves (<artifact_root>/bundles/<id>); required by `worker.app serve`.
+worker_bundle_id: speech-evaluator-v0.1.0
 
 encoder_config_path: model/wav2vec2-base-960h.yaml

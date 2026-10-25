@@ -24,9 +24,9 @@ from echolingo_speech.data.manifest import (
 from echolingo_speech.training.dataset import (
     SpeechOceanScoringDataset,
     _match_words_and_phones,
-    _span_to_frame_range,
     _time_to_frame,
     collate_fn,
+    span_to_frame_range,
 )
 from echolingo_speech.training.labels import canonical_phone_id
 
@@ -99,7 +99,7 @@ def test_time_to_frame_clips_to_valid_range():
 
 def test_span_to_frame_range_never_returns_an_empty_span():
     # A span shorter than one frame's worth of time should still yield >=1 frame.
-    start, end = _span_to_frame_range(1.0, 1.001, duration_sec=2.0, num_frames=100)
+    start, end = span_to_frame_range(1.0, 1.001, duration_sec=2.0, num_frames=100)
     assert end > start
 
 

@@ -16,23 +16,32 @@ dependencies = [
   "praatio>=6.2.2",
   "pyarrow>=24.0.0",
   "safetensors>=0.8.0",
+  "fastapi>=0.109.0",
+  "uvicorn>=0.27.0",
+  "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.6.0",
+  "httpx>=0.24.0",
 ]
 
 [tool.uv]
 dev-dependencies = [
   "pytest>=8.0.0",
   "ruff>=0.6.0",
+  "httpx>=0.24.0",
 ]
+# The Worker runs the torch release the evaluator was trained with.
+constraint-dependencies = ["torch==2.5.1", "torchaudio==2.5.1"]
 
+# CUDA wheels on the Linux training machine (ADR-0014); PyPI's CPU/MPS wheels
+# for the Speech Evaluation Worker on macOS.
 [tool.uv.sources]
-torch = [{ index = "pytorch-cu121" }]
-torchaudio = [{ index = "pytorch-cu121" }]
+torch = [{ index = "pytorch-cu121", marker = "sys_platform == 'linux'" }]
+torchaudio = [{ index = "pytorch-cu121", marker = "sys_platform == 'linux'" }]
 
 [[tool.uv.index]]
 name = "pytorch-cu121"
@@ -52,6 +61,7 @@ addopts = "-p no:cacheprovider"  # .pytest_cache can't be written on the DrvFs (
 markers = [
   "gpu: requires a CUDA-capable GPU",
   "network: requires network access (e.g. Hugging Face Hub)",
+  "mfa: runs the Montreal Forced Aligner from the `aligner` env",
 ]
 
 [tool.ruff]

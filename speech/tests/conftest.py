@@ -199,3 +199,125 @@ def char_vocab():
     from echolingo_speech.encoder.loquacious import CharVocab
 
     return CharVocab(WAV2VEC2_VOCAB)
+
+
+# --- M4 Evaluator Checkpoint Bundle inputs --------------------------------------------
+
+BUNDLE_LAYERS = [4, 12]
+TINY_ENCODER_REVISION = "a" * 40
+
+
+def _bundle_manifest_record(index: int, partition: str, duration: float):
+    from echolingo_speech.data.manifest import (
+        AudioInfo,
+        DerivationInfo,
+        ManifestRecord,
+        SourceInfo,
+    )
+
+    return ManifestRecord(
+        sample_id=f"SPEAKER{index:04d}_0001",
+        dataset="speechocean762",
+        dataset_version="876c34b828c2ebcc35ba2ff1ba5947d50e6b0162fc4a4af91db0942422b3bdd5",
+        source=SourceInfo(origin="openslr", resource_id=101, url="https://example.invalid",
+                          license="CC-BY-4.0", citation="zhang2021speechocean762"),
+        speaker_id=f"{index:04d}",
+        speaker_age_group="adult" if index % 2 else "child",
+        speaker_gender="m",
+        official_split="test" if partition == "test" else "train",
+        partition=partition,
+        consent_class="public_licensed_corpus",
+        audio=AudioInfo(relative_path=f"WAVE/{index}.WAV", sha256="0", duration_sec=duration,
+                        sample_rate=16000),
+        text_reference="we call it bear",
+        scores={},
+        derivation=DerivationInfo(code_version="test", generated_at="2026-10-25T00:00:00+00:00"),
+    )
+
+
+@pytest.fixture
+def bundle_inputs(tmp_path):
+    """Everything `bundles.bundle.export_bundle` reads, for a small scorer
+    over layers 4 and 12; returns the keyword arguments (minus `version` and
+    `out_root`). Tests may edit the files before exporting."""
+    import torch
+
+    from echolingo_speech.config import EncoderConfig
+    from echolingo_speech.data.manifest import write_jsonl
+    from echolingo_speech.models.scorer import SpeechEvaluatorA0
+    from echolingo_speech.training.checkpoint import TrainingState, save_training_checkpoint
+    from echolingo_speech.training.config import TrainingConfig
+    from echolingo_speech.training.loop import write_prediction_thresholds
+
+    root = tmp_path / "bundle-inputs"
+    training_yaml = {
+        "seed": 7,
+        "normalize_acoustic_features": True,
+        "use_canonical_phones": True,
+        "hidden_state_layers": BUNDLE_LAYERS,
+        "rater_mean_targets": True,
+    }
+    training_config_path = root / "training.yaml"
+    root.mkdir()
+    import yaml
+
+    training_config_path.write_text(yaml.safe_dump(training_yaml), encoding="utf-8")
+
+    torch.manual_seed(0)
+    model = SpeechEvaluatorA0(
+        normalize_acoustic_features=True, use_canonical_phones=True,
+        num_hidden_layers=len(BUNDLE_LAYERS),
+    )
+    model.set_acoustic_normalization(torch.arange(9.0), torch.full((9,), 2.0))
+    optimizer = torch.optim.AdamW(model.parameters())
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    checkpoint_path = root / "run" / "best.pt"
+    save_training_checkpoint(
+        checkpoint_path, model=model, optimizer=optimizer, scheduler=scheduler,
+        state=TrainingState(epoch=3, best_val_loss=0.02), seed=7,
+        training_config=TrainingConfig(**training_yaml).model_dump(),
+    )
+    write_prediction_thresholds(checkpoint_path.parent, {"word": 0.8, "phone": 0.85})
+
+    run_dir = root / "mlruns" / "1" / "run123"
+    (run_dir / "params").mkdir(parents=True)
+    (run_dir / "tags").mkdir()
+    for name, value in {
+        "git_commit": "b" * 40, "seed": "7", "encoder_revision": TINY_ENCODER_REVISION,
+        "manifest_sha256": "c" * 64, "gpu_name": "test GPU",
+        "dataset_version": "876c34b828c2ebcc35ba2ff1ba5947d50e6b0162fc4a4af91db0942422b3bdd5",
+    }.items():
+        (run_dir / "params" / name).write_text(value)
+    (run_dir / "tags" / "mlflow.runName").write_text("tiny-seed7")
+
+    manifest_path = root / "manifest.jsonl"
+    write_jsonl(manifest_path, [
+        _bundle_manifest_record(1, "train", 1.5),
+        _bundle_manifest_record(2, "train", 12.0),
+        _bundle_manifest_record(3, "validation", 3.0),
+        _bundle_manifest_record(4, "test", 4.0),
+    ])
+    benchmarks = {}
+    for name, accuracy in (("validation", 0.8), ("test", 0.7)):
+        path = root / f"{name}.json"
+        path.write_text(json.dumps({
+            "sentence_accuracy_pearson": accuracy, "sentence_fluency_pearson": accuracy,
+        }))
+        benchmarks[name] = path
+
+    return {
+        "checkpoint_path": checkpoint_path,
+        "training_config_path": training_config_path,
+        "mlflow_run_dir": run_dir,
+        "manifest_path": manifest_path,
+        "benchmarks": benchmarks,
+        "encoder": EncoderConfig(model_id="test/tiny-wav2vec2", revision=TINY_ENCODER_REVISION,
+                                 license="apache-2.0"),
+    }
+
+
+@pytest.fixture
+def bundle_dir(bundle_inputs, tmp_path):
+    from echolingo_speech.bundles.bundle import export_bundle
+
+    return export_bundle(**bundle_inputs, version="0.1.0", out_root=tmp_path / "bundles")

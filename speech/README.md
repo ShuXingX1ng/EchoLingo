@@ -332,6 +332,81 @@ extraction ~2 min, each A0 seed ~10 min including dataset assembly, baseline
   2026-10-24), so keep it for those only, e.g. by saving `http_proxy` and
   `https_proxy` before unsetting them and passing them to the download.
 
+## M4: Checkpoint Bundle and Speech Evaluation Worker
+
+The Worker runs on the development Mac (Apple Silicon, CPU), not on the GPU
+instance: training stays on Linux (ADR-0014), inference needs only the
+exported bundle. `pyproject.toml` pins torch/torchaudio 2.5.1 on both
+platforms (CUDA wheels on Linux, PyPI wheels elsewhere), so the Worker runs
+the release the evaluator was trained with.
+
+```bash
+# Environment (Python 3.11 venv outside the repo) and the aligner env
+export SPEECH_HOME=$HOME/echolingo-speech
+UV_PROJECT_ENVIRONMENT=$SPEECH_HOME/venv uv sync --frozen --python 3.11
+conda create -n aligner -c conda-forge montreal-forced-aligner
+conda run -n aligner mfa model download acoustic english_us_arpa
+conda run -n aligner mfa model download dictionary english_us_arpa
+
+# Export one accepted run as an immutable bundle under <artifact_root>/bundles/
+# (from the backed-up run: best.pt + prediction_thresholds.json, the MLflow
+# run directory, the manifest, and the evaluate --out JSONs; `test` is required
+# and must pass the SS7.2 sentence gate)
+uv run python -m echolingo_speech.bundles.bundle export --config configs/speech.yaml \
+  --checkpoint $B/checkpoints/a0ama-seed42/best.pt --training-config configs/training/m3-aug-mask-audio.yaml \
+  --mlflow-run-dir $MLRUNS/<experiment>/<run_id> --manifest $MANIFEST \
+  --benchmark validation=... --benchmark validation-noisy=... \
+  --benchmark test=... --benchmark test-adult=... --benchmark test-child=... --version 0.1.0
+uv run python -m echolingo_speech.bundles.bundle verify --bundle $SPEECH_HOME/artifacts/bundles/speech-evaluator-v0.1.0
+
+# Serve the bundle named by worker_bundle_id in speech.yaml on worker_host:worker_port
+uv run python -m echolingo_speech.worker.app serve --config configs/speech.yaml
+curl -s localhost:8100/health
+curl -s -F audio=@answer.wav -F reference_text="Born likes green." localhost:8100/v1/evaluate
+```
+
+A bundle is a directory whose `bundle.json` lists every other file with its
+SHA-256. Export refuses to overwrite a bundle (a new model is a new version),
+and loading refuses any bundle whose files differ from that list. The Worker
+serves exactly the bundle named in `worker_bundle_id` (or `--bundle-id`); it
+never looks for the newest one. Startup verifies the bundle, downloads the
+pinned encoder revision into `<artifact_root>/hf-cache` on first use, and
+runs every stage once, or exits.
+
+`POST /v1/evaluate` takes a WAV or FLAC `audio` file (the frontend sends 16
+kHz mono PCM) and `reference_text`. It returns scores on the bundle's label
+scales (sentence and word 0-10, phone 0-2), the free ASR transcript, the
+share of the reference the ASR heard, and an evidence status for each of
+sentence, word and phoneme. These scores are not the 10-90 reference score;
+that mapping is M5's. Each level degrades instead of being guessed:
+
+- the alignment fails, or its word count differs from the reference: no
+  words or phonemes, and the sentence scores are `degraded`;
+- almost none of the reference was heard (a wrong passage, another
+  language): the same, with reason `reference_not_read`;
+- an out-of-dictionary word gets no score, and word/phoneme evidence is
+  `partial`.
+
+Refusals carry an error code: `invalid_audio`, `audio_too_short` (< 1 s),
+`audio_too_long` (> 60 s), `audio_too_large`, `no_speech` (digital silence
+or nothing recognized), `invalid_request`, `worker_busy`, `timeout` (25 s
+request budget, 20 s for the aligner), `internal_error`. One evaluation runs
+at a time. Each request's audio and transcript go to a temporary directory
+that is always removed. Only the models MFA extracts stay in
+`<artifact_root>/mfa-cache` between requests: re-extracting them took a
+call from about 3 s to 7.5 s.
+
+`evaluation.worker_parity` is the M4 acceptance check. It scores every
+validation recording through the Worker's decoding and encoder twice: once
+with training's corpus TextGrids and SpeechOcean phones, which should
+reproduce the bundle's recorded validation metrics, and once along the full
+request path.
+
+```bash
+uv run python -m echolingo_speech.evaluation.worker_parity --config configs/speech.yaml --manifest $MANIFEST \
+  --corpus-root $CORPUS --textgrid-root $PROC/mfa-output --out $SPEECH_HOME/reports/m4/parity-validation.json
+```
+
 ## Notes
 
 MLflow >=3 disables its plain filesystem tracking backend by default; any

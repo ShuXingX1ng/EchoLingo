@@ -46,6 +46,9 @@ class SpeechConfig(BaseModel):
     mlflow_tracking_uri: str
     worker_host: str = "localhost"
     worker_port: int = 8100
+    # The one bundle (`<artifact_root>/bundles/<id>`) the Worker serves; it
+    # never picks one by itself (ADR-0013).
+    worker_bundle_id: str | None = None
     encoder: EncoderConfig
 
     @field_validator("data_root", "artifact_root")
