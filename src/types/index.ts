@@ -78,7 +78,10 @@ export type TaskFeedback = {
   weaknesses: string[]
   suggestions: string[]
   details?: TaskFeedbackDetails
-  speechEvaluation?: SpeechEvaluationResult
+  speechEvaluation?: StoredSpeechEvaluationResult
+  /** Why the recording has no Speech Evaluation Result, when evaluation failed. */
+  speechEvaluationError?: SpeechEvaluationFailure
+  speechEvaluationComparison?: SpeechEvaluationComparison
   /**
    * Azure's own shape, on Practice Tasks saved before the provider-neutral
    * result. Read either one through `speechEvaluationOf()`.
@@ -211,26 +214,73 @@ export type TaskTypeWeakness = {
 }
 
 // Speech Evaluation Result — provider-neutral (CONTEXT.md, ADR-0012).
+export type WordStatus = "correct" | "mispronounced" | "omitted" | "inserted" | "not_scored"
+
 export type WordEvidence = {
   word: string
-  score: number
-  status: "correct" | "mispronounced" | "omitted" | "inserted"
+  /** Null for a word the provider could not judge (`not_scored`). */
+  score: number | null
+  status: WordStatus
   phonemes?: Array<{ phoneme: string; score: number }> | null
 }
 
+export type EvidenceLevel = {
+  status: "available" | "partial" | "degraded" | "unavailable"
+  reason?: string | null
+}
+
+export type EvidenceStatus = {
+  sentence: EvidenceLevel
+  word: EvidenceLevel
+  phoneme: EvidenceLevel
+}
+
+/** `10-90`: the EchoLingo display scale (Provisional Score Normalization); `0-100`: Azure's own. */
+export type SpeechScoreScale = "10-90" | "0-100"
+
 export type SpeechEvaluationResult = {
   provider: string
+  scale: SpeechScoreScale
   /** 10–90 Spoken Task Score Estimate; only the EchoLingo Speech Evaluator produces one. */
   taskScoreEstimate: number | null
-  /** The provider's own 0–100 aggregate, not a Spoken Task Score Estimate. */
+  /** The provider's own aggregate, not a Spoken Task Score Estimate. */
   overallScore: number | null
-  pronunciation: number
-  oralFluency: number
-  content: number
+  /** A dimension is null when its evidence could not support a score. */
+  pronunciation: number | null
+  oralFluency: number | null
+  content: number | null
   recognizedText?: string | null
   words: WordEvidence[]
-  evidence: { taskScoreEstimate: boolean; words: boolean; phonemes: boolean }
+  evidenceStatus: EvidenceStatus
+  /** The Evaluator Checkpoint Bundle behind the result, if any. */
+  modelId?: string | null
+  warnings?: string[]
   summary: string
+}
+
+/** A Speech Evaluation Result as saved on Practice Tasks before evidence status and scales. */
+export type StoredSpeechEvaluationResult = Omit<SpeechEvaluationResult, "scale" | "evidenceStatus"> & {
+  scale?: SpeechScoreScale
+  evidenceStatus?: EvidenceStatus
+  evidence?: { taskScoreEstimate: boolean; words: boolean; phonemes: boolean }
+}
+
+/** Why a provider produced no Speech Evaluation Result. */
+export type SpeechEvaluationFailure = {
+  provider: string
+  code: string
+  message: string
+}
+
+/** An explicit EchoLingo-versus-Azure comparison (developer use; the primary result stays EchoLingo's). */
+export type SpeechEvaluationComparison = {
+  recordingSha256: string
+  createdAt: string
+  baseline: SpeechEvaluationResult | null
+  baselineError: SpeechEvaluationFailure | null
+  latencyMs: Record<string, number>
+  differences: Record<string, number | null>
+  wordDisagreements: Array<{ word: string; echolingo: WordStatus; azure: WordStatus }>
 }
 
 /** Response of POST /api/pte/spoken-feedback. */
@@ -238,6 +288,8 @@ export type SpokenFeedbackResponse = {
   transcript: string
   feedback: TaskFeedback | null
   speechEvaluation: SpeechEvaluationResult | null
+  speechEvaluationError: SpeechEvaluationFailure | null
+  speechEvaluationComparison: SpeechEvaluationComparison | null
 }
 
 // Azure Pronunciation Assessment as stored on older Practice Tasks.

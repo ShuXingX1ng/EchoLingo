@@ -40,6 +40,8 @@ yarn-error.log*
 # ECDICT dictionary data (fetched via backend/scripts/import_ecdict.py)
 backend/data/*
 !backend/data/rubrics/
+# Provisional Score Normalization per Evaluator Checkpoint Bundle (small, versioned)
+!backend/data/speech_calibration/
 
 # vercel
 .vercel

@@ -1,0 +1,28 @@
+{
+  "bundleId": "speech-evaluator-v0.1.0",
+  "createdAt": "2026-10-25T12:05:42+00:00",
+  "fittedOn": "SpeechOcean762 validation, 260 recordings, Worker request path",
+  "labelScale": {
+    "sentence": 10.0,
+    "word": 10.0,
+    "phone": 2.0
+  },
+  "sentence": {
+    "pronunciation": {
+      "slope": 1.024497947102226,
+      "intercept": -0.33979084913308366
+    },
+    "oral_fluency": {
+      "slope": 1.0230703087394355,
+      "intercept": -0.33725604227404826
+    }
+  },
+  "word": {
+    "slope": 1.0,
+    "intercept": 0.0
+  },
+  "phone": {
+    "slope": 1.0,
+    "intercept": 0.0
+  }
+}

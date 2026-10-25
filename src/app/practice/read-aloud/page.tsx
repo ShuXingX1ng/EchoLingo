@@ -3,23 +3,18 @@
 import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import CountdownRing from "@/components/CountdownRing"
-import SpeechEvaluationDetails from "@/components/SpeechEvaluationDetails"
-import { speechEvaluationOf, speechProviderName, speechScores } from "@/lib/speech-evaluation"
+import SpeechEvaluationDetails, {
+  SpeechEvaluationErrorNotice,
+  SpeechScoreBadge,
+} from "@/components/SpeechEvaluationDetails"
+import {
+  speechEvaluationErrorOf,
+  speechEvaluationOf,
+  speechProviderName,
+  speechScores,
+} from "@/lib/speech-evaluation"
 import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import { useTranslation } from "@/lib/i18n"
-
-function ScoreBadge({ score }: { score: number }) {
-  const color = score >= 80
-    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
-    : score >= 60
-    ? "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800"
-    : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
-  return (
-    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-sm font-semibold ${color}`}>
-      {score}
-    </span>
-  )
-}
 
 export default function ReadAloudPage() {
   const { t } = useTranslation()
@@ -28,6 +23,7 @@ export default function ReadAloudPage() {
     recSeconds, canStop, startNow, stopRecording, generate,
   } = usePracticeTaskRun("read_aloud")
   const speechEvaluation = speechEvaluationOf(feedback)
+  const speechEvaluationError = speechEvaluationErrorOf(feedback)
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -162,7 +158,7 @@ export default function ReadAloudPage() {
                 <div className="grid grid-cols-4 gap-3 mb-5">
                   {speechScores(speechEvaluation).map(({ labelKey, score }) => (
                     <div key={labelKey} className="text-center">
-                      <ScoreBadge score={score} />
+                      <SpeechScoreBadge score={score} scale={speechEvaluation.scale} />
                       <p className="mt-1 text-xs text-[var(--text-secondary)]">{t(labelKey)}</p>
                     </div>
                   ))}
@@ -170,6 +166,7 @@ export default function ReadAloudPage() {
                 <SpeechEvaluationDetails evaluation={speechEvaluation} />
               </div>
             )}
+            {speechEvaluationError && <SpeechEvaluationErrorNotice error={speechEvaluationError} />}
 
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">

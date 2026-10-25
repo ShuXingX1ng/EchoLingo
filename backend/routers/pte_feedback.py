@@ -15,7 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from models.schemas import PteFeedbackRequest, SpokenFeedbackResponse
 from services.feedback_graph import run_feedback_graph
-from services.speech_evaluation import evaluate_spoken_response, provider_for
+from services.speech_evaluation import evaluate_spoken_response, modes_for, provider_for
 from services.task_types import VALID_TASK_TYPES
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ async def generate_spoken_feedback(
     stimulus: str = Form(...),
     transcript: str = Form(""),
     historicalWeaknesses: Optional[str] = Form(None),
+    evaluationMode: Optional[str] = Form(None),
 ):
     """
     Evaluate a recorded Response and generate its Feedback in one request.
@@ -71,17 +72,34 @@ async def generate_spoken_feedback(
     The recording (WAV) is evaluated against the Stimulus first, so the
     Feedback is scored on the provider's recognised text and dimension
     estimates. `transcript` is the browser's own transcript, used only when
-    the evaluation yields no recognised text.
+    the evaluation yields no recognised text. `evaluationMode` is the Read
+    Aloud Speech Evaluation Mode (`echolingo` by default, or `compare`).
     """
     if taskType not in VALID_TASK_TYPES:
         raise HTTPException(status_code=400, detail=f"Invalid taskType: {taskType}")
     if provider_for(taskType) is None:
         raise HTTPException(status_code=400, detail=f"{taskType} has no speech evaluation")
+    if evaluationMode is not None and evaluationMode not in modes_for(taskType):
+        raise HTTPException(
+            status_code=400, detail=f"Invalid evaluationMode for {taskType}: {evaluationMode}"
+        )
     weaknesses = _parse_weaknesses(historicalWeaknesses)
 
-    evaluation = await evaluate_spoken_response(taskType, await audio.read(), stimulus)
+    spoken = await evaluate_spoken_response(taskType, await audio.read(), stimulus, evaluationMode)
+    evaluation = spoken.result
     response_text = ((evaluation.recognizedText if evaluation else None) or transcript).strip()
+
+    def evaluation_only() -> SpokenFeedbackResponse:
+        # No Feedback, but the evaluation's own failure is still the answer.
+        return SpokenFeedbackResponse(
+            transcript=response_text,
+            speechEvaluationError=spoken.error,
+            speechEvaluationComparison=spoken.comparison,
+        )
+
     if not response_text:
+        if spoken.error is not None:
+            return evaluation_only()
         raise HTTPException(status_code=400, detail="response is required")
 
     request = PteFeedbackRequest(
@@ -98,16 +116,30 @@ async def generate_spoken_feedback(
     except Exception as exc:
         # An evaluated recording is still worth returning without Feedback.
         if evaluation is None:
+            if spoken.error is not None:
+                logger.warning("[spoken-feedback] feedback failed for %s: %s", taskType, exc)
+                return evaluation_only()
             if isinstance(exc, ValueError):
                 raise HTTPException(status_code=502, detail=str(exc))
             raise HTTPException(status_code=500, detail="Failed to generate feedback")
         logger.warning("[spoken-feedback] feedback failed for %s: %s", taskType, exc)
 
     if feedback is None and evaluation is None:
+        if spoken.error is not None:
+            return evaluation_only()
         raise HTTPException(status_code=502, detail="Invalid feedback format from LLM")
+
+    # Saved with the Practice Task, so the failure or comparison stays with it.
+    if feedback is not None:
+        if spoken.error is not None:
+            feedback = {**feedback, "speechEvaluationError": spoken.error.model_dump()}
+        if spoken.comparison is not None:
+            feedback = {**feedback, "speechEvaluationComparison": spoken.comparison.model_dump()}
 
     return SpokenFeedbackResponse(
         transcript=response_text,
         feedback=feedback,
         speechEvaluation=evaluation,
+        speechEvaluationError=spoken.error,
+        speechEvaluationComparison=spoken.comparison,
     )

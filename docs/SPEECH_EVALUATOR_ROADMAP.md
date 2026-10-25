@@ -1,7 +1,7 @@
 # EchoLingo Read Aloud Speech Evaluator 路线图
 
-状态：M0–M4 已完成（M3 定稿候选 3.2c 导出为 Bundle `speech-evaluator-v0.1.0`，由本机私有 Worker 服务）；下一步是 M5 FastAPI 与 Read Aloud 集成，见第 18 节  
-更新日期：2026-10-25  
+状态：M0–M4 已完成（M3 定稿候选 3.2c 导出为 Bundle `speech-evaluator-v0.1.0`，由本机私有 Worker 服务）；M5 FastAPI 与 Read Aloud 集成进行中，见第 18 节  
+更新日期：2026-10-26  
 范围：第一代仅覆盖 PTE Academic Read Aloud  
 优先级：先完成 Speech Evaluator，再启动 PTE Task Calibrator 与 Native Speech Model
 
@@ -365,7 +365,7 @@ speech/
 }
 ```
 
-旧 Azure `/api/pronunciation` 契约已于 2026-10-13 删除：前端改用 `POST /api/pte/spoken-feedback`，由 `backend/services/speech_evaluation.py` 把 Azure 结果转换为 provider-neutral 的 Speech Evaluation Result。EchoLingo provider、`compare` 模式与 10–90 分数估计仍属 M5，尚未实现。M4 的 Worker 返回私有结果（`speech/src/echolingo_speech/worker/schema.py`）：分数保持标签原始尺度，句子、单词、音素各带证据状态，由 M5 的 Provider Adapter 映射到上面的公共契约。
+旧 Azure `/api/pronunciation` 契约已于 2026-10-13 删除：前端改用 `POST /api/pte/spoken-feedback`，由 `backend/services/speech_evaluation.py` 把 Azure 结果转换为 provider-neutral 的 Speech Evaluation Result。M4 的 Worker 返回私有结果（`speech/src/echolingo_speech/worker/schema.py`）：分数保持标签原始尺度，句子、单词、音素各带证据状态。M5 起 `from_echolingo` 把它映射到公共契约（`backend/models/schemas.py`）：上面示例中的 `taskScore`、`dimensions`、`evidenceStatus` 对应字段 `taskScoreEstimate`、`pronunciation` / `oralFluency` / `content`、逐层 `evidenceStatus`（状态加原因），另有 `scale`（EchoLingo `10-90`，Azure `0-100`）、`modelId`（Bundle）与 `warnings`；无法支持的维度为 null。参考评价标签由前端按 `scale` 显示。
 
 ### 10.3 Read Aloud 模式
 
@@ -540,7 +540,7 @@ LLM 不得：
 
 ## 18. 当前进度与执行计划
 
-更新日期：2026-10-25。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
+更新日期：2026-10-26。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
 
 ### 18.1 里程碑状态
 
@@ -552,10 +552,10 @@ LLM 不得：
 | M2.5 A0 基线修复 | 完成（2026-10-23） | `speech/docs/m25-diagnostics-report.md` 第 12 节 |
 | M3 候选改进 | 完成（2026-10-25；采纳 3.1a 与 3.2c，未采纳分歧辅助头、成人微调、输入归一化与 A1；定稿候选 3.2c 在封存 Test 上评估一次） | 第 18.3 节步骤 4 |
 | M4 Bundle 与 Worker | 完成（2026-10-25；3.2c 种子 42 导出为 `speech-evaluator-v0.1.0`，Worker 在本机 Mac CPU 上运行，ADR-0015） | 第 18.3 节步骤 5 |
-| M5 FastAPI 与 Read Aloud | 未开始 | — |
+| M5 FastAPI 与 Read Aloud | 进行中（2026-10-26） | 第 18.3 节步骤 6 |
 | M6 反馈与诊断 | 未开始 | — |
 
-原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`、`2026-10-25-m3-a1/`（A1 Adapter 权重、训练历史与 `last.pt`、A1-Scorer 检查点、各层缓存的 `adapter.json`；Loquacious 与 Adapter 层缓存可按 README 重建，不备份）、`2026-10-25-m3-final-test/`（3.2c 封存 Test 结果）、`2026-10-25-m4/`（只在本机：Bundle `speech-evaluator-v0.1.0` 与 Worker 验收报告）。
+原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`、`2026-10-25-m3-a1/`（A1 Adapter 权重、训练历史与 `last.pt`、A1-Scorer 检查点、各层缓存的 `adapter.json`；Loquacious 与 Adapter 层缓存可按 README 重建，不备份）、`2026-10-25-m3-final-test/`（3.2c 封存 Test 结果）、`2026-10-25-m4/`（只在本机：Bundle `speech-evaluator-v0.1.0` 与 Worker 验收报告）、`2026-10-26-m5/`（只在本机：Validation 请求路径逐条结果、校准报告与归一化文件、段落校验）。
 
 ### 18.2 A0 已知问题
 
@@ -684,6 +684,43 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 - SpeechOcean 训练音频为 1.6–20.4 秒，Read Aloud 作答更长；超出训练时长范围的结果带 `duration_outside_training_range` 警告。
 - 分数仍是原始尺度。3.1a 起训练目标是专家平均，预测整体偏低，展示前需要 M5 的单调归一化。
 - 儿童句子级偏弱（Test 上 0.38）。
+
+**步骤 6：M5 FastAPI 与 Read Aloud** — 进行中（2026-10-26）
+
+已确定（2026-10-25，ADR-0016）：10–90 用 Validation 上的线性校准；参数放在 backend，按 Bundle 区分；Content 用机会校正的字母覆盖率；Compare 由后端参数加前端开发开关触发；多句作答在 Worker 中按参考句切分评分。
+
+已实现：
+- 公共契约 V2（`backend/models/schemas.py`）：`scale`、逐层 `evidenceStatus`、`modelId`、`warnings`，单词状态增加 `not_scored`，维度证据不足时为 null；前端读取旧记录时自动补齐 `scale` 与证据状态。
+- EchoLingo Provider（`backend/services/speech_worker.py`、`speech_evaluation.py`）：Worker 的错误码原样透传，连接失败、超时、缺少归一化各有自己的错误码；Read Aloud 默认只运行 EchoLingo，失败时返回 `speechEvaluationError`，Feedback 改用浏览器转写，不调用 Azure；即使同时没有转写或 Feedback 生成失败，接口也返回 200 并带上失败原因，不再改报 400/500。Repeat Sentence 仍用 Azure。
+- Compare：`evaluationMode=compare` 时两个 Provider 并行调用，任一方失败都返回 Partial；EchoLingo 失败时不会把 Azure 提升为主结果。比较内容为维度差值（按各自量程折算为 0–100 位置）、单词判断分歧、延迟和录音 SHA-256，随 Feedback 保存。开发者面板属于 M6。
+- Provisional Score Normalization（`backend/services/speech_normalization.py`，`evaluation/display_calibration.py`）：在 Validation 的完整请求路径上，对每个维度拟合"预测 → 官方标签"的线性映射，只有能降低 MAE 才采用。句子 Accuracy 与 Fluency 采用（斜率约 1.02、截距约 −0.34，MAE 0.80 → 0.79、0.58 → 0.57）。单词与音素用最小二乘拟合后 MAE 反而变差（1.05 → 1.19、0.21 → 0.26），所以保持恒等。之后统一映射为 10 + 80 × 分数 / 量程。实测请求路径的预测平均略高于标签（句子 7.44 对 7.29），并不偏低。
+- Content 与门控：原始字母覆盖率无法识别长段落读错，另一段文字按顺序也能匹配约 0.45 的字母。改为机会校正的覆盖率：用字母顺序整体倒过来的参考文本作机会基线（字母构成和长度不变，不受回文词影响），0 表示与机会相当，1 表示全部字母都听到。在同一说话人 6 句拼成的约 40 词段落上（400 次抽样）：
+  - 自己的段落没有一段低于 0.10（最低 0.21），低于 0.50 的占 28%；
+  - 读错段落 95% 低于 0.10；
+  - 只读一半的段落 85% 低于 0.30。
+
+  因此 Worker 的 `reference_not_read` 门槛改为校正覆盖率 < 0.10：此时所有维度和总分都给 10。Content 在 0.10–0.50 之间从 10 线性升到 90。总分为 40/40/20 加权，并封顶在 Content + 30。对齐失败时只给 Content，不给发音、流利度和总分。代价：在 3–10 词的单句上，有 3.1% 的真实朗读会低于门槛。门槛没有提到 0.15（读错段落可挡住 99.5%），因为把真实朗读误判为没读比漏掉读错段落更糟。
+- 多句作答：每条训练录音都只有一句。整段一次评分时，多句段落的句子分系统性偏低，只拼 2 句（6.2 秒，仍在训练时长内）就会出现。Worker 现在先对整段做一次 MFA 对齐，再按参考文本的句号切分（少于 3 个词的句子并入前一句）；每句两侧各留 0.5 秒（训练录音首尾静音的中位数），但不超过与相邻句之间间隔的中点。每句单独跑编码器和评分头，句子分按词数加权平均，自由 ASR 仍对整段运行。在 Validation 拼成的 39 个段落上（16–38 秒，各 6 句）：
+
+  | | Accuracy 与单句评分之差（均值 / MAE） | Accuracy 对专家 Pearson | Fluency 与单句评分之差（均值 / MAE） | Fluency 对专家 Pearson |
+  |---|---|---|---|---|
+  | 整段一次评分 | −1.30 / 1.30 | 0.862 | −1.67 / 1.67 | 0.915 |
+  | 按句切分 | +0.13 / 0.20 | 0.873 | +0.13 / 0.21 | 0.911 |
+
+  完整请求的延迟中位数 3.9 秒，最长 4.8 秒。句间停顿不计入流利度，留给 M6 的流利度事件。`duration_outside_training_range` 警告改为按每段切出的句子判断，因为评分头看到的是这些切段。
+- 前端：分数颜色按量程的同一比例分档（10–90 上为 82/74/66），证据不足的维度显示"—"，显示参考评价标签、证据说明与失败原因。`NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE=1` 时请求 compare，页面仍只展示主结果。
+
+验证：
+- backend `pytest` 410 passed，`ruff` 通过；speech `pytest` 266 passed / 2 skipped，`ruff` 通过；前端 typecheck、lint（无新警告）通过，单元测试 190 passed。
+- 本机 Worker 端到端（从 backend 调用 Provider，不调用 LLM，两段 39 / 45 词、约 20 秒的成人拼接段落）：P 77 / 78、F 77 / 77、C 90、总分 80 / 80（专家逐句标签换算为 P 76 / 73、F 78 / 76），每次请求约 4.1 秒；读错段落返回 `reference_not_read`，全部为 10；只读一半时对齐失败，只给 Content 47。
+- 代码审查发现并修复：Mock 汇总页把 `overallScore` 当作发音平均分（现在按量程分别平均 Pronunciation）；评估失败的原因可能被 400/500 吞掉；回文词使原先的"每个词倒拼"基线失效（现在改为整段字母倒序）；斜率非正时校准拟合中断；Content 下限与 Worker 门槛重复定义（现在 Worker 结果带 `reference_not_read_below`，FastAPI 以它为下限）。
+
+- Azure 适配改为连续识别（`backend/services/azure_speech.py`）：原来的 `recognize_once` 在第一次停顿处就结束，长段落的 Compare 基线只覆盖开头。现在每段话分别评估后合并：只有一段时保留 Azure 自己的分数（Repeat Sentence 不变）；多段时总分与 Accuracy 按评估词数加权，Fluency 按时长加权，Completeness 为参考词中未漏读的比例。合并逻辑有单元测试。
+
+尚未完成：
+- 真实 Azure 的 Compare 运行：2026-10-26 用两段拼接段落调用时，Azure 返回 401 认证错误（`backend/.env` 中 `eastasia` 的 key 已失效或与 region 不符）。这次调用验证了 Partial 路径：EchoLingo 主结果正常，`baselineError` 记录了原因。连续识别的真实效果需在凭据更新后再验证；
+- 浏览器中完整的 Read Aloud 流程（需要 LLM）；
+- 已知限制：EchoLingo 不检测漏读、多读和重复，这部分属于 M6；Content 是策略而非估计，ASR 对口音的识别错误也会拉低 Content。
 
 ### 18.4 实验纪律
 

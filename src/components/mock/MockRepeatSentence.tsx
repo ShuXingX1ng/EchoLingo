@@ -4,6 +4,7 @@ import { useTranslation } from "@/lib/i18n"
 import { usePracticeTaskRun } from "@/hooks/usePracticeTaskRun"
 import type { PracticeTask } from "@/types"
 import CountdownRing from "@/components/CountdownRing"
+import { SpeechScoreBadge } from "@/components/SpeechEvaluationDetails"
 import { speechEvaluationOf, speechScores } from "@/lib/speech-evaluation"
 
 export default function MockRepeatSentence({ onComplete }: { onComplete: (task: PracticeTask) => void }) {
@@ -73,7 +74,7 @@ export default function MockRepeatSentence({ onComplete }: { onComplete: (task: 
               <div className="grid grid-cols-4 gap-2 text-center">
                 {speechScores(speechEvaluation).map(({ labelKey, score: val }) => (
                   <div key={labelKey}>
-                    <span className={`inline-block rounded border px-2 py-0.5 text-sm font-semibold ${val >= 80 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800" : val >= 60 ? "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800" : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"}`}>{val}</span>
+                    <SpeechScoreBadge score={val} scale={speechEvaluation.scale} />
                     <p className="mt-1 text-xs text-slate-500">{t(labelKey)}</p>
                   </div>
                 ))}

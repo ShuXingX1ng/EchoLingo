@@ -16,6 +16,7 @@ from langgraph.graph import StateGraph, END
 from services.llm_chain import llm_chain, parse_json
 from services.prompt_loader import prompts
 from services.rag import retrieve_context as rag_retrieve
+from services.speech_normalization import display_share
 from services.task_types import (
     max_score as task_max_score,
     scoring_dimensions,
@@ -107,9 +108,14 @@ def _find_divergences(primary: dict, judge: dict) -> list:
 def _format_speech_context(evaluation: Optional[dict]) -> str:
     if not evaluation:
         return ""
+    def score(key: str) -> str:
+        value = evaluation.get(key)
+        return "not available" if value is None else str(value)
+    scale = evaluation.get("scale", "0-100")
     return (
-        f"\n\nSpeech evaluation scores — Pronunciation: {evaluation.get('pronunciation')}, "
-        f"Oral fluency: {evaluation.get('oralFluency')}, Content: {evaluation.get('content')}"
+        f"\n\nSpeech evaluation scores ({scale} scale, a learning reference, not an official "
+        f"PTE score) — Pronunciation: {score('pronunciation')}, "
+        f"Oral fluency: {score('oralFluency')}, Content: {score('content')}"
     )
 
 
@@ -290,7 +296,7 @@ def _apply_content_coverage(task_type: str, state: FeedbackState, result: dict) 
     # The evaluated content estimate is most accurate (word-level alignment)
     evaluation = state.get("speech_evaluation")
     if evaluation and isinstance(evaluation.get("content"), (int, float)):
-        coverage = evaluation["content"] / 100
+        coverage = display_share(evaluation["content"], evaluation.get("scale", "0-100"))
     else:
         coverage = _word_coverage_ratio(stimulus, response)
 

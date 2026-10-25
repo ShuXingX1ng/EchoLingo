@@ -5,8 +5,8 @@ import Link from "next/link"
 import DesktopNav from "@/components/DesktopNav"
 import { useTranslation } from "@/lib/i18n"
 import { practicePath, taskTypeLabel } from "@/lib/task-type-registry"
-import { speechEvaluationOf } from "@/lib/speech-evaluation"
-import type { PracticeTask } from "@/types"
+import { pronunciationAverages, scoreShare, speechEvaluationOf } from "@/lib/speech-evaluation"
+import type { PracticeTask, SpeechScoreScale } from "@/types"
 
 const SESSION_KEY = "echo_mock_session"
 
@@ -29,8 +29,9 @@ function formatDate(iso: string): string {
   }
 }
 
-function ScoreDot({ score }: { score: number }) {
-  const color = score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-yellow-500" : "bg-red-500"
+function ScoreDot({ score, scale }: { score: number; scale: SpeechScoreScale }) {
+  const share = scoreShare(score, scale)
+  const color = share >= 0.8 ? "bg-emerald-500" : share >= 0.6 ? "bg-yellow-500" : "bg-red-500"
   return <span className={`inline-block w-2 h-2 rounded-full ${color} mr-2`} />
 }
 
@@ -94,11 +95,7 @@ export default function MockSummaryPage() {
     .slice(0, 5)
     .map(([w]) => w)
 
-  const overallSpeechScore = (task: PracticeTask) => speechEvaluationOf(task.feedback)?.overallScore ?? null
-  const speechScores = tasks.map(overallSpeechScore).filter((score): score is number => score !== null)
-  const avgPronunciationScore = speechScores.length > 0
-    ? Math.round(speechScores.reduce((sum, score) => sum + score, 0) / speechScores.length)
-    : null
+  const pronunciationStats = pronunciationAverages(tasks.map((task) => speechEvaluationOf(task.feedback)))
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -132,14 +129,19 @@ export default function MockSummaryPage() {
             <p className="text-2xl font-bold text-slate-950 dark:text-white">{formatDuration(totalDuration)}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("mock.summary.totalTime")}</p>
           </div>
-          {avgPronunciationScore !== null && (
-            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900 text-center">
-              <p className={`text-2xl font-bold ${avgPronunciationScore >= 80 ? "text-emerald-600 dark:text-emerald-400" : avgPronunciationScore >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                {avgPronunciationScore}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("mock.summary.avgPronunciation")}</p>
-            </div>
-          )}
+          {pronunciationStats.map(({ scale, average }) => {
+            const share = scoreShare(average, scale)
+            return (
+              <div key={scale} className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900 text-center">
+                <p className={`text-2xl font-bold ${share >= 0.8 ? "text-emerald-600 dark:text-emerald-400" : share >= 0.6 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                  {average}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {t("mock.summary.avgPronunciation")} ({scale === "10-90" ? "10–90" : "0–100"})
+                </p>
+              </div>
+            )
+          })}
         </div>
 
         {/* Top weaknesses */}
@@ -175,14 +177,18 @@ export default function MockSummaryPage() {
                         <p className="text-sm font-medium text-slate-900 dark:text-white">
                           {taskTypeLabel(t, task.taskType)}
                         </p>
-                        {overallSpeechScore(task) !== null && (
-                          <div className="flex items-center gap-3 mt-1">
-                            <ScoreDot score={overallSpeechScore(task)!} />
-                            <span className="text-xs text-slate-500">
-                              {t("mock.summary.pronunciationScore", { score: overallSpeechScore(task)! })}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const evaluation = speechEvaluationOf(task.feedback)
+                          if (evaluation?.pronunciation == null) return null
+                          return (
+                            <div className="flex items-center gap-3 mt-1">
+                              <ScoreDot score={evaluation.pronunciation} scale={evaluation.scale} />
+                              <span className="text-xs text-slate-500">
+                                {t("mock.summary.pronunciationScore", { score: evaluation.pronunciation })}
+                              </span>
+                            </div>
+                          )
+                        })()}
                         {task.feedback?.summary && (
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                             {task.feedback.summary}

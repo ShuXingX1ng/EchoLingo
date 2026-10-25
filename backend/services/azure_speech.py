@@ -7,6 +7,7 @@ Encapsulates Azure Speech SDK for TTS and Pronunciation Assessment.
 import asyncio
 import os
 import tempfile
+import threading
 from typing import List, Optional
 from dataclasses import dataclass
 import azure.cognitiveservices.speech as speechsdk
@@ -42,6 +43,65 @@ class PronunciationAssessmentResult(BaseModel):
     words: List[WordAssessment]
     summary: str
     recognizedText: Optional[str] = None
+
+
+# A recording is read from a file faster than real time; Read Aloud answers
+# are at most 40 s.
+CONTINUOUS_RECOGNITION_TIMEOUT_SEC = 25.0
+
+
+@dataclass
+class AssessedSegment:
+    """One utterance Azure recognized and assessed."""
+    score: float
+    accuracy: float
+    fluency: float
+    completeness: float
+    duration_sec: float
+    text: str
+    words: List[WordAssessment]
+
+
+def combine_segments(segments: List[AssessedSegment]) -> "PronunciationAssessmentResult":
+    """One assessment of the whole recording. A single utterance keeps
+    Azure's own scores. Several are combined: the overall score and accuracy
+    weighted by assessed words, fluency by utterance duration, and
+    completeness as the share of reference words not omitted."""
+    words = [word for segment in segments for word in segment.words]
+    if len(segments) == 1:
+        only = segments[0]
+        score, accuracy, fluency, completeness = (
+            only.score, only.accuracy, only.fluency, only.completeness
+        )
+    else:
+        def word_weighted(field: str) -> float:
+            weights = [
+                max(1, sum(w.errorType != "Insertion" for w in segment.words))
+                for segment in segments
+            ]
+            return sum(getattr(s, field) * w for s, w in zip(segments, weights)) / sum(weights)
+
+        total_duration = sum(segment.duration_sec for segment in segments)
+        score = word_weighted("score")
+        accuracy = word_weighted("accuracy")
+        fluency = (
+            sum(segment.fluency * segment.duration_sec for segment in segments) / total_duration
+            if total_duration > 0 else word_weighted("fluency")
+        )
+        reference = [w for w in words if w.errorType != "Insertion"]
+        completeness = (
+            100 * sum(w.errorType != "Omission" for w in reference) / len(reference)
+            if reference else 0.0
+        )
+    return PronunciationAssessmentResult(
+        score=round(score),
+        accuracyScore=round(accuracy),
+        fluencyScore=round(fluency),
+        completenessScore=round(completeness),
+        words=words,
+        summary=AzureSpeechService._generate_summary(score, accuracy, fluency, completeness, words),
+        recognizedText=" ".join(s.text for s in segments if s.text) or None,
+    )
 
 
 @dataclass
@@ -178,43 +238,66 @@ class AzureSpeechService:
             pronunciation_config.apply_to(speech_recognizer)
 
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: speech_recognizer.recognize_once_async().get())
+            segments, error = await loop.run_in_executor(
+                None, lambda: self._recognize_continuously(speech_recognizer)
+            )
         finally:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
 
-        if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-            error_details = (
-                result.cancellation_details.error_details
-                if result.cancellation_details
-                else "Recognition failed"
-            )
-            raise ValueError(f"Pronunciation assessment failed: {error_details}")
+        if error is not None:
+            raise ValueError(f"Pronunciation assessment failed: {error}")
+        if not segments:
+            raise ValueError("Pronunciation assessment failed: no speech was recognized")
+        return combine_segments(segments)
 
-        pronunciation_result = speechsdk.PronunciationAssessmentResult(result)
-        words = self._extract_words(pronunciation_result)
-        summary = self._generate_summary(
-            pronunciation_result.pronunciation_score,
-            pronunciation_result.accuracy_score,
-            pronunciation_result.fluency_score,
-            pronunciation_result.completeness_score,
-            words,
-        )
+    @staticmethod
+    def _recognize_continuously(
+        recognizer: speechsdk.SpeechRecognizer,
+    ) -> tuple[List["AssessedSegment"], Optional[str]]:
+        """Every recognized utterance of the recording, assessed against the
+        whole reference. `recognize_once` stops at the first pause, so a
+        Read Aloud passage would only be assessed up to its first sentence."""
+        done = threading.Event()
+        segments: List[AssessedSegment] = []
+        errors: List[str] = []
 
-        return PronunciationAssessmentResult(
-            score=round(pronunciation_result.pronunciation_score),
-            accuracyScore=round(pronunciation_result.accuracy_score),
-            fluencyScore=round(pronunciation_result.fluency_score),
-            completenessScore=round(pronunciation_result.completeness_score),
-            words=words,
-            summary=summary,
-            recognizedText=result.text or None,
-        )
+        def on_recognized(evt):
+            result = evt.result
+            if result.reason != speechsdk.ResultReason.RecognizedSpeech:
+                return
+            assessed = speechsdk.PronunciationAssessmentResult(result)
+            segments.append(AssessedSegment(
+                score=assessed.pronunciation_score,
+                accuracy=assessed.accuracy_score,
+                fluency=assessed.fluency_score,
+                completeness=assessed.completeness_score,
+                duration_sec=result.duration / 10_000_000,
+                text=result.text or "",
+                words=AzureSpeechService._extract_words(assessed),
+            ))
 
+        def on_canceled(evt):
+            details = evt.cancellation_details
+            if details.reason == speechsdk.CancellationReason.Error:
+                errors.append(details.error_details or "Recognition failed")
+            done.set()
+
+        recognizer.recognized.connect(on_recognized)
+        recognizer.canceled.connect(on_canceled)
+        recognizer.session_stopped.connect(lambda evt: done.set())
+        recognizer.start_continuous_recognition_async().get()
+        finished = done.wait(timeout=CONTINUOUS_RECOGNITION_TIMEOUT_SEC)
+        recognizer.stop_continuous_recognition_async().get()
+        if not finished:
+            errors.append("timed out")
+        return segments, (errors[0] if errors else None)
+
+    @staticmethod
     def _extract_words(
-        self, pronunciation_result: speechsdk.PronunciationAssessmentResult
+        pronunciation_result: speechsdk.PronunciationAssessmentResult,
     ) -> List[WordAssessment]:
         """Extract word-level assessment details."""
         words = []
@@ -247,8 +330,8 @@ class AzureSpeechService:
 
         return words
 
+    @staticmethod
     def _generate_summary(
-        self,
         overall_score: float,
         accuracy_score: float,
         fluency_score: float,

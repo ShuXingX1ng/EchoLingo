@@ -1,7 +1,15 @@
 "use client"
 
-import SpeechEvaluationDetails from "@/components/SpeechEvaluationDetails"
-import { speechEvaluationOf, speechProviderName, speechScores } from "@/lib/speech-evaluation"
+import SpeechEvaluationDetails, {
+  SpeechEvaluationErrorNotice,
+  SpeechScoreBadge,
+} from "@/components/SpeechEvaluationDetails"
+import {
+  speechEvaluationErrorOf,
+  speechEvaluationOf,
+  speechProviderName,
+  speechScores,
+} from "@/lib/speech-evaluation"
 import { useTranslation } from "@/lib/i18n"
 import type { TaskFeedback, DimensionScores, TaskScoreCard } from "@/types"
 
@@ -22,6 +30,7 @@ export default function TaskFeedbackDisplay({
 }: Props) {
   const { t } = useTranslation()
   const speechEvaluation = speechEvaluationOf(feedback)
+  const speechEvaluationError = speechEvaluationErrorOf(feedback)
   return (
     <div className="space-y-5">
       {feedback.scoreCard && (
@@ -52,7 +61,7 @@ export default function TaskFeedbackDisplay({
           <div className="grid grid-cols-4 gap-3 mb-5">
             {speechScores(speechEvaluation).map(({ labelKey, score }) => (
               <div key={labelKey} className="text-center">
-                <ScoreBadge score={score} />
+                <SpeechScoreBadge score={score} scale={speechEvaluation.scale} />
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t(labelKey)}</p>
               </div>
             ))}
@@ -60,6 +69,7 @@ export default function TaskFeedbackDisplay({
           <SpeechEvaluationDetails evaluation={speechEvaluation} />
         </div>
       )}
+      {speechEvaluationError && <SpeechEvaluationErrorNotice error={speechEvaluationError} />}
 
       {feedback.dimensionScores && (
         <DimensionScoresBlock scores={feedback.dimensionScores} />

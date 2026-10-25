@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRecordingSession } from "@/hooks/useRecordingSession"
 import { apiPost, apiPostForm } from "@/lib/api-client"
 import { getRandomImage, type ImageStimulus } from "@/lib/image-bank"
+import { speechEvaluationModeFor } from "@/lib/speech-evaluation"
 import { loadStimulusText } from "@/lib/stimulus-loader"
 import { isValidStructuredStimulus, spokenStimulusText } from "@/lib/structured-stimulus"
 import { TASK_TYPE_REGISTRY, dimensionEntries } from "@/lib/task-type-registry"
@@ -377,12 +378,14 @@ export function usePracticeTaskRun(
     const historicalWeaknesses = await computeHistoricalWeaknesses(taskType)
     const feedbackStimulus = input.feedbackStimulus ?? loaded.feedbackStimulus ?? loaded.content
     let result: TaskFeedback | null = null
+    const evaluationMode = speechEvaluationModeFor(taskType)
     const spokenForm = input.audio
       ? await prepareSpokenFeedbackForm(input.audio, {
           taskType,
           stimulus: feedbackStimulus,
           transcript: input.feedbackResponse,
           ...(historicalWeaknesses ? { historicalWeaknesses: JSON.stringify(historicalWeaknesses) } : {}),
+          ...(evaluationMode ? { evaluationMode } : {}),
         })
       : null
     try {
@@ -392,9 +395,17 @@ export function usePracticeTaskRun(
         )
         // The provider's recognised text is more reliable than the browser's.
         if (isCurrent() && spoken.transcript) setTranscript(spoken.transcript)
+        // Without Feedback the evaluation, its failure or the comparison is still kept.
         result = spoken.feedback
-          ?? (spoken.speechEvaluation
-            ? { ...FEEDBACK_UNAVAILABLE, speechEvaluation: spoken.speechEvaluation }
+          ?? (spoken.speechEvaluation || spoken.speechEvaluationError
+            ? {
+                ...FEEDBACK_UNAVAILABLE,
+                ...(spoken.speechEvaluation ? { speechEvaluation: spoken.speechEvaluation } : {}),
+                ...(spoken.speechEvaluationError ? { speechEvaluationError: spoken.speechEvaluationError } : {}),
+                ...(spoken.speechEvaluationComparison
+                  ? { speechEvaluationComparison: spoken.speechEvaluationComparison }
+                  : {}),
+              }
             : null)
       } else {
         result = await apiPost<TaskFeedback>("/api/pte/feedback", {

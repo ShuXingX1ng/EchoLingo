@@ -119,6 +119,34 @@ async def test_process_speech_evaluation_node_formats_dimension_estimates():
     assert "Azure" not in ctx
 
 
+@pytest.mark.anyio
+async def test_speech_context_names_the_scale_and_unavailable_dimensions():
+    evaluation = {"provider": "echolingo", "scale": "10-90", "pronunciation": None,
+                  "oralFluency": None, "content": 74}
+    result = await fg.process_speech_evaluation_node(_base_state(speech_evaluation=evaluation))
+    ctx = result["speech_context"]
+    assert "10-90 scale" in ctx and "not an official PTE score" in ctx
+    assert "Pronunciation: not available" in ctx
+    assert "Content: 74" in ctx
+
+
+@pytest.mark.parametrize("evaluation, capped", [
+    ({"scale": "0-100", "content": 50}, 50),
+    ({"scale": "10-90", "content": 50}, 50),   # halfway along 10–90
+    ({"scale": "10-90", "content": 10}, 0),
+    ({"scale": "10-90", "content": 90}, 80),   # no cap: the LLM said 80
+])
+def test_read_aloud_content_is_capped_by_the_evaluated_content_on_its_scale(evaluation, capped):
+    state = _base_state(
+        task_type="read_aloud", stimulus="The quick brown fox.", response="The quick brown fox.",
+        speech_evaluation=evaluation,
+    )
+    result = {"dimensionScores": {"section": "speaking", "content": 80, "pronunciation": 70,
+                                  "fluency": 70}}
+    corrected = fg._apply_content_coverage("read_aloud", state, result)
+    assert corrected["dimensionScores"]["content"] == capped
+
+
 # ---------------------------------------------------------------------------
 # call_primary_node
 # ---------------------------------------------------------------------------
@@ -419,7 +447,7 @@ async def test_run_feedback_graph_happy_path():
     assert result["speechEvaluation"] == _EVALUATION
     # Both scoring steps saw the evaluated dimension estimates.
     for call in mock_chain.ainvoke.await_args_list:
-        assert "Speech evaluation scores — Pronunciation: 82" in call.kwargs["user"]
+        assert "Pronunciation: 82, Oral fluency: 88" in call.kwargs["user"]
     assert result["dimensionScores"]["section"] == "speaking"
     assert "judgeLog" not in result  # no divergence
     assert result["coachSuggestions"] == ["Slow down."]

@@ -14,16 +14,23 @@ export async function mockTtsApi(page: Page) {
 /** Mock the one-request speech evaluation + Feedback for a recorded Response */
 export async function mockSpokenFeedbackApi(page: Page) {
   const speechEvaluation = {
-    provider: "azure",
-    taskScoreEstimate: null,
-    overallScore: 85,
-    pronunciation: 82,
-    oralFluency: 88,
-    content: 91,
+    provider: "echolingo",
+    scale: "10-90",
+    taskScoreEstimate: 74,
+    overallScore: null,
+    pronunciation: 72,
+    oralFluency: 70,
+    content: 90,
     recognizedText: "hello",
-    words: [{ word: "hello", score: 90, status: "correct" }],
-    evidence: { taskScoreEstimate: false, words: true, phonemes: false },
-    summary: "Good pronunciation.",
+    words: [{ word: "hello", score: 80, status: "correct" }],
+    evidenceStatus: {
+      sentence: { status: "available" },
+      word: { status: "available" },
+      phoneme: { status: "available" },
+    },
+    modelId: "speech-evaluator-v0.1.0",
+    warnings: [],
+    summary: "",
   };
   await page.route("**/api/pte/spoken-feedback", (route) =>
     route.fulfill({
@@ -32,6 +39,8 @@ export async function mockSpokenFeedbackApi(page: Page) {
       body: JSON.stringify({
         transcript: "hello",
         speechEvaluation,
+        speechEvaluationError: null,
+        speechEvaluationComparison: null,
         feedback: {
           summary: "Good attempt at the task.",
           strengths: ["Clear response"],

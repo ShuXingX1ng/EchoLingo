@@ -1,79 +1,102 @@
 "use client";
 
 import { useState } from "react";
-import type { SpeechEvaluationResult, WordEvidence } from "@/types";
+import type {
+  SpeechEvaluationFailure,
+  SpeechEvaluationResult,
+  SpeechScoreScale,
+  WordEvidence,
+} from "@/types";
 import { useTranslation } from "@/lib/i18n";
+import {
+  bandFloors,
+  evidenceNoticeKey,
+  scoreBand,
+  scoreShare,
+  speechErrorKey,
+  type ScoreBand,
+} from "@/lib/speech-evaluation";
 
 interface SpeechEvaluationDetailsProps {
   evaluation: SpeechEvaluationResult;
 }
 
-export default function SpeechEvaluationDetails({
-  evaluation,
-}: SpeechEvaluationDetailsProps) {
+// Badges keep the 80% / 60% cut-offs of the Feedback dimension badges, as a
+// share of the provider's scale (80 / 60 on 0–100, 74 / 58 on 10–90).
+function badgeColor(score: number, scale: SpeechScoreScale) {
+  const share = scoreShare(score, scale);
+  if (share >= 0.8) return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800";
+  if (share >= 0.6) return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800";
+  return "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800";
+}
+
+const UNAVAILABLE_BADGE = "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
+
+/** One score on its provider's scale; a dash when the evidence could not support it. */
+export function SpeechScoreBadge({ score, scale }: { score: number | null; scale: SpeechScoreScale }) {
+  const { t } = useTranslation();
+  const color = score === null ? UNAVAILABLE_BADGE : badgeColor(score, scale);
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-2 py-0.5 text-sm font-semibold ${color}`}
+      title={score === null ? t("speechEvaluation.unavailable") : undefined}
+    >
+      {score ?? "—"}
+    </span>
+  );
+}
+
+/** A recording whose evaluation failed: said plainly, never replaced by another provider. */
+export function SpeechEvaluationErrorNotice({ error }: { error: SpeechEvaluationFailure }) {
+  const { t } = useTranslation();
+  return (
+    <div className="border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+      <p className="font-medium">{t("speechEvaluation.failed")}</p>
+      <p className="mt-1 text-xs opacity-80">{t(speechErrorKey(error.code))}</p>
+    </div>
+  );
+}
+
+const WORD_COLORS: Record<ScoreBand, string> = {
+  excellent: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+  good: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+  fair: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+  needsWork: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+};
+
+function wordStyle(word: WordEvidence, scale: SpeechScoreScale) {
+  if (word.status === "mispronounced") {
+    return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 line-through";
+  }
+  if (word.status === "omitted" || word.status === "not_scored" || word.score === null) {
+    return "bg-gray-100 dark:bg-gray-800 text-gray-500 italic";
+  }
+  return WORD_COLORS[scoreBand(word.score, scale)];
+}
+
+export default function SpeechEvaluationDetails({ evaluation }: SpeechEvaluationDetailsProps) {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
-  const overall = evaluation.overallScore;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-600 dark:text-green-400";
-    if (score >= 80) return "text-blue-600 dark:text-blue-400";
-    if (score >= 70) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
-  };
-
-  const getScoreBgColor = (score: number) => {
-    if (score >= 90) return "bg-green-100 dark:bg-green-900/30";
-    if (score >= 80) return "bg-blue-100 dark:bg-blue-900/30";
-    if (score >= 70) return "bg-yellow-100 dark:bg-yellow-900/30";
-    return "bg-red-100 dark:bg-red-900/30";
-  };
-
-  const getWordStyle = (word: WordEvidence) => {
-    if (needsPractice(word)) {
-      return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 line-through";
-    }
-    if (word.status === "omitted") {
-      return "bg-gray-100 dark:bg-gray-800 text-gray-500 italic";
-    }
-    if (word.score >= 90) {
-      return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
-    }
-    if (word.score >= 80) {
-      return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300";
-    }
-    return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
-  };
+  const notice = evidenceNoticeKey(evaluation);
+  const floors = bandFloors(evaluation.scale);
+  const toPractice = evaluation.words.filter((word) => word.status === "mispronounced");
 
   return (
     <div className="space-y-4">
-      {/* Overall Score */}
-      <div className="flex items-center gap-4">
-        {overall !== null && (
-          <div
-            className={`w-20 h-20 rounded-full flex items-center justify-center ${getScoreBgColor(overall)}`}
-          >
-            <span className={`text-2xl font-bold ${getScoreColor(overall)}`}>
-              {overall}
-            </span>
-          </div>
-        )}
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">
-            {t("speechEvaluation.overall")}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {evaluation.summary}
-          </p>
-        </div>
-      </div>
-
-      {/* Sub-scores */}
-      <div className="grid grid-cols-3 gap-3">
-        <ScoreCard label={t("speechEvaluation.pronunciation")} score={evaluation.pronunciation} />
-        <ScoreCard label={t("speechEvaluation.oralFluency")} score={evaluation.oralFluency} />
-        <ScoreCard label={t("speechEvaluation.content")} score={evaluation.content} />
-      </div>
+      {evaluation.scale === "10-90" && (
+        <p className="text-xs text-[var(--text-secondary)]">{t("speechEvaluation.referenceLabel")}</p>
+      )}
+      {evaluation.summary && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">{evaluation.summary}</p>
+      )}
+      {notice && (
+        <p className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+          {t(notice)}
+        </p>
+      )}
+      {evaluation.warnings?.includes("duration_outside_training_range") && (
+        <p className="text-xs text-[var(--text-secondary)]">{t("speechEvaluation.notice.longRecording")}</p>
+      )}
 
       {/* Word-level Analysis */}
       {evaluation.words.length > 0 && (
@@ -100,11 +123,11 @@ export default function SpeechEvaluationDetails({
                 {evaluation.words.map((word, index) => (
                   <div
                     key={index}
-                    className={`px-2 py-1 rounded text-sm font-medium ${getWordStyle(word)}`}
-                    title={`Score: ${word.score}${word.status !== "correct" ? ` (${word.status})` : ""}`}
+                    className={`px-2 py-1 rounded text-sm font-medium ${wordStyle(word, evaluation.scale)}`}
+                    title={word.status === "correct" ? `${word.score}` : t(`speechEvaluation.wordStatus.${word.status}`)}
                   >
                     {word.word}
-                    <span className="text-xs ml-1 opacity-70">{word.score}</span>
+                    {word.score !== null && <span className="text-xs ml-1 opacity-70">{word.score}</span>}
                   </div>
                 ))}
               </div>
@@ -113,40 +136,38 @@ export default function SpeechEvaluationDetails({
               <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded bg-green-200 dark:bg-green-800"></span>
-                  90+ {t("pronunciation.excellent")}
+                  {floors.excellent}+ {t("pronunciation.excellent")}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded bg-blue-200 dark:bg-blue-800"></span>
-                  80-89 {t("pronunciation.good")}
+                  {floors.good}–{floors.excellent - 1} {t("pronunciation.good")}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded bg-yellow-200 dark:bg-yellow-800"></span>
-                  70-79 {t("pronunciation.fair")}
+                  &lt;{floors.good} {t("pronunciation.fair")}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded bg-red-200 dark:bg-red-800"></span>
-                  &lt;70 {t("pronunciation.needsWork")}
+                  {t("pronunciation.needsWork")}
                 </span>
               </div>
 
-              {/* Mispronounced words details */}
-              {evaluation.words.filter(needsPractice).length > 0 && (
+              {/* Mispronounced words */}
+              {toPractice.length > 0 && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                   <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">
                     {t("pronunciation.wordsToPractice")}:
                   </p>
                   <ul className="space-y-1">
-                    {evaluation.words
-                      .filter(needsPractice)
-                      .map((word, index) => (
-                        <li
-                          key={index}
-                          className="text-sm text-red-700 dark:text-red-400 flex items-center gap-2"
-                        >
-                          <span className="font-medium">&ldquo;{word.word}&rdquo;</span>
-                          <span className="text-xs opacity-70">Score: {word.score}</span>
-                        </li>
-                      ))}
+                    {toPractice.map((word, index) => (
+                      <li
+                        key={index}
+                        className="text-sm text-red-700 dark:text-red-400 flex items-center gap-2"
+                      >
+                        <span className="font-medium">&ldquo;{word.word}&rdquo;</span>
+                        {word.score !== null && <span className="text-xs opacity-70">{word.score}</span>}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -154,33 +175,6 @@ export default function SpeechEvaluationDetails({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function needsPractice(word: WordEvidence) {
-  return word.status === "mispronounced" && word.score < 70;
-}
-
-function ScoreCard({ label, score }: { label: string; score: number }) {
-  const getColor = (score: number) => {
-    if (score >= 90) return "text-green-600 dark:text-green-400";
-    if (score >= 80) return "text-blue-600 dark:text-blue-400";
-    if (score >= 70) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
-  };
-
-  const getBgColor = (score: number) => {
-    if (score >= 90) return "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800";
-    if (score >= 80) return "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800";
-    if (score >= 70) return "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800";
-    return "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800";
-  };
-
-  return (
-    <div className={`rounded-lg border p-3 text-center ${getBgColor(score)}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-      <p className={`text-lg font-bold ${getColor(score)}`}>{score}</p>
     </div>
   );
 }

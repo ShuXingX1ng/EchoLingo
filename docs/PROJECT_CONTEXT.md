@@ -15,13 +15,13 @@ EchoLingo 是面向 PTE Academic 学习者的个人全栈 AI 练习平台。产�
 PTE 产品 MVP 和平台架构已完成，当前进入 **Read Aloud Speech Evaluator** 阶段。
 
 - 已完成：PTE 练习与 Mock、FastAPI 分离、LangGraph feedback、rubric RAG、Exemplar retrieval、Study Assistant、Onboarding、Supabase 同步、i18n。
-- 当前运行：Azure Pronunciation Assessment 为 Read Aloud 和 Repeat Sentence 提供语音证据。
+- 当前运行：Read Aloud 默认由 EchoLingo Speech Evaluator（本机私有 Worker + FastAPI 的 10–90 Provisional Score Normalization）评估，Worker 不可用时明确报告失败，不回退 Azure；Repeat Sentence 仍用 Azure Pronunciation Assessment。
 - 已完成：Speech Evaluator M0（`speech/` 包骨架、固定 encoder revision、smoke test）、M1（SpeechOcean762 下载/校验、说话人隔离切分、MFA 对齐、Wav2Vec2 特征缓存）、M2（A0 冻结编码器多任务评分基线，两个种子；结果见 `speech/docs/m2-acceptance-report.md`）。
-- 评估器现状：A0 的封存测试集句子级 Accuracy/Fluency Pearson 为 0.63/0.72，单词错误检测与无学习基线持平。M2.5（2026-10-23）修复后的候选（Accuracy/Stress 重新加权、声学特征标准化、规范音素身份嵌入、第 4/6/8/10/12 层加权混合、在 Validation 上选错误检测阈值）在封存测试集上句子 Accuracy/Fluency Pearson 0.71/0.79、单词 Accuracy Pearson 0.40、单词错误检测 Macro F1 0.63（基线 0.48）。M3（2026-10-25）在其上采纳专家平均目标与特征 Mask 加离线音频增强（候选 3.2c），未采纳分歧辅助头、成人微调、输入归一化与 Loquacious CTC LoRA Adapter（A1）；3.2c 在封存测试集上单词错误检测 Macro F1 0.68/0.67、单词 Accuracy Pearson 0.44/0.41、音素错误检测 AP 0.25/0.23，句子 Accuracy/Fluency Pearson 0.71/0.79 持平；成人句子 Accuracy 0.81、儿童 0.38。M4（2026-10-25）把 3.2c（种子 42）导出为不可变 Bundle `speech-evaluator-v0.1.0`，并在本机 Mac CPU 上提供私有 Speech Evaluation Worker（`speech/src/echolingo_speech/worker/`，`localhost:8100` 上的 `/health` 与 `/v1/evaluate`，ADR-0015）。Worker 返回标签原始尺度的分数和逐层证据状态，尚未接入 FastAPI 或前端。
+- 评估器现状：A0 的封存测试集句子级 Accuracy/Fluency Pearson 为 0.63/0.72，单词错误检测与无学习基线持平。M2.5（2026-10-23）修复后的候选（Accuracy/Stress 重新加权、声学特征标准化、规范音素身份嵌入、第 4/6/8/10/12 层加权混合、在 Validation 上选错误检测阈值）在封存测试集上句子 Accuracy/Fluency Pearson 0.71/0.79、单词 Accuracy Pearson 0.40、单词错误检测 Macro F1 0.63（基线 0.48）。M3（2026-10-25）在其上采纳专家平均目标与特征 Mask 加离线音频增强（候选 3.2c），未采纳分歧辅助头、成人微调、输入归一化与 Loquacious CTC LoRA Adapter（A1）；3.2c 在封存测试集上单词错误检测 Macro F1 0.68/0.67、单词 Accuracy Pearson 0.44/0.41、音素错误检测 AP 0.25/0.23，句子 Accuracy/Fluency Pearson 0.71/0.79 持平；成人句子 Accuracy 0.81、儿童 0.38。M4（2026-10-25）把 3.2c（种子 42）导出为不可变 Bundle `speech-evaluator-v0.1.0`，并在本机 Mac CPU 上提供私有 Speech Evaluation Worker（`speech/src/echolingo_speech/worker/`，`localhost:8100` 上的 `/health` 与 `/v1/evaluate`，ADR-0015）。Worker 返回标签原始尺度的分数和逐层证据状态。M5（进行中）把它接入 FastAPI 与 Read Aloud。
 - 训练环境：原 WSL2 + RTX 4070 机器已不可用，训练迁移到租用的 Linux 云 GPU（ADR-0014）。2026-10-23 已在 Featurize RTX 3090 实例上重建 M1 并复现 A0（两个种子与验收报告相差不超过 0.01）。数据、特征缓存不在 Git 中，实例退还后需按 `speech/README.md` 重建；manifest、MLflow 记录与检查点在每阶段结束后备份到实例之外。MLflow 文件存储必须放在 `artifact_root` 之外。
-- 已实施的 seam：`backend/services/speech_evaluation.py` 定义 provider-neutral 的 Speech Evaluation Result，目前只有 Azure 一个 adapter；前端与 Feedback 流程不再接触 Azure 字段名。
-- 已实施但未接入：Checkpoint Bundle 与私有 Speech Evaluation Worker（M4）。已确认但未实施：EchoLingo provider、10–90 归一化与 Content 门控、显式 compare mode（M5）。
-- 当前权威计划：[`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 与 ADR 0011–0014。
+- 已实施的 seam：`backend/services/speech_evaluation.py` 定义 provider-neutral 的 Speech Evaluation Result（带 `scale`、逐层 `evidenceStatus` 与 `modelId`），有 EchoLingo 与 Azure 两个 adapter；`speech_worker.py` 是 Worker 的 HTTP client（`SPEECH_WORKER_URL`），`speech_normalization.py` 按 `backend/data/speech_calibration/<bundle>.json` 映射到 10–90 并执行 Read Aloud 的 40/40/20 与 Content 策略。`POST /api/pte/spoken-feedback` 接受 `evaluationMode`（`echolingo` 默认 / `compare`），失败返回 `speechEvaluationError`，比较返回 `speechEvaluationComparison`；前端只展示主结果，`NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE=1` 时请求 compare。
+- 尚未实施：完整单词与流利度标注、Compare 开发者面板与比较持久化策略（M6）。
+- 当前权威计划：[`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 与 ADR 0011–0016。
 
 ## Runtime Architecture
 
@@ -105,7 +105,8 @@ Exemplar 默认只作为 few-shot grounding，不向学习者逐字提供。生�
 
 ### Current
 
-- Read Aloud、Repeat Sentence：Azure 提供 word/phoneme 证据，经 Azure adapter 转为 Speech Evaluation Result（不含 10–90 的 Spoken Task Score Estimate）。
+- Read Aloud：EchoLingo Speech Evaluator（Bundle `speech-evaluator-v0.1.0`）经 EchoLingo adapter 转为 10–90 的 Speech Evaluation Result，含 Spoken Task Score Estimate；显式 `compare` 同时运行 Azure 作为基线。
+- Repeat Sentence：Azure 提供 word/phoneme 证据，经 Azure adapter 转为 0–100 的 Speech Evaluation Result（不含 Spoken Task Score Estimate）。
 - 其他需要转录的口语任务：使用现有 STT/LLM 路径生成学习反馈。
 
 ### Confirmed target for Read Aloud

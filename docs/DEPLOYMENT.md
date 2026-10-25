@@ -1,6 +1,6 @@
 # EchoLingo Deployment
 
-更新日期：2026-07-21
+更新日期：2026-10-26
 
 ## Target Shape
 
@@ -88,6 +88,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 4. 所需 migrations 已实际应用，而不仅是文件存在。
 5. ECDICT、rubric embeddings 和 stimulus exemplars 已按目标环境准备。
 6. 所有第三方 secret 只存在于 backend deployment。
+7. Read Aloud 由私有 Speech Evaluation Worker 评估（`SPEECH_WORKER_URL`，默认 `http://localhost:8100`；启动方式见 [`speech/README.md`](../speech/README.md) M4 节）。目前 Worker 只在开发 Mac 上运行（ADR-0015）：Backend 连不上 Worker 时，Read Aloud 返回明确的 `worker_unavailable` 评估失败，Feedback 仍基于浏览器转写生成，不回退到 Azure。`backend/data/speech_calibration/` 必须包含 Worker 所加载 Bundle 的归一化文件。
 
 ## Deployment Options
 

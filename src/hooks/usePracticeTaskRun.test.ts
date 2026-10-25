@@ -472,6 +472,40 @@ describe("recorded Response (Read Aloud)", () => {
     expect(result.current.feedback?.speechEvaluation).toEqual(speechEvaluation)
   })
 
+  it("keeps a failed evaluation's reason when Feedback could not be generated either", async () => {
+    const speechEvaluationError = { provider: "echolingo", code: "worker_unavailable", message: "down" }
+    mocked.apiPostForm.mockResolvedValue({
+      transcript: "a passage", feedback: null, speechEvaluation: null,
+      speechEvaluationError, speechEvaluationComparison: null,
+    })
+    const { result } = await startRun("read_aloud")
+    act(() => result.current.startNow())
+
+    await finishRecording("a passage about cities")
+
+    expect(result.current.feedback?.speechEvaluation).toBeUndefined()
+    expect(result.current.feedback?.speechEvaluationError).toEqual(speechEvaluationError)
+  })
+
+  it("asks for the backend's default Speech Evaluation Mode unless comparison is switched on", async () => {
+    const { result } = await startRun("read_aloud")
+    act(() => result.current.startNow())
+    await finishRecording("a passage about cities")
+    expect((mocked.apiPostForm.mock.calls[0][1] as FormData).get("evaluationMode")).toBeNull()
+  })
+
+  it("requests an explicit comparison for Read Aloud behind the developer switch", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE", "1")
+    try {
+      const { result } = await startRun("read_aloud")
+      act(() => result.current.startNow())
+      await finishRecording("a passage about cities")
+      expect((mocked.apiPostForm.mock.calls[0][1] as FormData).get("evaluationMode")).toBe("compare")
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it("saves the Practice Task without Feedback when the spoken request fails", async () => {
     mocked.apiPostForm.mockRejectedValue(new Error("backend down"))
     const { result } = await startRun("read_aloud")
