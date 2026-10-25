@@ -15,8 +15,9 @@ times through the Worker's own decoding and encoder (`worker/pipeline.py`):
 
 It also records how much of the reference the free ASR heard (by words and
 by letters), for the real reference and for another validation sentence (a
-wrong passage), which is how the `reference_not_read` cut was chosen, and
-per-stage latency. Validation only: the
+wrong passage), which is how M4 chose its `reference_not_read` cut (M5
+moved the gate to chance-corrected letter coverage, measured on passages in
+`display_calibration.py`), and per-stage latency. Validation only: the
 sealed test stays sealed.
 
 CLI: `python -m echolingo_speech.evaluation.worker_parity --config ... --out report.json`
@@ -53,6 +54,7 @@ from echolingo_speech.worker.aligner import AlignmentError
 from echolingo_speech.worker.pipeline import (
     EncodedAudio,
     SpeechEvaluationPipeline,
+    corrected_character_coverage,
     decode_audio,
     reference_character_coverage,
     reference_coverage,
@@ -185,15 +187,15 @@ def run_parity(
 ) -> dict:
     # The coverage gate is measured here, not applied: every record keeps
     # its word evidence.
-    gate = pipeline.limits.min_reference_character_coverage
+    gate = pipeline.limits.min_reference_character_coverage_corrected
     pipeline = SpeechEvaluationPipeline(
         pipeline.bundle, pipeline.encoder, pipeline.aligner,
-        replace(pipeline.limits, min_reference_character_coverage=0.0),
+        replace(pipeline.limits, min_reference_character_coverage_corrected=0.0),
     )
     training_pairs, worker_pairs = ScorePairs(), ScorePairs()
     counts = {"evidence": {}, "out_of_vocabulary_words": 0, "phone_count_mismatch_words": 0}
     coverage: dict[str, list[float]] = {
-        f"{unit}_{reference}": [] for unit in ("word", "character")
+        f"{unit}_{reference}": [] for unit in ("word", "character", "corrected_character")
         for reference in ("own_reference", "wrong_reference")
     }
     latency: dict[str, list[float]] = {
@@ -238,6 +240,9 @@ def run_parity(
             coverage[f"character_{reference}"].append(
                 reference_character_coverage(words, recognized)
             )
+            coverage[f"corrected_character_{reference}"].append(
+                corrected_character_coverage(words, recognized)
+            )
         if log_every and (index + 1) % log_every == 0:
             print(f"{index + 1}/{len(records)} scored", flush=True)
 
@@ -258,10 +263,12 @@ def run_parity(
         },
         "reference_coverage": {key: _distribution(values) for key, values in coverage.items()},
         "reference_not_read_gate": {
-            "min_reference_character_coverage": gate,
-            "own_reference_withheld": sum(v < gate for v in coverage["character_own_reference"]),
+            "min_reference_character_coverage_corrected": gate,
+            "own_reference_withheld": sum(
+                v < gate for v in coverage["corrected_character_own_reference"]
+            ),
             "wrong_reference_withheld": sum(
-                v < gate for v in coverage["character_wrong_reference"]
+                v < gate for v in coverage["corrected_character_wrong_reference"]
             ),
         },
         "latency_ms": {stage: _latency(values) for stage, values in latency.items()},

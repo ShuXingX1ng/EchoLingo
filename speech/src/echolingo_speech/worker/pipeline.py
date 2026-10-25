@@ -10,8 +10,9 @@ Layered degradation instead of fabricated evidence:
 - alignment fails, or its word count differs from the reference: no word or
   phoneme results; sentence scores are still computed but `degraded`, since
   their pause and timing features came from (absent) word spans;
-- almost none of the reference is in the free ASR output (another language,
-  another passage): the same, with reason `reference_not_read`;
+- the free ASR output shares no more of the reference's letters than an
+  unrelated text would (another language, another passage): the same, with
+  reason `reference_not_read`;
 - an out-of-dictionary word: that word gets no score and no phonemes, and
   word/phoneme evidence is `partial`.
 
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -87,12 +89,16 @@ class Limits:
     # to silence, so this is checked before anything else runs).
     silence_peak: float = 1e-3
     # Word and phoneme evidence is withheld (`reference_not_read`) below this
-    # share of the reference's letters found, in order, in the free ASR
-    # output. Chosen on validation (2026-10-25): no real reading fell below
-    # 0.30, and 9% of recordings paired with another validation sentence fell
-    # below 0.25. Word coverage was no use as a gate: 8% of real readings
-    # had none of their words recognized.
-    min_reference_character_coverage: float = 0.25
+    # chance-corrected letter coverage of the reference by the free ASR
+    # (`corrected_character_coverage`). Raw letter coverage cannot gate a
+    # Read Aloud passage: another passage already shares about 0.45 of its
+    # letters in order. Chosen on SpeechOcean validation readings joined into
+    # passages of about 40 words (M5, 2026-10-26): no own passage fell below
+    # 0.10 (the lowest was 0.21) and 95% of wrong passages did; on single
+    # 3-10 word sentences 3.1% of real readings fall below it. Word coverage
+    # was no use as a gate: 8% of real readings had none of their words
+    # recognized.
+    min_reference_character_coverage_corrected: float = 0.10
 
     def as_dict(self) -> dict[str, float]:
         return {name: float(value) for name, value in asdict(self).items()}
@@ -215,6 +221,31 @@ def reference_character_coverage(reference_words: list[str], recognized_text: st
     return _common_subsequence_share("".join(reference_words), recognized_text.replace(" ", ""))
 
 
+def chance_character_coverage(reference_words: list[str], recognized_text: str) -> float:
+    """The letter coverage an unrelated text reaches by chance: the same
+    measure against the reference's letters in reverse order, which keeps
+    their counts and length but not their order. Over a Read Aloud passage
+    this is about 0.45, so raw letter coverage cannot tell a wrong passage
+    from a poorly recognized reading."""
+    return _common_subsequence_share(
+        "".join(reference_words)[::-1], recognized_text.replace(" ", "")
+    )
+
+
+def corrected_character_coverage(
+    reference_words: list[str], recognized_text: str, observed: float | None = None
+) -> float:
+    """Letter coverage above chance, rescaled so 0 is chance and 1 is every
+    letter heard; clamped to [0, 1]. `observed` is
+    `reference_character_coverage`, when already computed."""
+    if observed is None:
+        observed = reference_character_coverage(reference_words, recognized_text)
+    chance = chance_character_coverage(reference_words, recognized_text)
+    if chance >= 1.0:
+        return 0.0
+    return min(1.0, max(0.0, (observed - chance) / (1.0 - chance)))
+
+
 @dataclass(frozen=True)
 class AlignedWord:
     text: str
@@ -240,6 +271,48 @@ def aligned_words(alignment: Alignment, reference_words: list[str]) -> list[Alig
         )
         words.append(AlignedWord(reference_word, span, phones, out_of_vocabulary))
     return words
+
+
+# Sentence ends in the reference text; a sentence of fewer words than this
+# is scored together with the one before it (or after it, if it is first).
+_SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
+MIN_SENTENCE_WORDS = 3
+# Training recordings have about 0.5 s of silence before the first word and
+# after the last (SpeechOcean medians 0.54 s / 0.53 s); a sentence cut gets
+# as much, but never past the midpoint of the gap to its neighbour.
+SENTENCE_PADDING_SEC = 0.5
+
+
+def reference_sentences(reference_text: str) -> list[int]:
+    """Word counts of the reference's sentences, in reading order, after the
+    same normalization as the whole text (so they sum to its word count)."""
+    counts = [len(normalize_text(part).split())
+              for part in _SENTENCE_END_RE.split(reference_text.strip())]
+    merged: list[int] = []
+    for count in (c for c in counts if c):
+        if merged and (count < MIN_SENTENCE_WORDS or merged[-1] < MIN_SENTENCE_WORDS):
+            merged[-1] += count
+        else:
+            merged.append(count)
+    return merged
+
+
+def sentence_segments(
+    words: list[AlignedWord], counts: list[int], duration: float
+) -> list[tuple[int, int, float, float]]:
+    """(first word, end word, start s, end s) of each sentence's cut."""
+    bounds, first = [], 0
+    for number, count in enumerate(counts):
+        last = first + count
+        start = words[first].span.start - SENTENCE_PADDING_SEC
+        end = words[last - 1].span.end + SENTENCE_PADDING_SEC
+        if number > 0:
+            start = max(start, (words[first - 1].span.end + words[first].span.start) / 2)
+        if last < len(words):
+            end = min(end, (words[last - 1].span.end + words[last].span.start) / 2)
+        bounds.append((first, last, max(0.0, start), min(duration, end)))
+        first = last
+    return bounds
 
 
 class SpeechEvaluationPipeline:
@@ -292,7 +365,9 @@ class SpeechEvaluationPipeline:
             alignment = None
         aligned_at = time.perf_counter()
 
-        result = self.score(waveform, encoded, alignment, reference_words)
+        result = self.score(
+            waveform, encoded, alignment, reference_words, reference_sentences(reference_text)
+        )
         finished = time.perf_counter()
         return result.model_copy(update={"timing": Timing(
             decode_ms=(decoded - started) * 1000,
@@ -309,13 +384,23 @@ class SpeechEvaluationPipeline:
         encoded: EncodedAudio,
         alignment: Alignment | None,
         reference_words: list[str],
+        sentence_word_counts: list[int] | None = None,
     ) -> EvaluationResult:
-        """Everything after alignment; `timing` is left zero."""
+        """Everything after alignment; `timing` is left zero.
+
+        `sentence_word_counts` splits the reference into sentences
+        (`reference_sentences`). With more than one, each sentence is cut
+        from the recording at its aligned span and scored on its own, as
+        every training recording was a single sentence; sentence scores are
+        then averaged by word count. Scoring a multi-sentence recording
+        whole runs about 1.5 points (of 10) low."""
         duration = waveform.shape[-1] / TARGET_SAMPLE_RATE
-        num_frames = encoded.hidden_states.shape[-2]
         word_coverage = reference_coverage(reference_words, encoded.recognized_text.split())
         character_coverage = reference_character_coverage(
             reference_words, encoded.recognized_text
+        )
+        corrected_coverage = corrected_character_coverage(
+            reference_words, encoded.recognized_text, character_coverage
         )
 
         words = aligned_words(alignment, reference_words) if alignment is not None else None
@@ -324,13 +409,110 @@ class SpeechEvaluationPipeline:
             withheld = "alignment_failed"
         elif words is None:
             withheld = "word_count_mismatch"
-        elif character_coverage < self.limits.min_reference_character_coverage:
+        elif corrected_coverage < self.limits.min_reference_character_coverage_corrected:
             withheld = "reference_not_read"
-        scored_words = words if withheld is None else []
 
+        counts = sentence_word_counts or [len(reference_words)]
+        if withheld is not None or len(counts) < 2 or sum(counts) != len(reference_words):
+            # One pass over the whole recording. Pause and timing features
+            # come from whatever word spans the aligner produced.
+            spans = alignment.words if alignment is not None else []
+            scored = words if withheld is None else []
+            sentence, results = self._score_segment(
+                waveform, encoded, scored, spans, len(reference_words), 0, 0.0
+            )
+            scored_durations = [duration]
+        else:
+            sentence, results, scored_durations = self._score_sentences(
+                waveform, words, counts, duration
+            )
+
+        if withheld is not None:
+            withheld_level = LevelEvidence(status="unavailable", reason=withheld)
+            evidence = EvidenceStatus(
+                sentence=LevelEvidence(status="degraded", reason=withheld),
+                word=withheld_level, phoneme=withheld_level,
+            )
+        else:
+            level = (
+                LevelEvidence(status="partial", reason="out_of_vocabulary")
+                if any(word.out_of_vocabulary for word in words)
+                else LevelEvidence(status="available")
+            )
+            evidence = EvidenceStatus(
+                sentence=LevelEvidence(status="available"), word=level, phoneme=level
+            )
+
+        low, high = self._training_duration
+        return EvaluationResult(
+            bundle_id=self.bundle.bundle_id,
+            duration_sec=duration,
+            reference_text=" ".join(reference_words),
+            recognized_text=encoded.recognized_text,
+            reference_word_coverage=word_coverage,
+            reference_character_coverage=character_coverage,
+            reference_character_coverage_corrected=corrected_coverage,
+            reference_not_read_below=self.limits.min_reference_character_coverage_corrected,
+            evidence_status=evidence,
+            sentence=SentenceScores(**{
+                key: value * SENTENCE_SCALE for key, value in zip(SENTENCE_TARGET_KEYS, sentence)
+            }),
+            words=results,
+            segment_count=len(scored_durations),
+            # The scorer saw each sentence cut, not the whole passage.
+            warnings=(
+                [] if all(low <= d <= high for d in scored_durations)
+                else ["duration_outside_training_range"]
+            ),
+            timing=Timing(decode_ms=0, encoder_ms=0, alignment_ms=0, scoring_ms=0, total_ms=0),
+        )
+
+    def _score_sentences(
+        self,
+        waveform: torch.Tensor,
+        words: list[AlignedWord],
+        counts: list[int],
+        duration: float,
+    ) -> tuple[list[float], list[WordResult], list[float]]:
+        """Each reference sentence scored from its own cut of the recording;
+        also the cuts' durations."""
+        weighted = [0.0] * len(SENTENCE_TARGET_KEYS)
+        results: list[WordResult] = []
+        durations: list[float] = []
+        for first, last, start_sec, end_sec in sentence_segments(words, counts, duration):
+            start = int(round(start_sec * TARGET_SAMPLE_RATE))
+            end = int(round(end_sec * TARGET_SAMPLE_RATE))
+            segment = waveform[:, start:end]
+            durations.append(segment.shape[-1] / TARGET_SAMPLE_RATE)
+            offset = start / TARGET_SAMPLE_RATE
+            shifted = [_shift_word(word, offset) for word in words[first:last]]
+            sentence, segment_results = self._score_segment(
+                segment, self.encoder.encode(segment), shifted,
+                [word.span for word in shifted], len(shifted), first, offset,
+            )
+            for index, value in enumerate(sentence):
+                weighted[index] += value * (last - first)
+            results.extend(segment_results)
+        return [value / len(words) for value in weighted], results, durations
+
+    def _score_segment(
+        self,
+        waveform: torch.Tensor,
+        encoded: EncodedAudio,
+        words: list[AlignedWord],
+        word_spans: list[TextGridSpan],
+        reference_word_count: int,
+        first_index: int,
+        offset_sec: float,
+    ) -> tuple[list[float], list[WordResult]]:
+        """The scorer on one recording (or one cut of it): its sentence
+        scores in [0, 1] and a result per word, with times moved back by
+        `offset_sec` and indices starting at `first_index`."""
+        duration = waveform.shape[-1] / TARGET_SAMPLE_RATE
+        num_frames = encoded.hidden_states.shape[-2]
         word_examples: list[WordExample] = []
         phone_examples: list[PhoneExample] = []
-        for word in scored_words:
+        for word in words:
             start, end = span_to_frame_range(word.span.start, word.span.end, duration, num_frames)
             phones = [] if word.out_of_vocabulary else word.phones
             word_examples.append(
@@ -341,10 +523,8 @@ class SpeechEvaluationPipeline:
                 phone_examples.append(PhoneExample(start, end, 0.0, canonical_phone_id(phone.text)))
 
         acoustic = compute_acoustic_features(
-            waveform,
-            alignment.words if alignment is not None else [],
-            duration_sec=duration,
-            reference_word_count=len(reference_words),
+            waveform, word_spans, duration_sec=duration,
+            reference_word_count=reference_word_count,
         )
         device = next(self.bundle.model.parameters()).device
         outputs = self.bundle.model({
@@ -364,10 +544,10 @@ class SpeechEvaluationPipeline:
         thresholds = self.bundle.prediction_thresholds
 
         results = []
-        for index, word in enumerate(scored_words):
+        for index, word in enumerate(words):
             common = {
-                "index": index, "text": word.text,
-                "start_sec": word.span.start, "end_sec": word.span.end,
+                "index": first_index + index, "text": word.text,
+                "start_sec": word.span.start + offset_sec, "end_sec": word.span.end + offset_sec,
             }
             if word.out_of_vocabulary:
                 results.append(WordResult(**common, status="out_of_vocabulary"))
@@ -376,7 +556,8 @@ class SpeechEvaluationPipeline:
             for phone in word.phones:
                 value = next(phone_accuracy)
                 phonemes.append(PhonemeResult(
-                    phone=phone.text, start_sec=phone.start, end_sec=phone.end,
+                    phone=phone.text, start_sec=phone.start + offset_sec,
+                    end_sec=phone.end + offset_sec,
                     accuracy=value * PHONE_SCALE, is_error=value < thresholds["phone"],
                 ))
             results.append(WordResult(
@@ -384,36 +565,15 @@ class SpeechEvaluationPipeline:
                 is_error=word_accuracy[index] < thresholds["word"],
                 stress_correct_probability=stress[index], phonemes=phonemes,
             ))
+        return sentence, results
 
-        if withheld is not None:
-            withheld_level = LevelEvidence(status="unavailable", reason=withheld)
-            evidence = EvidenceStatus(
-                sentence=LevelEvidence(status="degraded", reason=withheld),
-                word=withheld_level, phoneme=withheld_level,
-            )
-        else:
-            level = (
-                LevelEvidence(status="partial", reason="out_of_vocabulary")
-                if any(word.out_of_vocabulary for word in scored_words)
-                else LevelEvidence(status="available")
-            )
-            evidence = EvidenceStatus(
-                sentence=LevelEvidence(status="available"), word=level, phoneme=level
-            )
 
-        low, high = self._training_duration
-        return EvaluationResult(
-            bundle_id=self.bundle.bundle_id,
-            duration_sec=duration,
-            reference_text=" ".join(reference_words),
-            recognized_text=encoded.recognized_text,
-            reference_word_coverage=word_coverage,
-            reference_character_coverage=character_coverage,
-            evidence_status=evidence,
-            sentence=SentenceScores(**{
-                key: value * SENTENCE_SCALE for key, value in zip(SENTENCE_TARGET_KEYS, sentence)
-            }),
-            words=results,
-            warnings=[] if low <= duration <= high else ["duration_outside_training_range"],
-            timing=Timing(decode_ms=0, encoder_ms=0, alignment_ms=0, scoring_ms=0, total_ms=0),
-        )
+def _shift_span(span: TextGridSpan, offset: float) -> TextGridSpan:
+    return TextGridSpan(span.start - offset, span.end - offset, span.text)
+
+
+def _shift_word(word: AlignedWord, offset: float) -> AlignedWord:
+    return AlignedWord(
+        word.text, _shift_span(word.span, offset),
+        [_shift_span(phone, offset) for phone in word.phones], word.out_of_vocabulary,
+    )

@@ -22,6 +22,8 @@ EvidenceReason = Literal[
     "out_of_vocabulary",
 ]
 WordStatus = Literal["scored", "out_of_vocabulary"]
+# A recording (or, for a multi-sentence reference, a sentence cut) shorter or
+# longer than any training recording.
 ResultWarning = Literal["duration_outside_training_range"]
 
 
@@ -82,14 +84,22 @@ class EvaluationResult(BaseModel):
     reference_text: str
     recognized_text: str
     # Share of the reference words, and of its letters, found in order in
-    # the free ASR output. Learner speech often scores low on words alone;
-    # the `reference_not_read` gate uses letters.
+    # the free ASR output. Learner speech often scores low on words alone.
     reference_word_coverage: float
     reference_character_coverage: float
+    # Letter coverage above what an unrelated text reaches by chance (0 at
+    # chance, 1 for every letter): the `reference_not_read` gate and
+    # FastAPI's Read Aloud Content use it.
+    reference_character_coverage_corrected: float
+    # The `reference_not_read` gate this result was judged against.
+    reference_not_read_below: float
     evidence_status: EvidenceStatus
     sentence: SentenceScores
     # Empty unless word evidence is available or partial.
     words: list[WordResult]
+    # How many reference sentences were scored separately (1: the whole
+    # recording in one pass).
+    segment_count: int = 1
     warnings: list[ResultWarning] = []
     timing: Timing
 

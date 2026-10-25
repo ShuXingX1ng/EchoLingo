@@ -29,6 +29,8 @@ from echolingo_speech.worker.pipeline import (
     decode_audio,
     reference_character_coverage,
     reference_coverage,
+    reference_sentences,
+    sentence_segments,
 )
 
 # The `bundle_inputs` fixture's encoder and layers.
@@ -177,6 +179,7 @@ def test_a_clean_recording_gets_every_level(make_pipeline, bundle_dir):
     assert result.bundle_id == "speech-evaluator-v0.1.0"
     assert result.reference_text == "we call it bear"
     assert result.reference_word_coverage == result.reference_character_coverage == 1.0
+    assert result.reference_character_coverage_corrected == 1.0
     assert {level: evidence.status for level, evidence in result.evidence_status} == {
         "sentence": "available", "word": "available", "phoneme": "available",
     }
@@ -226,6 +229,7 @@ def test_a_wrong_passage_withholds_word_and_phoneme_evidence(make_pipeline):
     result = make_pipeline(encoder=FakeEncoder("oh no")).evaluate(_wav(), "we call it bear")
 
     assert result.reference_character_coverage == 0.0
+    assert result.reference_character_coverage_corrected == 0.0
     assert result.evidence_status.word.reason == "reference_not_read"
     assert result.words == []
 
@@ -235,7 +239,8 @@ def test_a_badly_recognized_real_reading_keeps_its_words(make_pipeline):
     result = make_pipeline(encoder=encoder).evaluate(_wav(), "we call it bear")
 
     assert result.reference_word_coverage == 0.0
-    assert result.reference_character_coverage > 0.25
+    gate = Limits().min_reference_character_coverage_corrected
+    assert result.reference_character_coverage_corrected > gate
     assert result.evidence_status.word.status == "available"
     assert len(result.words) == 4
 
@@ -557,3 +562,107 @@ def test_real_mfa_aligns_one_recording(tmp_path, monkeypatch):
     assert [span.text for span in alignment.words] == ["hello"]
     assert alignment.phones
     assert all(span.text not in ("sil", "<eps>") for span in alignment.phones)
+
+
+def test_a_passage_sharing_only_chance_letters_is_not_read(make_pipeline):
+    # Raw letter coverage of an unrelated sentence is high; above chance it is not.
+    encoder = FakeEncoder("a bee will tell her dad")
+    result = make_pipeline(encoder=encoder).evaluate(_wav(), "we call it bear")
+
+    assert result.reference_character_coverage >= 0.4
+    assert result.reference_character_coverage_corrected < 0.10
+    assert result.evidence_status.word.reason == "reference_not_read"
+
+
+# --- multi-sentence passages ----------------------------------------------------------
+
+
+def test_reference_sentences_follow_the_normalized_words():
+    text = "We call it bear. Born likes green! Is it? The lake is very deep."
+
+    assert reference_sentences(text) == [4, 3 + 2, 5]  # "is it" joins the one before
+    assert reference_sentences("We call it bear") == [4]
+    assert reference_sentences("Hi. We call it bear.") == [5]
+
+
+def test_sentence_cuts_keep_padding_but_stop_at_the_gap_midpoint():
+    words = aligned_words(WE_CALL_IT_BEAR, ["we", "call", "it", "bear"])
+
+    assert sentence_segments(words, [2, 2], 2.0) == [
+        (0, 2, 0.0, 0.9), (2, 4, 0.9, 2.0),
+    ]
+    spaced = Alignment(
+        words=[_span(0.8, 1.0, "we"), _span(1.0, 1.4, "call"), _span(3.0, 3.2, "it"),
+               _span(3.2, 3.6, "bear")],
+        phones=WE_CALL_IT_BEAR.phones,
+    )
+    bounds = sentence_segments(aligned_words(spaced, ["we", "call", "it", "bear"]), [2, 2], 5.0)
+    assert [(round(a, 2), round(b, 2)) for _, _, a, b in bounds] == [(0.3, 1.9), (2.5, 4.1)]
+
+
+class CountingEncoder(FakeEncoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lengths = []
+
+    def encode(self, waveform):
+        self.lengths.append(waveform.shape[-1])
+        return super().encode(waveform)
+
+
+def test_each_reference_sentence_is_scored_from_its_own_cut(make_pipeline):
+    encoder = CountingEncoder("we call it bear")
+    result = make_pipeline(encoder=encoder).evaluate(_wav(seconds=2.0), "We call. It bear.")
+
+    # "we call" and "it bear" are two words each, below MIN_SENTENCE_WORDS:
+    # one segment, one pass over the whole recording.
+    assert result.segment_count == 1
+    assert len(encoder.lengths) == 1
+
+
+def test_a_two_sentence_passage_is_scored_per_sentence(make_pipeline):
+    alignment = Alignment(
+        words=[_span(0.2, 0.4, "we"), _span(0.4, 0.6, "call"), _span(0.6, 0.8, "it"),
+               _span(1.2, 1.4, "we"), _span(1.4, 1.6, "call"), _span(1.6, 1.8, "it")],
+        phones=[_span(0.2, 0.3, "W"), _span(0.3, 0.4, "IY1"), _span(0.4, 0.5, "K"),
+                _span(0.5, 0.6, "AO1"), _span(0.6, 0.7, "IH1"), _span(0.7, 0.8, "T"),
+                _span(1.2, 1.3, "W"), _span(1.3, 1.4, "IY1"), _span(1.4, 1.5, "K"),
+                _span(1.5, 1.6, "AO1"), _span(1.6, 1.7, "IH1"), _span(1.7, 1.8, "T")],
+    )
+    encoder = CountingEncoder("we call it we call it")
+    result = make_pipeline(encoder=encoder, aligner=FakeAligner(alignment)).evaluate(
+        _wav(seconds=2.0), "We call it. We call it."
+    )
+
+    assert result.segment_count == 2
+    # The whole recording for the ASR, then one cut per sentence.
+    assert encoder.lengths[0] == 32000 and sum(encoder.lengths[1:]) == 32000
+    assert [word.index for word in result.words] == [0, 1, 2, 3, 4, 5]
+    assert result.words[3].start_sec == pytest.approx(1.2)
+    assert result.words[3].phonemes[0].start_sec == pytest.approx(1.2)
+    for score in result.sentence.model_dump().values():
+        assert 0.0 <= score <= 10.0
+
+
+def test_the_duration_warning_follows_the_sentence_cuts(make_pipeline):
+    # 14 s is longer than the fixture's 12 s training maximum; each 7 s
+    # sentence is not.
+    def sentence(start):
+        words = [_span(start + 1.0 + i, start + 1.8 + i, w)
+                 for i, w in enumerate(["we", "call", "it"])]
+        phones = [_span(s.start, s.end, "IH1") for s in words]
+        return words, phones
+
+    first_words, first_phones = sentence(0.0)
+    second_words, second_phones = sentence(7.0)
+    alignment = Alignment(words=first_words + second_words, phones=first_phones + second_phones)
+    pipeline = make_pipeline(
+        encoder=FakeEncoder("we call it we call it"), aligner=FakeAligner(alignment),
+        limits=Limits(max_duration_sec=60.0),
+    )
+
+    passage = pipeline.evaluate(_wav(seconds=14.0), "We call it. We call it.")
+    whole = pipeline.evaluate(_wav(seconds=14.0), "We call it we call it")
+
+    assert (passage.segment_count, passage.warnings) == (2, [])
+    assert (whole.segment_count, whole.warnings) == (1, ["duration_outside_training_range"])

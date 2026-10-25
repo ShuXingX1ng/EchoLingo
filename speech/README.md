@@ -380,12 +380,17 @@ kHz mono PCM) and `reference_text`. It returns scores on the bundle's label
 scales (sentence and word 0-10, phone 0-2), the free ASR transcript, the
 share of the reference the ASR heard, and an evidence status for each of
 sentence, word and phoneme. These scores are not the 10-90 reference score;
-that mapping is M5's. Each level degrades instead of being guessed:
+FastAPI maps them (M5, below). A reference of several sentences is cut at its
+aligned sentence spans and each sentence is scored on its own
+(`segment_count`), because every training recording is a single sentence.
+Each level degrades instead of being guessed:
 
 - the alignment fails, or its word count differs from the reference: no
   words or phonemes, and the sentence scores are `degraded`;
-- almost none of the reference was heard (a wrong passage, another
-  language): the same, with reason `reference_not_read`;
+- the free ASR shares no more of the reference's letters than an unrelated
+  text would (a wrong passage, another language;
+  `reference_character_coverage_corrected` < 0.10): the same, with reason
+  `reference_not_read`;
 - an out-of-dictionary word gets no score, and word/phoneme evidence is
   `partial`.
 
@@ -408,6 +413,35 @@ request path.
 uv run python -m echolingo_speech.evaluation.worker_parity --config configs/speech.yaml --manifest $MANIFEST \
   --corpus-root $CORPUS --textgrid-root $PROC/mfa-output --out $SPEECH_HOME/reports/m4/parity-validation.json
 ```
+
+## M5: Provisional Score Normalization and Read Aloud passages
+
+FastAPI (`backend/services/speech_normalization.py`) shows Worker scores on
+the 10-90 display scale through a per-bundle file,
+`backend/data/speech_calibration/<bundle_id>.json`; a bundle without one is
+not scored. `evaluation.display_calibration` produces it from validation only:
+
+```bash
+# Every validation recording through the request path once (about 13 min on the Mac)
+uv run python -m echolingo_speech.evaluation.display_calibration collect --config configs/speech.yaml \
+  --manifest $MANIFEST --corpus-root $CORPUS --out $SPEECH_HOME/reports/m5/calibration-rows-validation.jsonl
+# Linear prediction -> official label maps, kept only where they lower the MAE,
+# and the Content coverage measured on passages of about 40 words
+uv run python -m echolingo_speech.evaluation.display_calibration fit --bundle-id speech-evaluator-v0.1.0 \
+  --rows $SPEECH_HOME/reports/m5/calibration-rows-validation.jsonl \
+  --calibration-out ../backend/data/speech_calibration/speech-evaluator-v0.1.0.json \
+  --report-out $SPEECH_HOME/reports/m5/calibration-report.json
+# Six validation sentences joined into one recording, scored whole and per
+# sentence, against the same sentences scored alone
+uv run python -m echolingo_speech.evaluation.display_calibration passages --config configs/speech.yaml \
+  --manifest $MANIFEST --corpus-root $CORPUS --rows $SPEECH_HOME/reports/m5/calibration-rows-validation.jsonl \
+  --out $SPEECH_HOME/reports/m5/passages-validation.json
+```
+
+Read Aloud Content has no SpeechOcean label; it is FastAPI's policy on
+`reference_character_coverage_corrected` (the letters of the reference the
+free ASR heard, in order, above what an unrelated text reaches by chance).
+The Worker's `reference_not_read` gate and the Content floor are both 0.10.
 
 ## Notes
 
