@@ -6,8 +6,10 @@ skeleton), M1 (SpeechOcean762 data pipeline), and M2 (A0 frozen-encoder
 baseline -- see `docs/m2-acceptance-report.md`) are complete, A0 was
 reproduced on a rented GPU on 2026-10-23, and M2.5 baseline repair is
 complete (`docs/m25-diagnostics-report.md`; the M2.5 candidate is
-`configs/training/a0-rebalance-acnorm-phones-layers.yaml`). No Bundle
-export, Worker, or FastAPI integration (M4/M5) yet.
+`configs/training/a0-rebalance-acnorm-phones-layers.yaml`). M3 (candidate
+improvements; final candidate `configs/training/m3-aug-mask-audio.yaml`) and
+M4 (Checkpoint Bundle and the private Speech Evaluation Worker, see "M4"
+below) are complete. FastAPI integration (M5) is not done yet.
 
 ## Runtime environment
 

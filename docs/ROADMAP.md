@@ -1,6 +1,6 @@
 # EchoLingo Roadmap
 
-更新日期：2026-10-23
+更新日期：2026-10-25
 
 本文件只描述阶段、优先级和范围，不维护逐文件实施清单。详细 Speech Evaluator 任务与验收标准只保存在 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md)。
 
@@ -8,16 +8,16 @@
 
 EchoLingo 已完成 PTE 产品 MVP、前后端分离、反馈 Agent/RAG、Exemplar 数据管线、学习辅助功能和 Study Assistant。当前阶段是 **Read Aloud Speech Evaluator**。
 
-运行时仍由 Azure Pronunciation Assessment 服务 Read Aloud 与 Repeat Sentence。自研评估器已完成 M0（环境与骨架）、M1（SpeechOcean762 数据管线）和 M2（A0 冻结编码器基线）；句子级达到验收门槛，单词/音素级仍有已标记缺口。2026-10-23 已在租用 GPU 上重建数据并复现 A0，并完成 M2.5 基线修复：封存 Test 上句子 Accuracy Pearson 0.71、Fluency 0.79，单词错误检测 Macro F1 0.63（超过无学习基线 0.48）。2026-10-25 完成 M3 候选改进：定稿候选 3.2c（专家平均目标、特征 Mask、离线音频增强）在封存 Test 上单词错误检测 Macro F1 0.68/0.67，单词与音素级全部提升，句子级持平；Loquacious CTC Adapter（A1）改善了识别 WER，但没有可确认的评分收益，未采纳。尚无 Bundle、Worker 或运行时集成；在独立验收通过前，不切换默认提供方。
+运行时仍由 Azure Pronunciation Assessment 服务 Read Aloud 与 Repeat Sentence。自研评估器已完成 M0（环境与骨架）、M1（SpeechOcean762 数据管线）和 M2（A0 冻结编码器基线）；句子级达到验收门槛，单词/音素级仍有已标记缺口。2026-10-23 已在租用 GPU 上重建数据并复现 A0，并完成 M2.5 基线修复：封存 Test 上句子 Accuracy Pearson 0.71、Fluency 0.79，单词错误检测 Macro F1 0.63（超过无学习基线 0.48）。2026-10-25 完成 M3 候选改进：定稿候选 3.2c（专家平均目标、特征 Mask、离线音频增强）在封存 Test 上单词错误检测 Macro F1 0.68/0.67，单词与音素级全部提升，句子级持平；Loquacious CTC Adapter（A1）改善了识别 WER，但没有可确认的评分收益，未采纳。M4 同日完成：3.2c（种子 42）导出为不可变 Checkpoint Bundle `speech-evaluator-v0.1.0`，私有 Speech Evaluation Worker 在本机 Mac CPU 上运行（ADR-0015）。Worker 在 Validation 上复现了 Bundle 记录的指标；完整请求路径句子级持平，单词错误检测 AP 约低 0.03；中位延迟 3.0 秒。Worker 尚未接入 FastAPI；在第 7.2 节其余验收通过前，不切换默认提供方。
 
 ## 当前优先级
 
-1. **M4 Bundle 与 Worker**：把定稿候选 3.2c 导出为 Checkpoint Bundle（`feature-schema.json` 写明编码器输入为 16 kHz 原始波形、不做 `do_normalize`），建立私有 Worker（启动加载、健康检查、超时）与句子/单词/音素分层降级。
-2. **通过独立 worker 集成**：之后建立 provider-neutral FastAPI contract 和显式 compare 模式（M5–M6）。
+1. **M5 FastAPI 与 Read Aloud**：EchoLingo Provider Client 调用本机 Worker，把 Worker 的原始尺度结果与证据状态映射到 provider-neutral Speech Evaluation Result；实现第 8 节的 10–90 归一化与 Content 门控、Azure Compare Adapter，并让 Read Aloud 默认使用 EchoLingo。
+2. **M6 反馈与诊断**：单词级与流利度事件标注、重点建议摘要、Compare 开发者面板与结构化比较持久化。
 
 ## 下一道阶段门槛
 
-M3 已完成（2026-10-25），定稿候选 3.2c 满足第 7.2 节中由模型指标判断的门槛（句子 Accuracy 与 Fluency 至少 0.60、优于无学习基线、两个种子稳定）。第 7.2 节其余验收项（异常音频、非英语与对齐失败的安全处理，Azure Compare 仍可工作）在服务化与集成后验证，见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
+M4 已完成（2026-10-25）。3.2c 满足第 7.2 节中由模型指标判断的门槛；Worker 已安全处理异常音频与对齐失败。非英语只有字符覆盖率安全网，最终由 M5 的 Content 门控处理；Azure Compare 仍可工作也属于 M5。见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
 
 ## 运维与文档
 
