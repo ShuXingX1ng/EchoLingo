@@ -22,6 +22,7 @@ from services.task_types import (
     scoring_dimensions,
     scoring_section,
     task_types_scored_as,
+    task_types_where,
 )
 from tools.rubric import get_rubric
 from tools.weakness import make_weakness_tool
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 # Reading Task Types are scored deterministically and never enter the graph.
 SCORED_READING = task_types_scored_as("reading")
+# Task Types whose recordings get a Speech Evaluation Result; their response
+# is a recognition transcript, not text the learner wrote.
+SPEECH_EVALUATED = set(task_types_where(pronunciation_assessment=True))
 
 
 class FeedbackState(TypedDict):
@@ -105,25 +109,73 @@ def _find_divergences(primary: dict, judge: dict) -> list:
     ]
 
 
-def _format_speech_context(evaluation: Optional[dict]) -> str:
-    if not evaluation:
+_FLAGGED_WORD_STATUSES = ("mispronounced", "omitted", "inserted")
+
+_TRANSCRIPT_NOTE = (
+    "The transcript is automatic speech recognition of the recording and may contain "
+    "recognition errors: a difference between it and the stimulus is not evidence of a "
+    "pronunciation error."
+)
+
+
+def _format_word_judgments(evaluation: Optional[dict]) -> str:
+    """What the Speech Evaluation Result says about each word — the only
+    word-level pronunciation evidence the LLM may cite."""
+    words = (evaluation or {}).get("words") or []
+    level = ((evaluation or {}).get("evidenceStatus") or {}).get("word") or {}
+    if not words or level.get("status", "available") not in ("available", "partial"):
+        return (
+            "No word-level judgments are available for this recording. Do not name specific "
+            "words as mispronounced, omitted or inserted."
+        )
+    flagged = [w for w in words if w.get("status") in _FLAGGED_WORD_STATUSES]
+    not_judged = [w["word"] for w in words if w.get("status") == "not_scored"]
+    lines = ["Word-level judgments by the speech evaluator:"]
+    if flagged:
+        lines.append("Flagged words: " + ", ".join(f'"{w["word"]}" ({w["status"]})' for w in flagged))
+    else:
+        lines.append(f"All {len(words) - len(not_judged)} scored words were judged correct.")
+    if not_judged:
+        lines.append("Words not judged: " + ", ".join(f'"{w}"' for w in not_judged))
+    lines.append("Name a word as mispronounced, omitted or inserted only if it is flagged above.")
+    return "\n".join(lines)
+
+
+def _format_speech_context(task_type: str, evaluation: Optional[dict]) -> str:
+    """Speech evaluation evidence for Task Types whose recordings are evaluated.
+
+    The response of such a Task Type is a recognition transcript, so the LLM
+    is told which words the evaluator judged — and, without a result, that
+    there are none — instead of inferring mispronunciations from the
+    transcript's recognition errors.
+    """
+    if task_type not in SPEECH_EVALUATED and not evaluation:
         return ""
-    def score(key: str) -> str:
-        value = evaluation.get(key)
-        return "not available" if value is None else str(value)
-    scale = evaluation.get("scale", "0-100")
-    return (
-        f"\n\nSpeech evaluation scores ({scale} scale, a learning reference, not an official "
-        f"PTE score) — Pronunciation: {score('pronunciation')}, "
-        f"Oral fluency: {score('oralFluency')}, Content: {score('content')}"
-    )
+    parts = []
+    if evaluation:
+        def score(key: str) -> str:
+            value = evaluation.get(key)
+            return "not available" if value is None else str(value)
+        scale = evaluation.get("scale", "0-100")
+        parts.append(
+            f"Speech evaluation scores ({scale} scale, a learning reference, not an official "
+            f"PTE score) — Pronunciation: {score('pronunciation')}, "
+            f"Oral fluency: {score('oralFluency')}, Content: {score('content')}"
+        )
+    parts += [_format_word_judgments(evaluation), _TRANSCRIPT_NOTE]
+    return "\n\n" + "\n\n".join(parts)
 
 
 def _build_user_content(state: FeedbackState) -> str:
     speech_ctx = state.get("speech_context", "")
+    label = (
+        "Automatic speech recognition transcript of the candidate's recording"
+        if state["task_type"] in SPEECH_EVALUATED else "Candidate response"
+    )
+    response = f"{label}:\n{state['response'].strip()}{speech_ctx}"
     if state.get("stimulus"):
-        return f"Stimulus:\n{state['stimulus']}\n\nCandidate response:\n{state['response'].strip()}{speech_ctx}"
-    return f"Candidate response:\n{state['response'].strip()}{speech_ctx}"
+        return f"Stimulus:\n{state['stimulus']}\n\n{response}"
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +189,9 @@ async def retrieve_context_node(state: FeedbackState) -> dict:
 
 async def process_speech_evaluation_node(state: FeedbackState) -> dict:
     """Format the Speech Evaluation Result into a context string for the LLM nodes."""
-    return {"speech_context": _format_speech_context(state.get("speech_evaluation"))}
+    return {"speech_context": _format_speech_context(
+        state["task_type"], state.get("speech_evaluation")
+    )}
 
 
 async def call_primary_node(state: FeedbackState) -> dict:

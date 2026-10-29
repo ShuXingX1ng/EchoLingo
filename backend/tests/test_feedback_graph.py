@@ -103,7 +103,7 @@ _EVALUATION = {"provider": "azure", "overallScore": 85, "pronunciation": 82, "or
 
 @pytest.mark.anyio
 async def test_process_speech_evaluation_node_no_evaluation():
-    state = _base_state(speech_evaluation=None)
+    state = _base_state(task_type="describe_image", speech_evaluation=None)
     result = await fg.process_speech_evaluation_node(state)
     assert result == {"speech_context": ""}
 
@@ -128,6 +128,70 @@ async def test_speech_context_names_the_scale_and_unavailable_dimensions():
     assert "10-90 scale" in ctx and "not an official PTE score" in ctx
     assert "Pronunciation: not available" in ctx
     assert "Content: 74" in ctx
+
+
+def _words(*pairs) -> list[dict]:
+    return [{"word": word, "status": status} for word, status in pairs]
+
+
+def _evidence(word: str = "available") -> dict:
+    return {"sentence": {"status": "available"}, "word": {"status": word, "reason": None},
+            "phoneme": {"status": word, "reason": None}}
+
+
+def test_speech_context_says_every_scored_word_was_judged_correct():
+    evaluation = {"scale": "10-90", "pronunciation": 77, "oralFluency": 78, "content": 90,
+                  "words": _words(("heart", "correct"), ("failure", "correct"), ("now", "correct")),
+                  "evidenceStatus": _evidence()}
+    ctx = fg._format_speech_context("read_aloud", evaluation)
+    assert "All 3 scored words were judged correct" in ctx
+    assert "not evidence of a pronunciation error" in ctx
+
+
+def test_speech_context_lists_only_the_flagged_words():
+    evaluation = {"scale": "0-100", "pronunciation": 60, "oralFluency": 70, "content": 80,
+                  "words": _words(("the", "correct"), ("heart", "mispronounced"),
+                                  ("now", "omitted"), ("um", "inserted"), ("zyx", "not_scored")),
+                  "evidenceStatus": _evidence("partial")}
+    ctx = fg._format_speech_context("repeat_sentence", evaluation)
+    assert '"heart" (mispronounced)' in ctx
+    assert '"now" (omitted)' in ctx
+    assert '"um" (inserted)' in ctx
+    assert '"zyx"' in ctx and "not judged" in ctx
+    assert '"the"' not in ctx
+    assert "only if it is flagged above" in ctx
+
+
+@pytest.mark.parametrize("evaluation", [
+    {"scale": "10-90", "pronunciation": None, "oralFluency": None, "content": 47,
+     "words": [], "evidenceStatus": _evidence("degraded")},
+    {"scale": "10-90", "pronunciation": 70, "oralFluency": 70, "content": 70,
+     "words": _words(("fox", "correct")), "evidenceStatus": _evidence("unavailable")},
+    None,  # the evaluation failed; Feedback runs on the browser transcript
+])
+def test_speech_context_forbids_naming_words_without_word_judgments(evaluation):
+    ctx = fg._format_speech_context("read_aloud", evaluation)
+    assert "No word-level judgments are available" in ctx
+    assert "Do not name specific words" in ctx
+
+
+def test_speech_context_is_empty_for_task_types_without_speech_evaluation():
+    assert fg._format_speech_context("describe_image", None) == ""
+    assert fg._format_speech_context("write_essay", None) == ""
+
+
+def test_user_content_labels_a_recording_transcript_as_automatic():
+    state = _base_state(response="so of course i was picked on",
+                        speech_context=fg._format_speech_context("read_aloud", None))
+    user = fg._build_user_content(state)
+    assert "Candidate response" not in user
+    assert "Automatic speech recognition transcript" in user
+    assert "so of course i was picked on" in user
+
+
+def test_user_content_keeps_a_written_response_as_the_candidate_response():
+    state = _base_state(task_type="write_essay", stimulus="Prompt.", response="My essay.")
+    assert "Candidate response:\nMy essay." in fg._build_user_content(state)
 
 
 @pytest.mark.parametrize("evaluation, capped", [
