@@ -222,6 +222,9 @@ export type WordEvidence = {
   score: number | null
   status: WordStatus
   phonemes?: Array<{ phoneme: string; score: number }> | null
+  /** Seconds from the start of the recording; absent when the provider gives no timing. */
+  startSec?: number | null
+  endSec?: number | null
 }
 
 export type EvidenceLevel = {

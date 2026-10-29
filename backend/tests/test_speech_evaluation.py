@@ -293,8 +293,20 @@ def test_an_out_of_vocabulary_word_is_not_scored():
 
     assert result.words[-1].model_dump() == {
         "word": "zorblax", "score": None, "status": "not_scored", "phonemes": None,
+        "startSec": 1.1, "endSec": 1.5,
     }
     assert result.taskScoreEstimate is not None
+
+
+def test_echolingo_words_keep_where_the_worker_aligned_them():
+    result = from_echolingo(_worker_result())
+    assert [(w.word, w.startSec, w.endSec) for w in result.words] == [
+        ("cities", 0.1, 0.6), ("grow", 0.6, 0.9), ("when", 0.9, 1.1),
+    ]
+
+
+def test_azure_words_have_no_timing():
+    assert all(w.startSec is None and w.endSec is None for w in from_azure(AZURE_RESULT).words)
 
 
 def test_content_falls_with_the_corrected_coverage():

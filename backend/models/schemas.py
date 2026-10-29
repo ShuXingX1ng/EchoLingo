@@ -32,6 +32,10 @@ class WordEvidence(BaseModel):
     score: Optional[int] = None
     status: WordStatus = "correct"
     phonemes: Optional[List[PhonemeEvidence]] = None
+    # Seconds from the start of the recording, where the provider aligned the
+    # word; None when it gives no timing (Azure's SDK result does not).
+    startSec: Optional[float] = None
+    endSec: Optional[float] = None
 
 
 EvidenceState = Literal["available", "partial", "degraded", "unavailable"]

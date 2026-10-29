@@ -155,11 +155,13 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
 
     words = []
     for word in result["words"]:
+        timing = {"startSec": word.get("start_sec"), "endSec": word.get("end_sec")}
         if word["status"] != "scored":
-            words.append(WordEvidence(word=word["text"], status="not_scored"))
+            words.append(WordEvidence(word=word["text"], status="not_scored", **timing))
             continue
         words.append(WordEvidence(
             word=word["text"],
+            **timing,
             score=calibration.word_score(word["accuracy"]),
             status="mispronounced" if word["is_error"] else "correct",
             phonemes=[
