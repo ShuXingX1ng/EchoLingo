@@ -9,11 +9,9 @@ complete (`docs/m25-diagnostics-report.md`; the M2.5 candidate is
 `configs/training/a0-rebalance-acnorm-phones-layers.yaml`). M3 (candidate
 improvements; final candidate `configs/training/m3-aug-mask-audio.yaml`) and
 M4 (Checkpoint Bundle and the private Speech Evaluation Worker, see "M4"
-below) are complete. M5 (FastAPI and Read Aloud) is in progress: FastAPI
-calls the Worker, Read Aloud uses it by default, and the 10-90 normalization
-and passage scoring are in place (see "M5" below), and a real Azure Compare
-run and the full browser flow passed on 2026-10-29; issues that run found are
-tracked in the roadmap's M5 step.
+below) and M5 (FastAPI and Read Aloud: FastAPI calls the Worker, Read Aloud
+uses it by default, with the 10-90 normalization and passage scoring, see
+"M5" below) are complete. M6 (feedback and diagnostics) is in progress.
 
 ## Runtime environment
 

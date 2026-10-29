@@ -161,9 +161,9 @@ never depends on PyTorch, CUDA, MFA, or MLflow.
 - Training runs on a rented Linux GPU (ADR-0014); inference runs on the
   development Mac CPU (ADR-0015, median latency about 3 s).
 
-Roadmap status: M0–M4 are complete, M5 (FastAPI and Read Aloud integration) is
-in progress, and M6 (word/fluency annotations, Compare developer panel,
-comparison persistence) is planned. See `docs/SPEECH_EVALUATOR_ROADMAP.md`.
+Roadmap status: M0–M5 are complete (Read Aloud runs on the evaluator by
+default), and M6 (word/fluency annotations, Compare developer panel,
+comparison persistence) is in progress. See `docs/SPEECH_EVALUATOR_ROADMAP.md`.
 
 ## Agent Workflows
 

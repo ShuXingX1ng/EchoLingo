@@ -1,7 +1,7 @@
 # EchoLingo Read Aloud Speech Evaluator 路线图
 
-状态：M0–M4 已完成（M3 定稿候选 3.2c 导出为 Bundle `speech-evaluator-v0.1.0`，由本机私有 Worker 服务）；M5 FastAPI 与 Read Aloud 集成进行中，见第 18 节  
-更新日期：2026-10-26  
+状态：M0–M5 已完成（M3 定稿候选 3.2c 导出为 Bundle `speech-evaluator-v0.1.0`，由本机私有 Worker 服务，Read Aloud 默认使用）；M6 反馈与诊断进行中，见第 18 节  
+更新日期：2026-10-30  
 范围：第一代仅覆盖 PTE Academic Read Aloud  
 优先级：先完成 Speech Evaluator，再启动 PTE Task Calibrator 与 Native Speech Model
 
@@ -540,7 +540,7 @@ LLM 不得：
 
 ## 18. 当前进度与执行计划
 
-更新日期：2026-10-26。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
+更新日期：2026-10-30。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
 
 ### 18.1 里程碑状态
 
@@ -552,8 +552,8 @@ LLM 不得：
 | M2.5 A0 基线修复 | 完成（2026-10-23） | `speech/docs/m25-diagnostics-report.md` 第 12 节 |
 | M3 候选改进 | 完成（2026-10-25；采纳 3.1a 与 3.2c，未采纳分歧辅助头、成人微调、输入归一化与 A1；定稿候选 3.2c 在封存 Test 上评估一次） | 第 18.3 节步骤 4 |
 | M4 Bundle 与 Worker | 完成（2026-10-25；3.2c 种子 42 导出为 `speech-evaluator-v0.1.0`，Worker 在本机 Mac CPU 上运行，ADR-0015） | 第 18.3 节步骤 5 |
-| M5 FastAPI 与 Read Aloud | 进行中（2026-10-26） | 第 18.3 节步骤 6 |
-| M6 反馈与诊断 | 未开始 | — |
+| M5 FastAPI 与 Read Aloud | 完成（2026-10-30；真实 Azure Compare 与浏览器完整流程于 2026-10-29 跑通） | 第 18.3 节步骤 6 |
+| M6 反馈与诊断 | 进行中（2026-10-30） | 第 18.3 节步骤 7 |
 
 原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`、`2026-10-25-m3-a1/`（A1 Adapter 权重、训练历史与 `last.pt`、A1-Scorer 检查点、各层缓存的 `adapter.json`；Loquacious 与 Adapter 层缓存可按 README 重建，不备份）、`2026-10-25-m3-final-test/`（3.2c 封存 Test 结果）、`2026-10-25-m4/`（只在本机：Bundle `speech-evaluator-v0.1.0` 与 Worker 验收报告）、`2026-10-26-m5/`（只在本机：Validation 请求路径逐条结果、校准报告与归一化文件、段落校验）。
 
@@ -685,7 +685,7 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 - 分数仍是原始尺度。3.1a 起训练目标是专家平均，预测整体偏低，展示前需要 M5 的单调归一化。
 - 儿童句子级偏弱（Test 上 0.38）。
 
-**步骤 6：M5 FastAPI 与 Read Aloud** — 进行中（2026-10-26）
+**步骤 6：M5 FastAPI 与 Read Aloud** — 完成（2026-10-30）
 
 已确定（2026-10-25，ADR-0016）：10–90 用 Validation 上的线性校准；参数放在 backend，按 Bundle 区分；Content 用机会校正的字母覆盖率；Compare 由后端参数加前端开发开关触发；多句作答在 Worker 中按参考句切分评分。
 
@@ -724,6 +724,17 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 尚未完成：
 - rubric RAG 检索失败：`backend/.env` 的 `SUPABASE_DB_URL` 连接时报 `tenant/user ... not found`，Feedback 在没有 rubric 上下文的情况下生成（运维问题，需在 Supabase 后台确认）；
 - 已知限制：EchoLingo 不检测漏读、多读和重复，这部分属于 M6；Content 是策略而非估计，ASR 对口音的识别错误也会拉低 Content。
+
+**步骤 7：M6 反馈与诊断** — 进行中（2026-10-30）
+
+顺序（2026-10-30 确定）：
+1. 契约带上单词时间：`WordEvidence` 增加 `startSec`/`endSec`。— 完成（2026-10-30）：EchoLingo 单词带 Worker 对齐的起止时间（含未评分词）；Azure 的 SDK 单词结果没有时间偏移，保持为空（要拿到需解析原始 JSON，M6 的流利度事件只依赖 Worker）。backend `pytest` 420 passed、`ruff` 通过，前端 typecheck、lint、单元测试 190 passed。
+2. 流利度事件：Worker 由对齐结果给出句中长停顿与异常拖长的单词，阈值只在 Validation 上选，用插入已知静音的合成基准报告检测率与误报率。
+3. 漏读、多读与重复：只在多个信号同时成立时判定（强制对齐时长接近下限且单词分很低且自由 ASR 未听到；对齐间隙中有语音能量且 ASR 听到额外的词），用对 Validation 录音删词、复制片段、插入别的词的合成基准评估；精确率优先，某一类达不到 0.9 就不上线并记为限制。只改 Worker 后处理，Bundle 不变。
+4. 确定性解释层（第 12 节）与重点练习摘要：FastAPI 把结果转成可核查的事实与少量优先练习项，Feedback LLM 只组织语言。
+5. 前端标注：单词状态分色、流利度事件就地标出、点击单词看分数与问题类别、页面顶部显示摘要。
+6. Compare 开发者面板；比较结果仍随练习记录保存，但只保留第 13 节的结构化字段。
+7. 整体验证与文档。
 
 ### 18.4 实验纪律
 

@@ -1,6 +1,6 @@
 # EchoLingo Roadmap
 
-更新日期：2026-10-29
+更新日期：2026-10-30
 
 本文件只描述阶段、优先级和范围，不维护逐文件实施清单。详细 Speech Evaluator 任务与验收标准只保存在 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md)。
 
@@ -12,12 +12,11 @@ EchoLingo 已完成 PTE 产品 MVP、前后端分离、反馈 Agent/RAG、Exempl
 
 ## 当前优先级
 
-1. **完成 M5 FastAPI 与 Read Aloud**：真实 Azure Compare 与浏览器完整流程均已跑通，发现的 Feedback 问题已修复；剩下 rubric RAG 的数据库连接（`SUPABASE_DB_URL`）与 M5 收尾。
-2. **M6 反馈与诊断**：单词级与流利度事件标注、重点建议摘要、Compare 开发者面板与结构化比较持久化。
+1. **M6 反馈与诊断**：单词级与流利度事件标注、重点建议摘要、Compare 开发者面板与结构化比较持久化。
 
 ## 下一道阶段门槛
 
-M5 完成门槛：第 7.2 节其余验收中，非英语与读错段落由 M5 的机会校正 Content 门控处理（已实现）；Azure Compare 已在真实凭据下确认可用，浏览器中的完整流程已跑通（均为 2026-10-29）；该次运行发现的问题已修复。见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
+M5 已完成（2026-10-30）：非英语与读错段落由机会校正 Content 门控处理，Azure Compare 在真实凭据下可用，浏览器完整流程已跑通，该次运行发现的 Feedback 问题已修复。M6 的门槛是第 15 节第一代完成定义中的完整单词与流利度标注和 Compare 开发者面板。见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
 
 ## 运维与文档
 
