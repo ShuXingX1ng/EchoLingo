@@ -719,8 +719,11 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 
 - 真实 Azure 的 Compare 运行：2026-10-26 第一次调用时 Azure 返回 401（`backend/.env` 的 key 失效），验证了 Partial 路径：EchoLingo 主结果正常，`baselineError` 记录了原因。2026-10-29 更新凭据后，经 `evaluate_spoken_response(..., "compare")` 用同样两段成人拼接段落（39 / 45 词，19.4 / 22.2 秒）重跑：两个 Provider 都成功；连续识别覆盖了全部参考词（39/39、45/45，无漏读）；EchoLingo 结果与 10-26 基本一致（P 77 / 78、F 78 / 77、C 90、总分 80 / 80；第一段 F 比 10-26 高 1 分），Azure 为 P 99 / 98、F 92 / 99、Completeness 100；折算到 0–100 位置的差值为发音 −15.2 / −13.0、流利度 −7.0 / −15.2、Content 0，单词判断无分歧；延迟 EchoLingo 8.1 / 4.4 秒（第一次含冷启动），Azure 8.1 / 9.4 秒。Azure 对这两段明显比专家标签宽松（专家换算 P 76 / 73、F 78 / 76）。
 
+- 浏览器中完整的 Read Aloud 流程（2026-10-29）：Playwright 驱动 Chromium，以上面第一段成人拼接段落（39 词，19.4 秒）的 WAV 作为假麦克风，Stimulus 接口固定为该段原文（因此未覆盖 AI 出题）；录音、16 kHz WAV 编码、`POST /api/pte/spoken-feedback`、本机 Worker 与 LLM Feedback 均为真实调用。返回 200，页面显示参考分 80、P 77、F 78、C 90，三层证据均为 `available`，39 个词全部 `correct`，与后端直接调用的结果相同；Feedback、优缺点、建议与教练建议都正常生成。已修复（2026-10-29）：缺少的 i18n 键 `practiceTask.read-aloud.pronunciation`（Feedback 卡片曾直接显示键名）；`duration_outside_training_range` 在任一切出的句子超出训练时长范围（1.59–20.4 秒，过长或过短）时触发，提示文案原先只说"更长"，现改为 `speechEvaluation.notice.durationOutsideTrainingRange`，说明录音或其中某句过长或过短。其余问题见下。
+
 尚未完成：
-- 浏览器中完整的 Read Aloud 流程（需要 LLM）；
+- Feedback 与评估结果矛盾：路由把 `recognizedText`（Worker 自由 ASR 的贪心转写，"heart failure" 识别成 "hard failure"、"now" 识别成 "male"）作为 "Candidate response" 交给 LLM，而 `_format_speech_context` 只给三个维度分、不给单词判断；LLM 因此把 ASR 识别错误当成误读，与 EchoLingo 判定全部 39 个词正确相矛盾。LLM 需要以 Speech Evaluation Result 的单词证据为准，不能把转写当作发音证据；
+- rubric RAG 检索失败：`backend/.env` 的 `SUPABASE_DB_URL` 连接时报 `tenant/user ... not found`，Feedback 在没有 rubric 上下文的情况下生成（运维问题，需在 Supabase 后台确认）；
 - 已知限制：EchoLingo 不检测漏读、多读和重复，这部分属于 M6；Content 是策略而非估计，ASR 对口音的识别错误也会拉低 Content。
 
 ### 18.4 实验纪律

@@ -12,7 +12,8 @@ M4 (Checkpoint Bundle and the private Speech Evaluation Worker, see "M4"
 below) are complete. M5 (FastAPI and Read Aloud) is in progress: FastAPI
 calls the Worker, Read Aloud uses it by default, and the 10-90 normalization
 and passage scoring are in place (see "M5" below), and a real Azure Compare
-run passed on 2026-10-29; the full browser flow is still to be verified.
+run and the full browser flow passed on 2026-10-29; issues that run found are
+tracked in the roadmap's M5 step.
 
 ## Runtime environment
 

@@ -95,7 +95,7 @@ export default function SpeechEvaluationDetails({ evaluation }: SpeechEvaluation
         </p>
       )}
       {evaluation.warnings?.includes("duration_outside_training_range") && (
-        <p className="text-xs text-[var(--text-secondary)]">{t("speechEvaluation.notice.longRecording")}</p>
+        <p className="text-xs text-[var(--text-secondary)]">{t("speechEvaluation.notice.durationOutsideTrainingRange")}</p>
       )}
 
       {/* Word-level Analysis */}
