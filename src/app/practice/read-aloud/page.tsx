@@ -146,6 +146,7 @@ export default function ReadAloudPage() {
             {transcript && transcript !== "[transcript not captured]" && (
               <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">{t("practiceTask.read-aloud.yourReading")}</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-2">{t("speechEvaluation.notice.transcript")}</p>
                 <p className="text-sm leading-7 text-[var(--text-secondary)] italic">{transcript}</p>
               </div>
             )}

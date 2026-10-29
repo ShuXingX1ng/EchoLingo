@@ -49,6 +49,10 @@ export default function TaskFeedbackDisplay({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">
             {responseLabel ?? t("taskFeedback.yourResponse")}
           </p>
+          {/* A recording's response is a recognition transcript, not evidence of pronunciation. */}
+          {speechEvaluation && (
+            <p className="text-xs text-[var(--text-secondary)] mb-2">{t("speechEvaluation.notice.transcript")}</p>
+          )}
           <p className="text-sm leading-7 text-slate-600 dark:text-slate-300 italic">{responseText}</p>
         </div>
       )}
