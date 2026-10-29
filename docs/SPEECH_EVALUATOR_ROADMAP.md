@@ -717,8 +717,9 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 
 - Azure 适配改为连续识别（`backend/services/azure_speech.py`）：原来的 `recognize_once` 在第一次停顿处就结束，长段落的 Compare 基线只覆盖开头。现在每段话分别评估后合并：只有一段时保留 Azure 自己的分数（Repeat Sentence 不变）；多段时总分与 Accuracy 按评估词数加权，Fluency 按时长加权，Completeness 为参考词中未漏读的比例。合并逻辑有单元测试。
 
+- 真实 Azure 的 Compare 运行：2026-10-26 第一次调用时 Azure 返回 401（`backend/.env` 的 key 失效），验证了 Partial 路径：EchoLingo 主结果正常，`baselineError` 记录了原因。2026-10-29 更新凭据后，经 `evaluate_spoken_response(..., "compare")` 用同样两段成人拼接段落（39 / 45 词，19.4 / 22.2 秒）重跑：两个 Provider 都成功；连续识别覆盖了全部参考词（39/39、45/45，无漏读）；EchoLingo 结果与 10-26 基本一致（P 77 / 78、F 78 / 77、C 90、总分 80 / 80；第一段 F 比 10-26 高 1 分），Azure 为 P 99 / 98、F 92 / 99、Completeness 100；折算到 0–100 位置的差值为发音 −15.2 / −13.0、流利度 −7.0 / −15.2、Content 0，单词判断无分歧；延迟 EchoLingo 8.1 / 4.4 秒（第一次含冷启动），Azure 8.1 / 9.4 秒。Azure 对这两段明显比专家标签宽松（专家换算 P 76 / 73、F 78 / 76）。
+
 尚未完成：
-- 真实 Azure 的 Compare 运行：2026-10-26 用两段拼接段落调用时，Azure 返回 401 认证错误（`backend/.env` 中 `eastasia` 的 key 已失效或与 region 不符）。这次调用验证了 Partial 路径：EchoLingo 主结果正常，`baselineError` 记录了原因。连续识别的真实效果需在凭据更新后再验证；
 - 浏览器中完整的 Read Aloud 流程（需要 LLM）；
 - 已知限制：EchoLingo 不检测漏读、多读和重复，这部分属于 M6；Content 是策略而非估计，ASR 对口音的识别错误也会拉低 Content。
 

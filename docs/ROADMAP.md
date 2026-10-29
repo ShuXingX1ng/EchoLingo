@@ -1,6 +1,6 @@
 # EchoLingo Roadmap
 
-更新日期：2026-10-25
+更新日期：2026-10-29
 
 本文件只描述阶段、优先级和范围，不维护逐文件实施清单。详细 Speech Evaluator 任务与验收标准只保存在 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md)。
 
@@ -8,16 +8,16 @@
 
 EchoLingo 已完成 PTE 产品 MVP、前后端分离、反馈 Agent/RAG、Exemplar 数据管线、学习辅助功能和 Study Assistant。当前阶段是 **Read Aloud Speech Evaluator**。
 
-运行时仍由 Azure Pronunciation Assessment 服务 Read Aloud 与 Repeat Sentence。自研评估器已完成 M0（环境与骨架）、M1（SpeechOcean762 数据管线）和 M2（A0 冻结编码器基线）；句子级达到验收门槛，单词/音素级仍有已标记缺口。2026-10-23 已在租用 GPU 上重建数据并复现 A0，并完成 M2.5 基线修复：封存 Test 上句子 Accuracy Pearson 0.71、Fluency 0.79，单词错误检测 Macro F1 0.63（超过无学习基线 0.48）。2026-10-25 完成 M3 候选改进：定稿候选 3.2c（专家平均目标、特征 Mask、离线音频增强）在封存 Test 上单词错误检测 Macro F1 0.68/0.67，单词与音素级全部提升，句子级持平；Loquacious CTC Adapter（A1）改善了识别 WER，但没有可确认的评分收益，未采纳。M4 同日完成：3.2c（种子 42）导出为不可变 Checkpoint Bundle `speech-evaluator-v0.1.0`，私有 Speech Evaluation Worker 在本机 Mac CPU 上运行（ADR-0015）。Worker 在 Validation 上复现了 Bundle 记录的指标；完整请求路径句子级持平，单词错误检测 AP 约低 0.03；中位延迟 3.0 秒。Worker 尚未接入 FastAPI；在第 7.2 节其余验收通过前，不切换默认提供方。
+运行时 Read Aloud 默认由 EchoLingo Speech Evaluator（本机私有 Worker + FastAPI 的 10–90 Provisional Score Normalization）评估，Worker 不可用时明确报告失败，不回退 Azure；Repeat Sentence 仍用 Azure Pronunciation Assessment，Azure 另作为 Read Aloud 显式 `compare` 模式的基线。自研评估器已完成 M0（环境与骨架）、M1（SpeechOcean762 数据管线）和 M2（A0 冻结编码器基线）；句子级达到验收门槛，单词/音素级仍有已标记缺口。2026-10-23 已在租用 GPU 上重建数据并复现 A0，并完成 M2.5 基线修复：封存 Test 上句子 Accuracy Pearson 0.71、Fluency 0.79，单词错误检测 Macro F1 0.63（超过无学习基线 0.48）。2026-10-25 完成 M3 候选改进：定稿候选 3.2c（专家平均目标、特征 Mask、离线音频增强）在封存 Test 上单词错误检测 Macro F1 0.68/0.67，单词与音素级全部提升，句子级持平；Loquacious CTC Adapter（A1）改善了识别 WER，但没有可确认的评分收益，未采纳。M4 同日完成：3.2c（种子 42）导出为不可变 Checkpoint Bundle `speech-evaluator-v0.1.0`，私有 Speech Evaluation Worker 在本机 Mac CPU 上运行（ADR-0015）。Worker 在 Validation 上复现了 Bundle 记录的指标；完整请求路径句子级持平，单词错误检测 AP 约低 0.03；中位延迟 3.0 秒。M5 自 2026-10-26 进行中：FastAPI 已通过 provider-neutral 契约调用 Worker，Read Aloud 默认使用 EchoLingo，10–90 归一化、Content 门控、多句段落按句评分与 Azure Compare Adapter 已实现，2026-10-29 用真实 Azure 跑通了 Compare；浏览器中完整的 Read Aloud 流程尚待验证。
 
 ## 当前优先级
 
-1. **M5 FastAPI 与 Read Aloud**：EchoLingo Provider Client 调用本机 Worker，把 Worker 的原始尺度结果与证据状态映射到 provider-neutral Speech Evaluation Result；实现第 8 节的 10–90 归一化与 Content 门控、Azure Compare Adapter，并让 Read Aloud 默认使用 EchoLingo。
+1. **完成 M5 FastAPI 与 Read Aloud**：在浏览器中走通完整 Read Aloud 流程（真实 Azure Compare 已于 2026-10-29 验证）。
 2. **M6 反馈与诊断**：单词级与流利度事件标注、重点建议摘要、Compare 开发者面板与结构化比较持久化。
 
 ## 下一道阶段门槛
 
-M4 已完成（2026-10-25）。3.2c 满足第 7.2 节中由模型指标判断的门槛；Worker 已安全处理异常音频与对齐失败。非英语只有字符覆盖率安全网，最终由 M5 的 Content 门控处理；Azure Compare 仍可工作也属于 M5。见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
+M5 完成门槛：第 7.2 节其余验收中，非英语与读错段落由 M5 的机会校正 Content 门控处理（已实现）；Azure Compare 已在真实凭据下确认可用（2026-10-29）；剩下浏览器中的完整流程。见 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 7 节。具体清单不在本文件复制。
 
 ## 运维与文档
 

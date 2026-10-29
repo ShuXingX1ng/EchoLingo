@@ -1,7 +1,7 @@
 # EchoLingo Speech Evaluator (`speech/`)
 
 Read Aloud Speech Evaluator package. See `docs/SPEECH_EVALUATOR_ROADMAP.md`
-and ADR 0011-0013 for the full plan. Current status: M0 (environment
+and ADR 0011-0016 for the full plan. Current status: M0 (environment
 skeleton), M1 (SpeechOcean762 data pipeline), and M2 (A0 frozen-encoder
 baseline -- see `docs/m2-acceptance-report.md`) are complete, A0 was
 reproduced on a rented GPU on 2026-10-23, and M2.5 baseline repair is
@@ -9,7 +9,10 @@ complete (`docs/m25-diagnostics-report.md`; the M2.5 candidate is
 `configs/training/a0-rebalance-acnorm-phones-layers.yaml`). M3 (candidate
 improvements; final candidate `configs/training/m3-aug-mask-audio.yaml`) and
 M4 (Checkpoint Bundle and the private Speech Evaluation Worker, see "M4"
-below) are complete. FastAPI integration (M5) is not done yet.
+below) are complete. M5 (FastAPI and Read Aloud) is in progress: FastAPI
+calls the Worker, Read Aloud uses it by default, and the 10-90 normalization
+and passage scoring are in place (see "M5" below), and a real Azure Compare
+run passed on 2026-10-29; the full browser flow is still to be verified.
 
 ## Runtime environment
 
