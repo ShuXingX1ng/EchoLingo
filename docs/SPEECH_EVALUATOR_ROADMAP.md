@@ -540,7 +540,7 @@ LLM 不得：
 
 ## 18. 当前进度与执行计划
 
-更新日期：2026-10-30。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
+更新日期：2026-10-31。本节是当前唯一的执行清单；完成一项就更新状态，不在其他文档复制。
 
 ### 18.1 里程碑状态
 
@@ -553,7 +553,7 @@ LLM 不得：
 | M3 候选改进 | 完成（2026-10-25；采纳 3.1a 与 3.2c，未采纳分歧辅助头、成人微调、输入归一化与 A1；定稿候选 3.2c 在封存 Test 上评估一次） | 第 18.3 节步骤 4 |
 | M4 Bundle 与 Worker | 完成（2026-10-25；3.2c 种子 42 导出为 `speech-evaluator-v0.1.0`，Worker 在本机 Mac CPU 上运行，ADR-0015） | 第 18.3 节步骤 5 |
 | M5 FastAPI 与 Read Aloud | 完成（2026-10-30；真实 Azure Compare 与浏览器完整流程于 2026-10-29 跑通） | 第 18.3 节步骤 6 |
-| M6 反馈与诊断 | 进行中（2026-10-30） | 第 18.3 节步骤 7 |
+| M6 反馈与诊断 | 完成（2026-10-31；合成段落经真实 Worker、Azure Compare 与 LLM 在浏览器中跑通，流利度事件改为需自由 ASR 确认） | 第 18.3 节步骤 7 |
 
 原训练机上的 M0–M2 产物已丢失。2026-10-23 在 Featurize RTX 3090 实例上按 `speech/README.md` 从零重建并复现了 A0（验收报告第 6 节），manifest、两个种子的 MLflow 记录、检查点和日志已备份到实例的 `~/work/backup/2026-10-23-a0-repro` 与本机 `~/echolingo-backup/`。原始音频和特征缓存不备份，需要时按 README 重建。MFA 输出自 2026-10-24 起备份：`2026-10-24-m3-mfa/` 下的 `mfa-output.tar.gz`（5000 个 TextGrid）与对齐时的 `manifest.jsonl`（含专家原始分），同时存于 Featurize `~/work/backup/` 与本机 `~/echolingo-backup/`；新实例按 README 恢复即可跳过 `aligner` 环境与对齐。M3 各步的结果、检查点与 mlruns 在同两处的 `2026-10-24-m3-step31a/`、`2026-10-24-m3-step31b/`、`2026-10-24-m3-step32/`（含增强副本的 `effects.json` 与 `variant.json`；副本本身可按种子重建，不备份）、`2026-10-24-m3-step32c/`、`2026-10-24-m3-step4/`、`2026-10-24-m3-norm/`、`2026-10-25-m3-a1/`（A1 Adapter 权重、训练历史与 `last.pt`、A1-Scorer 检查点、各层缓存的 `adapter.json`；Loquacious 与 Adapter 层缓存可按 README 重建，不备份）、`2026-10-25-m3-final-test/`（3.2c 封存 Test 结果）、`2026-10-25-m4/`（只在本机：Bundle `speech-evaluator-v0.1.0` 与 Worker 验收报告）、`2026-10-26-m5/`（只在本机：Validation 请求路径逐条结果、校准报告与归一化文件、段落校验）。
 
@@ -725,16 +725,27 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 - rubric RAG 检索失败：`backend/.env` 的 `SUPABASE_DB_URL` 连接时报 `tenant/user ... not found`，Feedback 在没有 rubric 上下文的情况下生成（运维问题，需在 Supabase 后台确认）；
 - 已知限制：EchoLingo 不检测漏读、多读和重复，这部分属于 M6；Content 是策略而非估计，ASR 对口音的识别错误也会拉低 Content。
 
-**步骤 7：M6 反馈与诊断** — 进行中（2026-10-30）
+**步骤 7：M6 反馈与诊断** — 完成（2026-10-31）
 
 顺序（2026-10-30 确定）：
 1. 契约带上单词时间：`WordEvidence` 增加 `startSec`/`endSec`。— 完成（2026-10-30）：EchoLingo 单词带 Worker 对齐的起止时间（含未评分词）；Azure 的 SDK 单词结果没有时间偏移，保持为空（要拿到需解析原始 JSON，M6 的流利度事件只依赖 Worker）。backend `pytest` 420 passed、`ruff` 通过，前端 typecheck、lint、单元测试 190 passed。
-2. 流利度事件：Worker 由对齐结果给出句中长停顿与异常拖长的单词，阈值只在 Validation 上选，用插入已知静音的合成基准报告检测率与误报率。— 完成（2026-10-30）：`worker/fluency.py` 从对齐的单词区间给出 `pause`（两词间隙；句内 ≥ 0.4 秒，句间 ≥ 1.5 秒）与 `slow_word`（≥ 0.5 秒且每个音素 ≥ 0.25 秒），录音首尾静音不算；结果的 `fluency_events` 经 FastAPI 成为 `fluencyEvents`。阈值由 `evaluation/fluency_events.py` 在 Validation 260 条上选定（规则：流利读者——官方 Fluency ≥ 9，58 条——出现事件的比例不超过 5% 的最小候选）：句内停顿 0.4 秒时流利读者 1.7%、不流利读者（≤ 6，57 条）42%，对插入的 0.5 / 0.8 / 1.2 秒停顿（录音自身的底噪）检出 91% / 94% / 97%；拖长词流利读者 3.4%、不流利读者 65%，无合成基准。260 条全部对齐成功。句间阈值 1.5 秒没有基准（SpeechOcean 每条只有一句），是保守的先验。speech `pytest` 与 `ruff` 通过，backend 契约测试通过，前端 `tsc` 通过。行数据与报告在 `~/echolingo-speech/reports/m6/`，备份于本机 `~/echolingo-backup/2026-10-30-m6/`。本机运行的 Worker 需重启才会给出事件。
+2. 流利度事件：Worker 由对齐结果给出句中长停顿与异常拖长的单词，阈值只在 Validation 上选，用插入已知静音的合成基准报告检测率与误报率。— 完成（2026-10-30）：`worker/fluency.py` 从对齐的单词区间给出 `pause`（两词间隙；句内 ≥ 0.4 秒，句间 ≥ 1.5 秒）与 `slow_word`（≥ 0.5 秒且每个音素 ≥ 0.25 秒），录音首尾静音不算；结果的 `fluency_events` 经 FastAPI 成为 `fluencyEvents`。阈值由 `evaluation/fluency_events.py` 在 Validation 260 条上选定（规则：流利读者——官方 Fluency ≥ 9，58 条——出现事件的比例不超过 5% 的最小候选）：句内停顿 0.4 秒时流利读者 1.7%、不流利读者（≤ 6，57 条）42%，对插入的 0.5 / 0.8 / 1.2 秒停顿（录音自身的底噪）检出 91% / 94% / 97%；拖长词流利读者 3.4%、不流利读者 65%，无合成基准。260 条全部对齐成功。句间阈值 1.5 秒没有基准（SpeechOcean 每条只有一句），是保守的先验。speech `pytest` 与 `ruff` 通过，backend 契约测试通过，前端 `tsc` 通过。行数据与报告在 `~/echolingo-speech/reports/m6/`，备份于本机 `~/echolingo-backup/2026-10-30-m6/`。本机运行的 Worker 需重启才会给出事件。2026-10-31 起事件还需自由 ASR 确认，见第 7 项。
 3. 漏读、多读与重复：只在多个信号同时成立时判定（强制对齐时长接近下限且单词分很低且自由 ASR 未听到；对齐间隙中有语音能量且 ASR 听到额外的词），用对 Validation 录音删词、复制片段、插入别的词的合成基准评估；精确率优先，某一类达不到 0.9 就不上线并记为限制。只改 Worker 后处理，Bundle 不变。— 完成（2026-10-30）：只有多读上线。`worker/reading_errors.py` 给自由 ASR 的词加上 CTC 帧时间，按字母相似度与参考文本顺序匹配，只保留可信匹配作锚点，只判断相邻锚点之间：两侧都听到而中间没听到、且被对齐压缩的参考词为漏读；两个相邻参考词之间多听到的词为多读（像其中一个则为重复）；ASR 把一个词拆成两段（"how ever"）不算；中间听到的是别的词时不判断。原计划的两个信号数据不支持：被压缩的漏读词评分模型照样给高分（中位 9.3，其余词 9.7），插入的语音也几乎全被对齐覆盖，不落在间隙里，所以都没有采用。合成基准 `evaluation/reading_errors.py`：Validation 260 条各做删词、重复、插入（取前面录音中读得好的至少三个音素的词，多为同一说话人）三个版本；说话人交替分两半，在调参半选每类召回最高且精确率 ≥ 0.9 的阈值，在留出半（6 位说话人、120 条）只测一次；精确率从严计算，未改动的录音里报出的也算误报。留出结果：多读精确率 0.94（16 次报告中 15 次正确，Wilson 95% 下限 0.72），召回 0.13，252 条未改动录音无一误报，上线（匹配相似度 0.7，额外词至少 0.3 秒）；漏读精确率 0.75（召回 0.31），误报多为错到相邻词，或被插入、重复挤压的词，不上线；重复 0.81（召回 0.19），不上线。限制：召回低，主要因为自由 ASR 在学习者（多为儿童）语音上常听错漏读处附近的词，此时按设计不判断；合成插入都是较长的实词，短的插入词（"the"）没有测到，短于 0.3 秒的也不会报。契约：Worker `reading_errors` → FastAPI `readingErrors`（`kind`、`wordIndex`、`startSec`、`endSec`、`heard`），漏读词在 `words` 中标为 `omitted`、不给分（目前不上线）。Bundle 不变。speech `pytest` 292 passed、2 skipped（GPU），backend `pytest` 422 passed，两侧 `ruff` 通过，前端 typecheck、lint（0 错误）与单元测试 190 passed。行数据与报告在 `~/echolingo-speech/reports/m6/`，备份于本机 `~/echolingo-backup/2026-10-30-m6/`。
 4. 确定性解释层（第 12 节）与重点练习摘要：FastAPI 把结果转成可核查的事实与少量优先练习项，Feedback LLM 只组织语言。— 完成（2026-10-30）：`backend/services/speech_explanation.py` 把 Speech Evaluation Result 转成带位置的事实（读错的词、漏读、多读、重复、停顿、拖长的词，按阅读顺序），再按固定规则排出 `practiceSummary`：漏读、多读、重复排最前；读错与流利度问题之间，Pronunciation 和 Oral Fluency 哪个分低哪个排前（相同或缺分时读错在前）；最多 3 项，每项按最差（分最低、停顿最长）选至多 5 个词、按阅读顺序列出，`count` 为总数。`evaluate_spoken_response` 给主结果填入摘要，随 Feedback 存进练习记录。Feedback LLM 的语音上下文改由这层生成（取代 `_format_word_judgments`），列出全部事实、优先练习顺序与第 12 节的四条禁令，并说明评估器不会检出所有漏读、多读、重复，不能据此说没有；Azure 不报流利度事件，也明确告知。只是后端与契约（前端类型 `PracticeItem`），页面展示在第 5 项。用 3 条低流利度 Validation 录音经本机 Worker 核对：未读出参考文本的录音无摘要且禁止点名单词，另两条的摘要与排序符合规则。backend `pytest` 430 passed、`ruff` 通过，前端 typecheck、lint（0 错误）与单元测试 190 passed。LLM 自己给的分数见第 5 项。
 5. 前端标注：单词状态分色、流利度事件就地标出、点击单词看分数与问题类别、页面顶部显示摘要。— 完成（2026-10-30）：`SpeechEvaluationDetails` 改为直接显示标注后的原文（不再折叠）：读错的词红底下划线，漏读删除线，多读以 `+词` 插在对应位置，重复以 ↻ 标出，未评分的词灰色斜体，停顿以 `‖ 秒数` 标在两词之间，拖长的词虚线下划线；点击单词显示单词分与问题（状态、重复、拖长、其后的停顿或多读），不展示音素；顶部“优先练习”直接显示 FastAPI 的 `practiceSummary`（不经 LLM，旧记录没有就不显示）。标注模型在 `src/lib/speech-annotation.ts`。原来按分档给每个词上色、“需要练习的单词”列表与对应的分档函数和 i18n 键已删除。练习记录页（`TaskFeedbackDisplay`）在有 EchoLingo 结果时不再显示 LLM 自己给的 `scoreCard` 与 0–100 维度分（第 12 节）；Azure 结果照旧。统计页与历史弱项仍按 LLM 的维度分计算，未改。用真实 Worker 结果（加一个多读）在浏览器里查看并点击单词核对。前端 typecheck、lint（0 错误）、单元测试 201 passed。
 6. Compare 开发者面板；比较结果仍随练习记录保存，但只保留第 13 节的结构化字段。— 完成（2026-10-30）：`SpeechComparisonPanel` 在开发开关 `NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE=1` 打开且有比较结果时，显示在 Read Aloud 页与练习记录页：双方三个维度分（各自量程）与差值、双方识别文本、判断不一致的单词、EchoLingo 的对齐状态与 Checkpoint、双方延迟与失败、时间与录音哈希前缀。保存前（`usePracticeTaskRun` 调用 `feedbackForRecord`，`src/lib/speech-comparison.ts`）把 Azure 基线裁剪为分数、量程、证据状态、Checkpoint 与 warnings，不再保存它的逐词结果（含音素）、识别文本与摘要；差值、单词分歧、延迟、失败、时间与哈希照旧。当次结果页仍看到完整比较，记录里看到“未保存”。契约类型不变，旧记录照常读取；已保存的旧记录里的完整基线没有回溯清理。前端 typecheck、lint（0 错误）、单元测试 210 passed。
-7. 整体验证与文档。
+7. 整体验证与文档。— 完成（2026-10-31）：
+   - 整体检查：speech `pytest` 292 passed / 2 skipped、`ruff` 通过；backend `pytest` 430 passed、`ruff` 通过；前端 lint（0 错误）、typecheck、单元测试 210 passed、build、E2E 51 passed（付费服务均为 mock）。
+   - 浏览器端到端（真实 Worker、Azure Compare 与 LLM，Stimulus 固定为原文）：取 M5 用过的成人拼接段落（39 词，原本全部判为正确、无任何事件），在 "strokes" 后插入 1 秒底噪、把 "now" 用相位声码器拉长 2.2 倍、在 "just" 后插入同一录音里的 "contradiction"，以 Playwright 的假麦克风播放。标注、优先练习摘要、单词详情、Compare 面板正常；页面不显示 LLM 的分数；保存的记录里 Azure 基线没有逐词结果与识别文本，记录页显示"未保存"。
+   - 这次运行发现流利度事件的误报，并已修复：埋入的停顿与拖长都检出，但另有三处误报——录音开头 "so" 被对齐到 70 毫秒的起始杂音，其后报 0.6 秒停顿；多读的词被对齐并入 "want"，"want my" 又被挤进 "money"，于是 "want" 后报停顿、"money" 报拖长 1.2 秒。LLM 照这些事实建议练习，等于给出错误的练习指导。原因是强制对齐总要把每个参考词放进录音，偏离原文处的间隙与长词不是朗读者真正的停顿或拖长。修复只改 Worker 后处理（Bundle 不变）：`worker/fluency.py` 的 `confirmed` 只保留自由 ASR 能印证的事件——停顿中 ASR 不能听到任何词；拖长的词若被 ASR 听到，须落在它的对齐区间内，区间内不能听到别的参考词，多出的字母不超过 4 个。对齐漂移但 ASR 在间隙中没听到任何词时，停顿保留（位置可信，时间不精确）。
+   - 确认规则的基准 `evaluation/fluency_confirmation.py`（Validation 260 条）：误报用多读基准的删词、重复、插入拷贝计数（这些改动不会制造停顿或拖长，拷贝里新出现的事件都是误报）；保留率用两份新拷贝衡量——与原基准同种子插入的停顿，以及用相位声码器拉长 2.5 倍的一个词。按说话人交替分半，事先定的规则：在调参半保留至少 90% 的埋入停顿（≥ 0.5 秒）与拖长、误报最少者入选，再在留出半只测一次。第一版规则同时要求停顿两侧的词被 ASR 听到的位置与对齐一致，只保留 81% 的埋入停顿，未达标；被去掉的多是对齐已漂移、但停顿位置仍正确的录音，所以改为只检查间隙中听到的内容（仍只用调参半选择）。留出结果（6 位说话人、120 条）：埋入错误附近新增的误报 118 → 41（350 份拷贝），埋入停顿保留 94%、拖长保留 89%；成人 49 → 21、90%、85%；流利朗读者出现事件的比例不变（5.9%）。重启 Worker 后，同一段埋入错误的录音直接请求只报出埋入的停顿、拖长与多读，浏览器重跑只报出停顿与拖长（多读未报：ASR 把相邻的 "want" 听成 "ont"，按设计不判断），LLM 的弱项与建议只针对这两处。speech `pytest` 299 passed / 2 skipped、`ruff` 通过。行数据与报告在 `~/echolingo-speech/reports/m6/`，备份于本机 `~/echolingo-backup/2026-10-30-m6/`。
+   - 已知限制：
+     - 整词替换（把 "terms" 换成另一个词的录音）没有被判为读错，评分模型给 9.75（满分 10），且扰乱了附近的对齐，仍会在其旁报出一处停顿与拖长；SpeechOcean 没有这类标签，未做基准。
+     - 埋入的拖长约有一成、停顿约有 6% 被确认规则去掉，主要在识别很差的录音上。
+     - 多读召回低（第 3 项）。
+     - 统计页与历史弱项仍按 LLM 的维度分计算（第 5 项）。
+     - 已保存的旧记录里的完整 Azure 基线没有回溯清理（第 6 项）。
+     - 决策见 ADR-0017。
 
 ### 18.4 实验纪律
 
