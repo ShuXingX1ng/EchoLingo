@@ -460,6 +460,36 @@ describe("recorded Response (Read Aloud)", () => {
     )
   })
 
+  it("shows the whole comparison but saves it without the baseline's words and text", async () => {
+    const baseline = {
+      provider: "azure", scale: "0-100", taskScoreEstimate: null, overallScore: 80, pronunciation: 78,
+      oralFluency: 82, content: 90, recognizedText: "a passage about cities",
+      words: [{ word: "a", score: 90, status: "correct" }],
+      evidenceStatus: { sentence: { status: "available" }, word: { status: "available" }, phoneme: { status: "available" } },
+      summary: "Good.",
+    }
+    const comparison = {
+      recordingSha256: "ab", createdAt: "2026-10-30T00:00:00Z", baseline, baselineError: null,
+      latencyMs: { echolingo: 3000, azure: 900 }, differences: { pronunciation: -5 }, wordDisagreements: [],
+    }
+    mocked.apiPostForm.mockResolvedValue({
+      transcript: "a passage about cities",
+      feedback: { ...FEEDBACK, speechEvaluationComparison: comparison },
+      speechEvaluation: null,
+      speechEvaluationComparison: comparison,
+    })
+    const { result } = await startRun("read_aloud")
+    act(() => result.current.startNow())
+
+    await finishRecording("a passage about cities")
+
+    expect(result.current.feedback?.speechEvaluationComparison?.baseline?.recognizedText).toBe("a passage about cities")
+    const saved = mocked.saveTask.mock.calls[0][0].feedback?.speechEvaluationComparison
+    expect(saved?.baseline).toMatchObject({ pronunciation: 78, words: [], summary: "" })
+    expect(saved?.baseline).not.toHaveProperty("recognizedText")
+    expect(saved?.differences).toEqual({ pronunciation: -5 })
+  })
+
   it("keeps the Speech Evaluation Result when Feedback could not be generated", async () => {
     const speechEvaluation = { provider: "azure", overallScore: 80, pronunciation: 78, oralFluency: 82, content: 90 }
     mocked.apiPostForm.mockResolvedValue({ transcript: "a passage", feedback: null, speechEvaluation })

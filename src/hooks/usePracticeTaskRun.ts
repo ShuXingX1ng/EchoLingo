@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRecordingSession } from "@/hooks/useRecordingSession"
 import { apiPost, apiPostForm } from "@/lib/api-client"
 import { getRandomImage, type ImageStimulus } from "@/lib/image-bank"
+import { feedbackForRecord } from "@/lib/speech-comparison"
 import { speechEvaluationModeFor } from "@/lib/speech-evaluation"
 import { loadStimulusText } from "@/lib/stimulus-loader"
 import { isValidStructuredStimulus, spokenStimulusText } from "@/lib/structured-stimulus"
@@ -423,7 +424,8 @@ export function usePracticeTaskRun(
       taskType,
       stimulus: { kind: stimulusKind(taskType), content: loaded.content },
       response: { kind: input.responseKind, content: input.storedResponse },
-      feedback: fb,
+      // The screen shows the whole comparison; the record keeps only §13's fields.
+      feedback: feedbackForRecord(fb),
       durationSeconds,
       createdAt: input.startedAt,
       endedAt,

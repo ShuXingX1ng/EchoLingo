@@ -132,17 +132,23 @@ export function speechProviderName(evaluation: { provider: string }): string {
   return PROVIDER_NAMES[evaluation.provider] ?? evaluation.provider
 }
 
+/** Whether the developer switch `NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE=1` is set. */
+export function compareSwitchOn(
+  compareSwitch: string | undefined = process.env.NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE,
+): boolean {
+  return compareSwitch === "1"
+}
+
 /**
  * The Speech Evaluation Mode to request: Read Aloud runs an explicit
- * EchoLingo-versus-Azure comparison only when the developer switch
- * `NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE=1` is set; otherwise the backend
- * default (EchoLingo only) applies.
+ * EchoLingo-versus-Azure comparison only when the developer switch is set
+ * (`compareSwitchOn`); otherwise the backend default (EchoLingo only) applies.
  */
 export function speechEvaluationModeFor(
   taskType: PteTaskType,
   compareSwitch: string | undefined = process.env.NEXT_PUBLIC_SPEECH_EVALUATION_COMPARE,
 ): "compare" | undefined {
-  return taskType === "read_aloud" && compareSwitch === "1" ? "compare" : undefined
+  return taskType === "read_aloud" && compareSwitchOn(compareSwitch) ? "compare" : undefined
 }
 
 // Failure codes with their own explanation; any other is "other".

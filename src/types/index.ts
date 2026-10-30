@@ -316,7 +316,10 @@ export type SpeechEvaluationFailure = {
   message: string
 }
 
-/** An explicit EchoLingo-versus-Azure comparison (developer use; the primary result stays EchoLingo's). */
+/**
+ * An explicit EchoLingo-versus-Azure comparison (developer use; the primary result stays EchoLingo's).
+ * Saved through `comparisonForRecord`, so a stored `baseline` has no words or recognised text.
+ */
 export type SpeechEvaluationComparison = {
   recordingSha256: string
   createdAt: string

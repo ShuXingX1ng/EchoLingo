@@ -7,7 +7,9 @@ import SpeechEvaluationDetails, {
   SpeechEvaluationErrorNotice,
   SpeechScoreBadge,
 } from "@/components/SpeechEvaluationDetails"
+import SpeechComparisonPanel from "@/components/SpeechComparisonPanel"
 import {
+  compareSwitchOn,
   speechEvaluationErrorOf,
   speechEvaluationOf,
   speechProviderName,
@@ -168,6 +170,13 @@ export default function ReadAloudPage() {
               </div>
             )}
             {speechEvaluationError && <SpeechEvaluationErrorNotice error={speechEvaluationError} />}
+            {compareSwitchOn() && feedback.speechEvaluationComparison && (
+              <SpeechComparisonPanel
+                comparison={feedback.speechEvaluationComparison}
+                primary={speechEvaluation}
+                primaryError={speechEvaluationError}
+              />
+            )}
 
             <div className="border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[4px_4px_0_rgba(15,23,42,0.08)] space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">

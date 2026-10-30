@@ -161,7 +161,10 @@ class SpeechEvaluationComparison(BaseModel):
     The primary EchoLingo result stays in `speechEvaluation`; Azure is the
     baseline only. Differences are EchoLingo minus Azure in points of each
     provider's own scale range (0–100), since the scales differ. No audio is
-    kept: the recording is identified by its SHA-256.
+    kept: the recording is identified by its SHA-256. The browser shows the
+    whole comparison but saves the baseline with its scores, evidence status
+    and checkpoint only, without its words or recognised text (roadmap §13,
+    `src/lib/speech-comparison.ts`).
     """
     recordingSha256: str
     createdAt: str

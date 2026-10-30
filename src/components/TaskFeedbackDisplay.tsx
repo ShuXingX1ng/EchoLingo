@@ -4,7 +4,9 @@ import SpeechEvaluationDetails, {
   SpeechEvaluationErrorNotice,
   SpeechScoreBadge,
 } from "@/components/SpeechEvaluationDetails"
+import SpeechComparisonPanel from "@/components/SpeechComparisonPanel"
 import {
+  compareSwitchOn,
   hidesFeedbackScores,
   speechEvaluationErrorOf,
   speechEvaluationOf,
@@ -76,6 +78,13 @@ export default function TaskFeedbackDisplay({
         </div>
       )}
       {speechEvaluationError && <SpeechEvaluationErrorNotice error={speechEvaluationError} />}
+      {compareSwitchOn() && feedback.speechEvaluationComparison && (
+        <SpeechComparisonPanel
+          comparison={feedback.speechEvaluationComparison}
+          primary={speechEvaluation}
+          primaryError={speechEvaluationError}
+        />
+      )}
 
       {showFeedbackScores && feedback.dimensionScores && (
         <DimensionScoresBlock scores={feedback.dimensionScores} />

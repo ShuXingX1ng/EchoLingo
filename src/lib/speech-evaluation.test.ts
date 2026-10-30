@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import type { SpeechEvaluationResult, StoredSpeechEvaluationResult, TaskFeedback } from "@/types"
 import {
+  compareSwitchOn,
   evidenceNoticeKey,
   hidesFeedbackScores,
   pronunciationAverages,
@@ -168,6 +169,14 @@ describe("speechErrorKey", () => {
   it("explains known failures and groups the rest", () => {
     expect(speechErrorKey("worker_unavailable")).toBe("speechEvaluation.error.worker_unavailable")
     expect(speechErrorKey("something_new")).toBe("speechEvaluation.error.other")
+  })
+})
+
+describe("compareSwitchOn", () => {
+  it("is on only when the switch is 1", () => {
+    expect(compareSwitchOn("1")).toBe(true)
+    expect(compareSwitchOn("0")).toBe(false)
+    expect(compareSwitchOn(undefined)).toBe(false)
   })
 })
 
