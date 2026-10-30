@@ -28,6 +28,7 @@ from models.schemas import (
     EvidenceStatus,
     FluencyEvent,
     PhonemeEvidence,
+    ReadingError,
     SpeechEvaluationComparison,
     SpeechEvaluationFailure,
     SpeechEvaluationResult,
@@ -154,9 +155,22 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
     evidence = EvidenceStatus.model_validate(result["evidence_status"])
     sentence = result["sentence"]
 
+    reading_errors = [
+        ReadingError(
+            kind=error["kind"], wordIndex=error["word_index"], startSec=error["start_sec"],
+            endSec=error["end_sec"], heard=error.get("heard"),
+        )
+        for error in result.get("reading_errors", [])
+    ]
+    omitted = {error.wordIndex for error in reading_errors if error.kind == "omitted"}
+
     words = []
-    for word in result["words"]:
+    for index, word in enumerate(result["words"]):
         timing = {"startSec": word.get("start_sec"), "endSec": word.get("end_sec")}
+        if index in omitted:
+            # The scorer scored the sliver the aligner squeezed it into.
+            words.append(WordEvidence(word=word["text"], status="omitted", **timing))
+            continue
         if word["status"] != "scored":
             words.append(WordEvidence(word=word["text"], status="not_scored", **timing))
             continue
@@ -201,6 +215,7 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
             )
             for event in result.get("fluency_events", [])
         ],
+        readingErrors=reading_errors,
         evidenceStatus=evidence,
         modelId=result["bundle_id"],
         warnings=list(result.get("warnings", [])),

@@ -83,6 +83,22 @@ class FluencyEvent(BaseModel):
     at_sentence_boundary: bool = False
 
 
+ReadingErrorKind = Literal["omitted", "inserted", "repeated"]
+
+
+class ReadingError(BaseModel):
+    """A word left out, added or said again (`worker/reading_errors.py`)."""
+    kind: ReadingErrorKind
+    # omitted / repeated: this reference word; inserted: follows this word.
+    word_index: int
+    # omitted: where the aligner squeezed the word; otherwise when the free
+    # ASR heard the extra speech.
+    start_sec: float
+    end_sec: float
+    # inserted / repeated: what the free ASR heard.
+    heard: str | None = None
+
+
 class Timing(BaseModel):
     decode_ms: float
     encoder_ms: float
@@ -113,6 +129,9 @@ class EvaluationResult(BaseModel):
     words: list[WordResult]
     # Empty unless word evidence is available or partial.
     fluency_events: list[FluencyEvent] = []
+    # Empty unless word evidence is available or partial, and only of the
+    # kinds that met the benchmark's precision (`worker/reading_errors.py`).
+    reading_errors: list[ReadingError] = []
     # How many reference sentences were scored separately (1: the whole
     # recording in one pass).
     segment_count: int = 1

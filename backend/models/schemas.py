@@ -63,6 +63,24 @@ class FluencyEvent(BaseModel):
     atSentenceBoundary: bool = False
 
 
+ReadingErrorKind = Literal["omitted", "inserted", "repeated"]
+
+
+class ReadingError(BaseModel):
+    """A word left out, added or said again, from the EchoLingo Worker.
+
+    `omitted` and `repeated` name reference word `wordIndex` (an omitted
+    word also has the `omitted` status in `words`); an `inserted` word
+    follows it. `heard` is what the free ASR heard, for the last two. The
+    Worker reports only the kinds that met its benchmark's precision.
+    """
+    kind: ReadingErrorKind
+    wordIndex: int
+    startSec: float
+    endSec: float
+    heard: Optional[str] = None
+
+
 class EvidenceStatus(BaseModel):
     sentence: EvidenceLevel
     word: EvidenceLevel
@@ -91,6 +109,7 @@ class SpeechEvaluationResult(BaseModel):
     words: List[WordEvidence] = []
     # Empty when the provider reports none or has no word evidence.
     fluencyEvents: List[FluencyEvent] = []
+    readingErrors: List[ReadingError] = []
     evidenceStatus: EvidenceStatus
     # The Evaluator Checkpoint Bundle that produced the result, if any.
     modelId: Optional[str] = None

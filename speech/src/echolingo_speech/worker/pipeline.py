@@ -58,6 +58,15 @@ from echolingo_speech.worker.aligner import (
     AlignmentError,
 )
 from echolingo_speech.worker.fluency import fluency_events
+from echolingo_speech.worker.reading_errors import (
+    DEFAULT_THRESHOLDS as READING_ERROR_THRESHOLDS,
+)
+from echolingo_speech.worker.reading_errors import (
+    ReadingErrorThresholds,
+    RecognizedWord,
+    reading_errors,
+    recognized_words,
+)
 from echolingo_speech.worker.schema import (
     EvaluationResult,
     EvidenceStatus,
@@ -142,6 +151,8 @@ class EncodedAudio:
     # (L, T, H) float32, rounded through float16 as the training cache was.
     hidden_states: torch.Tensor
     recognized_text: str
+    # The words of `recognized_text` with the time the CTC head emitted them.
+    recognized_words: tuple[RecognizedWord, ...] = ()
 
 
 class Wav2Vec2Encoder:
@@ -186,9 +197,11 @@ class Wav2Vec2Encoder:
         output = self.model(waveform.to(self.device), output_hidden_states=True)
         stacked = torch.stack([output.hidden_states[i].squeeze(0) for i in self.layers])
         ids = output.logits.argmax(dim=-1).squeeze(0).cpu().tolist()
+        frame_sec = waveform.shape[-1] / TARGET_SAMPLE_RATE / max(1, len(ids))
         return EncodedAudio(
             hidden_states=stacked.to(torch.float16).float().cpu(),
             recognized_text=self.vocab.decode_greedy(ids).lower(),
+            recognized_words=tuple(recognized_words(ids, self.vocab, frame_sec)),
         )
 
 
@@ -323,6 +336,7 @@ class SpeechEvaluationPipeline:
         encoder: Wav2Vec2Encoder,
         aligner: Aligner,
         limits: Limits | None = None,
+        reading_error_thresholds: ReadingErrorThresholds = READING_ERROR_THRESHOLDS,
     ) -> None:
         if encoder.layers != bundle.hidden_state_layers:
             raise ValueError(
@@ -341,6 +355,7 @@ class SpeechEvaluationPipeline:
         self.encoder = encoder
         self.aligner = aligner
         self.limits = limits or Limits()
+        self.reading_error_thresholds = reading_error_thresholds
         duration_range = bundle.feature_schema["training_audio_duration_sec"]
         self._training_duration = (duration_range["min"], duration_range["max"])
 
@@ -415,6 +430,12 @@ class SpeechEvaluationPipeline:
 
         counts = sentence_word_counts or [len(reference_words)]
         events = fluency_events(words, counts) if withheld is None else []
+        # From the free ASR of the whole recording, even when its sentences
+        # are scored apart.
+        errors = (
+            reading_errors(words, encoded.recognized_words, self.reading_error_thresholds)
+            if withheld is None else []
+        )
         if withheld is not None or len(counts) < 2 or sum(counts) != len(reference_words):
             # One pass over the whole recording. Pause and timing features
             # come from whatever word spans the aligner produced.
@@ -461,6 +482,7 @@ class SpeechEvaluationPipeline:
             }),
             words=results,
             fluency_events=events,
+            reading_errors=errors,
             segment_count=len(scored_durations),
             # The scorer saw each sentence cut, not the whole passage.
             warnings=(

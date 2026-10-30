@@ -32,6 +32,11 @@ from echolingo_speech.worker.pipeline import (
     reference_sentences,
     sentence_segments,
 )
+from echolingo_speech.worker.reading_errors import (
+    KindThresholds,
+    ReadingErrorThresholds,
+    RecognizedWord,
+)
 
 # The `bundle_inputs` fixture's encoder and layers.
 ENCODER_ID = "test/tiny-wav2vec2"
@@ -53,15 +58,16 @@ class FakeEncoder:
     model_id = ENCODER_ID
     revision = ENCODER_REVISION
 
-    def __init__(self, recognized_text="we call it bear", layers=LAYERS):
+    def __init__(self, recognized_text="we call it bear", layers=LAYERS, recognized_words=()):
         self.recognized_text = recognized_text
         self.layers = layers
+        self.recognized_words = tuple(recognized_words)
 
     def encode(self, waveform):
         frames = max(1, int(waveform.shape[-1] / 16000 * FRAMES_PER_SECOND))
         generator = torch.Generator().manual_seed(0)
         hidden = torch.randn(len(self.layers), frames, 768, generator=generator)
-        return EncodedAudio(hidden.half().float(), self.recognized_text)
+        return EncodedAudio(hidden.half().float(), self.recognized_text, self.recognized_words)
 
 
 def _span(start, end, text):
@@ -99,9 +105,9 @@ class FakeAligner:
 def make_pipeline(bundle_dir):
     bundle = load_bundle(bundle_dir)
 
-    def make(encoder=None, aligner=None, limits=None):
+    def make(encoder=None, aligner=None, limits=None, **kwargs):
         return SpeechEvaluationPipeline(
-            bundle, encoder or FakeEncoder(), aligner or FakeAligner(), limits
+            bundle, encoder or FakeEncoder(), aligner or FakeAligner(), limits, **kwargs
         )
 
     return make
@@ -224,6 +230,7 @@ def test_without_a_usable_alignment_only_degraded_sentence_scores_remain(
     assert result.evidence_status.phoneme.status == "unavailable"
     assert result.words == []
     assert result.fluency_events == []
+    assert result.reading_errors == []
 
 
 def test_a_pause_in_the_alignment_is_a_fluency_event(make_pipeline):
@@ -240,6 +247,23 @@ def test_a_pause_in_the_alignment_is_a_fluency_event(make_pipeline):
     assert [(e.kind, e.word_index, e.start_sec, e.end_sec) for e in result.fluency_events] == [
         ("pause", 0, 0.5, 1.2),
     ]
+
+
+def test_an_extra_word_the_asr_heard_is_a_reading_error_of_a_reported_kind(make_pipeline):
+    heard = [RecognizedWord("we", 0.2, 0.5), RecognizedWord("call", 0.5, 0.9),
+             RecognizedWord("big", 0.9, 1.1), RecognizedWord("it", 1.1, 1.3),
+             RecognizedWord("bear", 1.3, 1.6)]
+    encoder = FakeEncoder("we call big it bear", recognized_words=heard)
+    thresholds = ReadingErrorThresholds(by_kind={"inserted": KindThresholds(
+        match_similarity=0.6, min_extra_sec=0.1, min_extra_letters=2, repeat_similarity=0.7)})
+
+    reported = make_pipeline(encoder=encoder, reading_error_thresholds=thresholds).evaluate(
+        _wav(), "we call it bear")
+    assert [(e.kind, e.word_index, e.heard) for e in reported.reading_errors] == [
+        ("inserted", 1, "big")]
+    off = ReadingErrorThresholds(by_kind={"inserted": None})
+    assert make_pipeline(encoder=encoder, reading_error_thresholds=off).evaluate(
+        _wav(), "we call it bear").reading_errors == []
 
 
 def test_a_wrong_passage_withholds_word_and_phoneme_evidence(make_pipeline):

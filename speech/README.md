@@ -469,6 +469,35 @@ uv run python -m echolingo_speech.evaluation.fluency_events report \
 Every SpeechOcean recording is one sentence, so the 1.5 s between-sentence
 threshold has no benchmark.
 
+## M6: Omitted, inserted and repeated words
+
+The Worker result lists `reading_errors` (empty without word evidence) from
+`worker/reading_errors.py`. The free ASR's words, timed from the CTC head,
+are matched to the reference; only confident matches are kept as anchors,
+and only what lies between two neighbouring anchors is judged: a reference
+word nothing was heard for and that the aligner squeezed is `omitted`, an
+extra word between two heard reference words is `inserted` (`repeated` if
+it resembles one of them). Where something else was heard in place of the
+reference, nothing is reported. Each kind is reported only if its precision
+on a synthetic validation benchmark is at least 0.9:
+
+```bash
+# Every validation recording as is, with an inner word cut out, with a word
+# played again, and with another validation word inserted (about 50 min on
+# the Mac; its own MFA cache, apart from a running Worker's)
+uv run python -m echolingo_speech.evaluation.reading_errors collect --config configs/speech.yaml \
+  --manifest $MANIFEST --corpus-root $CORPUS --out $SPEECH_HOME/reports/m6/reading-error-rows-validation.jsonl
+# Thresholds chosen on half the validation speakers, precision and recall on
+# the other half
+uv run python -m echolingo_speech.evaluation.reading_errors report \
+  --rows $SPEECH_HOME/reports/m6/reading-error-rows-validation.jsonl --out $SPEECH_HOME/reports/m6/reading-error-report-validation.json
+```
+
+Held out (2026-10-30): `inserted` precision 0.94 (15 of 16), recall 0.13,
+and no report in any unchanged recording, so it is reported; `omitted`
+(0.75) and `repeated` (0.81) are not. The planted words have at least three
+phones, and an inserted word under 0.3 s is never reported.
+
 ## Notes
 
 MLflow >=3 disables its plain filesystem tracking backend by default; any

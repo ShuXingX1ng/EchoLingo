@@ -317,6 +317,23 @@ def test_echolingo_fluency_events_are_carried_over():
     assert from_echolingo(_worker_result()).fluencyEvents == []
 
 
+def test_echolingo_reading_errors_are_carried_over_and_mark_omitted_words():
+    omitted = {"kind": "omitted", "word_index": 1, "start_sec": 0.6, "end_sec": 0.65}
+    inserted = {"kind": "inserted", "word_index": 1, "start_sec": 0.7, "end_sec": 0.9,
+                "heard": "big"}
+    result = from_echolingo(_worker_result(reading_errors=[omitted, inserted]))
+
+    assert [e.model_dump() for e in result.readingErrors] == [
+        {"kind": "omitted", "wordIndex": 1, "startSec": 0.6, "endSec": 0.65, "heard": None},
+        {"kind": "inserted", "wordIndex": 1, "startSec": 0.7, "endSec": 0.9, "heard": "big"},
+    ]
+    grow = result.words[1]
+    assert (grow.status, grow.score, grow.phonemes) == ("omitted", None, None)
+    assert [w.status for w in result.words] == ["correct", "omitted", "correct"]
+    # A Worker from before M6 reports none.
+    assert from_echolingo(_worker_result()).readingErrors == []
+
+
 def test_azure_words_have_no_timing():
     assert all(w.startSec is None and w.endSec is None for w in from_azure(AZURE_RESULT).words)
 

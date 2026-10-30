@@ -236,6 +236,19 @@ export type FluencyEvent = {
   atSentenceBoundary: boolean
 }
 
+/**
+ * A word left out, added or said again. `omitted` and `repeated` name word
+ * `wordIndex`; an `inserted` word follows it. `heard` is what speech
+ * recognition heard, for the last two.
+ */
+export type ReadingError = {
+  kind: "omitted" | "inserted" | "repeated"
+  wordIndex: number
+  startSec: number
+  endSec: number
+  heard?: string | null
+}
+
 export type EvidenceLevel = {
   status: "available" | "partial" | "degraded" | "unavailable"
   reason?: string | null
@@ -265,6 +278,7 @@ export type SpeechEvaluationResult = {
   words: WordEvidence[]
   /** Where the reading stalled (EchoLingo only); absent on older records. */
   fluencyEvents?: FluencyEvent[]
+  readingErrors?: ReadingError[]
   evidenceStatus: EvidenceStatus
   /** The Evaluator Checkpoint Bundle behind the result, if any. */
   modelId?: string | null
