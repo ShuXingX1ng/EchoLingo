@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest"
 import type { SpeechEvaluationResult, StoredSpeechEvaluationResult, TaskFeedback } from "@/types"
 import {
-  bandFloors,
   evidenceNoticeKey,
+  hidesFeedbackScores,
   pronunciationAverages,
-  scoreBand,
   speechErrorKey,
   speechEvaluationErrorOf,
   speechEvaluationModeFor,
@@ -146,18 +145,6 @@ describe("speechScores", () => {
   })
 })
 
-describe("score bands", () => {
-  it("use the same share of each scale's range", () => {
-    expect(scoreBand(90, "0-100")).toBe("excellent")
-    expect(scoreBand(82, "10-90")).toBe("excellent")
-    expect(scoreBand(81, "10-90")).toBe("good")
-    expect(scoreBand(66, "10-90")).toBe("fair")
-    expect(scoreBand(65, "10-90")).toBe("needsWork")
-    expect(bandFloors("10-90")).toEqual({ excellent: 82, good: 74, fair: 66 })
-    expect(bandFloors("0-100")).toEqual({ excellent: 90, good: 80, fair: 70 })
-  })
-})
-
 describe("evidenceNoticeKey", () => {
   it("explains a passage that was not read before anything else", () => {
     const notRead = { ...ECHOLINGO, evidenceStatus: {
@@ -209,5 +196,13 @@ describe("pronunciationAverages", () => {
       { scale: "0-100", average: 82 },
     ])
     expect(pronunciationAverages([])).toEqual([])
+  })
+})
+
+describe("hidesFeedbackScores", () => {
+  it("leaves out the Feedback's own scores only beside an EchoLingo result", () => {
+    expect(hidesFeedbackScores(ECHOLINGO)).toBe(true)
+    expect(hidesFeedbackScores(AZURE)).toBe(false)
+    expect(hidesFeedbackScores(undefined)).toBe(false)
   })
 })

@@ -5,6 +5,7 @@ import SpeechEvaluationDetails, {
   SpeechScoreBadge,
 } from "@/components/SpeechEvaluationDetails"
 import {
+  hidesFeedbackScores,
   speechEvaluationErrorOf,
   speechEvaluationOf,
   speechProviderName,
@@ -31,9 +32,10 @@ export default function TaskFeedbackDisplay({
   const { t } = useTranslation()
   const speechEvaluation = speechEvaluationOf(feedback)
   const speechEvaluationError = speechEvaluationErrorOf(feedback)
+  const showFeedbackScores = !hidesFeedbackScores(speechEvaluation)
   return (
     <div className="space-y-5">
-      {feedback.scoreCard && (
+      {showFeedbackScores && feedback.scoreCard && (
         <ScoreCardBlock card={feedback.scoreCard} />
       )}
 
@@ -75,7 +77,7 @@ export default function TaskFeedbackDisplay({
       )}
       {speechEvaluationError && <SpeechEvaluationErrorNotice error={speechEvaluationError} />}
 
-      {feedback.dimensionScores && (
+      {showFeedbackScores && feedback.dimensionScores && (
         <DimensionScoresBlock scores={feedback.dimensionScores} />
       )}
 

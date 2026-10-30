@@ -104,23 +104,6 @@ export function scoreShare(score: number, scale: SpeechScoreScale): number {
   return scale === "10-90" ? (score - 10) / 80 : score / 100
 }
 
-export type ScoreBand = "excellent" | "good" | "fair" | "needsWork"
-
-/** Bands at 90/80/70% of the scale's range: 90/80/70 on 0–100, 82/74/66 on 10–90. */
-export function scoreBand(score: number, scale: SpeechScoreScale): ScoreBand {
-  const share = scoreShare(score, scale)
-  if (share >= 0.9) return "excellent"
-  if (share >= 0.8) return "good"
-  if (share >= 0.7) return "fair"
-  return "needsWork"
-}
-
-/** The lowest score of each band on a scale, for legends. */
-export function bandFloors(scale: SpeechScoreScale): Record<Exclude<ScoreBand, "needsWork">, number> {
-  const at = (share: number) => (scale === "10-90" ? Math.round(10 + 80 * share) : share * 100)
-  return { excellent: at(0.9), good: at(0.8), fair: at(0.7) }
-}
-
 /**
  * The i18n key explaining missing or partial evidence, if any: a passage
  * that was not read, sentence scores that could not be supported, or words
@@ -132,6 +115,15 @@ export function evidenceNoticeKey(evaluation: SpeechEvaluationResult): string | 
   if (sentence.status !== "available") return "speechEvaluation.notice.sentenceDegraded"
   if (word.status === "partial") return "speechEvaluation.notice.wordsPartial"
   return undefined
+}
+
+/**
+ * Whether a Feedback's own scores (the LLM's `scoreCard` and dimension
+ * scores) are left out: the EchoLingo Speech Evaluator's scores are the
+ * task's scores, and the LLM may not offer others (roadmap §12).
+ */
+export function hidesFeedbackScores(evaluation?: SpeechEvaluationResult): boolean {
+  return evaluation?.provider === "echolingo"
 }
 
 const PROVIDER_NAMES: Record<string, string> = { azure: "Azure", echolingo: "EchoLingo" }
