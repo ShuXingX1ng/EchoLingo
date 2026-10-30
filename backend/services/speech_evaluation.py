@@ -37,6 +37,7 @@ from models.schemas import (
 )
 from services import speech_worker
 from services.azure_speech import PronunciationAssessmentResult, azure_speech_service
+from services.speech_explanation import with_practice_summary
 from services.speech_normalization import (
     CONTENT_FLOOR_COVERAGE,
     DISPLAY_MIN,
@@ -348,7 +349,8 @@ async def evaluate_spoken_response(
     """Evaluate a recording with the Task Type's provider.
 
     A failure is returned, not raised: the learner still gets Feedback on
-    what was recognised, and the failure is shown for what it is.
+    what was recognised, and the failure is shown for what it is. The
+    primary result carries its practice summary (`speech_explanation`).
     """
     provider = provider_for(task_type)
     if provider is None:
@@ -361,13 +363,13 @@ async def evaluate_spoken_response(
 
     if (mode or DEFAULT_SPEECH_EVALUATION_MODE) != "compare":
         result, error, _ = await _timed(provider, audio, reference_text)
-        return SpokenEvaluation(result=result, error=error)
+        return SpokenEvaluation(result=with_practice_summary(result), error=error)
 
     (result, error, ours_ms), (baseline, baseline_error, theirs_ms) = await asyncio.gather(
         _timed(provider, audio, reference_text), _timed(_azure, audio, reference_text)
     )
     return SpokenEvaluation(
-        result=result,
+        result=with_practice_summary(result),
         error=error,
         comparison=compare(
             result, baseline, baseline_error, audio,

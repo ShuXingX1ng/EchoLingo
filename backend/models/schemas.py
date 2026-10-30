@@ -81,6 +81,28 @@ class ReadingError(BaseModel):
     heard: Optional[str] = None
 
 
+PracticeItemKind = Literal[
+    "omitted", "inserted", "repeated", "mispronounced", "pause", "slow_word"
+]
+
+
+class PracticeItem(BaseModel):
+    """One of the few things to practise first, chosen from a Speech
+    Evaluation Result by fixed rules (`services/speech_explanation.py`).
+
+    `wordIndices` are into the result's `words`, in reading order: the
+    words mispronounced, left out, said again or drawn out; the word a
+    pause or an inserted word follows (or the inserted word itself, where
+    the provider lists it among the words). `words` names them, an inserted
+    word as heard. `count` is how many the result has in all, of which at
+    most five are named.
+    """
+    kind: PracticeItemKind
+    count: int
+    wordIndices: List[int]
+    words: List[str]
+
+
 class EvidenceStatus(BaseModel):
     sentence: EvidenceLevel
     word: EvidenceLevel
@@ -110,6 +132,8 @@ class SpeechEvaluationResult(BaseModel):
     # Empty when the provider reports none or has no word evidence.
     fluencyEvents: List[FluencyEvent] = []
     readingErrors: List[ReadingError] = []
+    # At most three, most important first; empty without word evidence.
+    practiceSummary: List[PracticeItem] = []
     evidenceStatus: EvidenceStatus
     # The Evaluator Checkpoint Bundle that produced the result, if any.
     modelId: Optional[str] = None

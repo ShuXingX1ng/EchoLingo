@@ -541,6 +541,9 @@ async def test_spoken_feedback_evaluates_read_aloud_with_echolingo(client):
     assert request.historicalWeaknesses == {"fluency": 55}
     evaluation = graph.await_args.kwargs["speech_evaluation"]
     assert SpeechEvaluationResult(**evaluation).content == 90
+    # The practice summary comes from the evaluation, not the LLM.
+    assert body["speechEvaluation"]["practiceSummary"] == evaluation["practiceSummary"] == [
+        {"kind": "mispronounced", "count": 1, "wordIndices": [1], "words": ["grow"]}]
 
 
 @pytest.mark.anyio

@@ -249,6 +249,20 @@ export type ReadingError = {
   heard?: string | null
 }
 
+/**
+ * One of the few things to practise first, chosen by FastAPI's fixed rules,
+ * not the LLM. `wordIndices` are into the result's `words`: the words
+ * mispronounced, left out, said again or drawn out, or the word a pause or
+ * an inserted word follows. `words` names them, an inserted word as heard;
+ * `count` is how many there are in all (at most five are named).
+ */
+export type PracticeItem = {
+  kind: "omitted" | "inserted" | "repeated" | "mispronounced" | "pause" | "slow_word"
+  count: number
+  wordIndices: number[]
+  words: string[]
+}
+
 export type EvidenceLevel = {
   status: "available" | "partial" | "degraded" | "unavailable"
   reason?: string | null
@@ -279,6 +293,8 @@ export type SpeechEvaluationResult = {
   /** Where the reading stalled (EchoLingo only); absent on older records. */
   fluencyEvents?: FluencyEvent[]
   readingErrors?: ReadingError[]
+  /** At most three, most important first; absent on older records. */
+  practiceSummary?: PracticeItem[]
   evidenceStatus: EvidenceStatus
   /** The Evaluator Checkpoint Bundle behind the result, if any. */
   modelId?: string | null

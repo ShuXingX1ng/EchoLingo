@@ -25,6 +25,7 @@ def _stub_vecs():
 _stub_vecs()
 
 import services.feedback_graph as fg  # noqa: E402
+from models.schemas import SpeechEvaluationResult  # noqa: E402
 from services.llm_chain import ToolLoopResult  # noqa: E402
 from tests.scripted_llm import ScriptedChatModel, tool_call  # noqa: E402
 
@@ -98,7 +99,18 @@ async def test_retrieve_context_node_returns_empty_on_error():
 # process_speech_evaluation_node
 # ---------------------------------------------------------------------------
 
-_EVALUATION = {"provider": "azure", "overallScore": 85, "pronunciation": 82, "oralFluency": 88, "content": 91}
+def _evidence(word: str = "available") -> dict:
+    return {"sentence": {"status": "available"}, "word": {"status": word, "reason": None},
+            "phoneme": {"status": word, "reason": None}}
+
+
+def _evaluation(**fields) -> dict:
+    """A Speech Evaluation Result as the graph is given it."""
+    values = {"provider": "azure", "scale": "0-100", "evidenceStatus": _evidence(), **fields}
+    return SpeechEvaluationResult.model_validate(values).model_dump()
+
+
+_EVALUATION = _evaluation(overallScore=85, pronunciation=82, oralFluency=88, content=91)
 
 
 @pytest.mark.anyio
@@ -121,8 +133,8 @@ async def test_process_speech_evaluation_node_formats_dimension_estimates():
 
 @pytest.mark.anyio
 async def test_speech_context_names_the_scale_and_unavailable_dimensions():
-    evaluation = {"provider": "echolingo", "scale": "10-90", "pronunciation": None,
-                  "oralFluency": None, "content": 74}
+    evaluation = _evaluation(provider="echolingo", scale="10-90", pronunciation=None,
+                             oralFluency=None, content=74)
     result = await fg.process_speech_evaluation_node(_base_state(speech_evaluation=evaluation))
     ctx = result["speech_context"]
     assert "10-90 scale" in ctx and "not an official PTE score" in ctx
@@ -134,45 +146,43 @@ def _words(*pairs) -> list[dict]:
     return [{"word": word, "status": status} for word, status in pairs]
 
 
-def _evidence(word: str = "available") -> dict:
-    return {"sentence": {"status": "available"}, "word": {"status": word, "reason": None},
-            "phoneme": {"status": word, "reason": None}}
-
-
 def test_speech_context_says_every_scored_word_was_judged_correct():
-    evaluation = {"scale": "10-90", "pronunciation": 77, "oralFluency": 78, "content": 90,
-                  "words": _words(("heart", "correct"), ("failure", "correct"), ("now", "correct")),
-                  "evidenceStatus": _evidence()}
+    evaluation = _evaluation(
+        provider="echolingo", scale="10-90", pronunciation=77, oralFluency=78, content=90,
+        words=_words(("heart", "correct"), ("failure", "correct"), ("now", "correct")))
     ctx = fg._format_speech_context("read_aloud", evaluation)
-    assert "All 3 scored words were judged correct" in ctx
+    assert "every scored word was judged correct and no pause" in ctx
     assert "not evidence of a pronunciation error" in ctx
 
 
-def test_speech_context_lists_only_the_flagged_words():
-    evaluation = {"scale": "0-100", "pronunciation": 60, "oralFluency": 70, "content": 80,
-                  "words": _words(("the", "correct"), ("heart", "mispronounced"),
-                                  ("now", "omitted"), ("um", "inserted"), ("zyx", "not_scored")),
-                  "evidenceStatus": _evidence("partial")}
+def test_speech_context_lists_only_what_the_evaluator_found():
+    evaluation = _evaluation(
+        pronunciation=60, oralFluency=70, content=80, evidenceStatus=_evidence("partial"),
+        words=_words(("the", "correct"), ("heart", "mispronounced"), ("now", "omitted"),
+                     ("um", "inserted"), ("zyx", "not_scored")))
     ctx = fg._format_speech_context("repeat_sentence", evaluation)
-    assert '"heart" (mispronounced)' in ctx
-    assert '"now" (omitted)' in ctx
-    assert '"um" (inserted)' in ctx
-    assert '"zyx"' in ctx and "not judged" in ctx
+    assert '"heart" mispronounced' in ctx
+    assert '"now" left out' in ctx
+    assert '"um" added' in ctx
+    assert 'Words not judged: "zyx"' in ctx
     assert '"the"' not in ctx
-    assert "only if it is flagged above" in ctx
+    assert "only if it is listed above" in ctx
+    # Azure reports no fluency events, so none is not a finding.
+    assert "not reported by this evaluator" in ctx
 
 
 @pytest.mark.parametrize("evaluation", [
-    {"scale": "10-90", "pronunciation": None, "oralFluency": None, "content": 47,
-     "words": [], "evidenceStatus": _evidence("degraded")},
-    {"scale": "10-90", "pronunciation": 70, "oralFluency": 70, "content": 70,
-     "words": _words(("fox", "correct")), "evidenceStatus": _evidence("unavailable")},
+    _evaluation(scale="10-90", pronunciation=None, oralFluency=None, content=47,
+                evidenceStatus=_evidence("degraded")),
+    _evaluation(scale="10-90", pronunciation=70, oralFluency=70, content=70,
+                words=_words(("fox", "correct")), evidenceStatus=_evidence("unavailable")),
     None,  # the evaluation failed; Feedback runs on the browser transcript
 ])
 def test_speech_context_forbids_naming_words_without_word_judgments(evaluation):
     ctx = fg._format_speech_context("read_aloud", evaluation)
     assert "No word-level judgments are available" in ctx
     assert "Do not name specific words" in ctx
+    assert "Do not change them" in ctx
 
 
 def test_speech_context_is_empty_for_task_types_without_speech_evaluation():

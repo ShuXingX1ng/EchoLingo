@@ -13,9 +13,12 @@ from typing import Optional, TypedDict
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 
+from models.schemas import SpeechEvaluationResult
+
 from services.llm_chain import llm_chain, parse_json
 from services.prompt_loader import prompts
 from services.rag import retrieve_context as rag_retrieve
+from services.speech_explanation import feedback_context
 from services.speech_normalization import display_share
 from services.task_types import (
     max_score as task_max_score,
@@ -109,8 +112,6 @@ def _find_divergences(primary: dict, judge: dict) -> list:
     ]
 
 
-_FLAGGED_WORD_STATUSES = ("mispronounced", "omitted", "inserted")
-
 _TRANSCRIPT_NOTE = (
     "The transcript is automatic speech recognition of the recording and may contain "
     "recognition errors: a difference between it and the stimulus is not evidence of a "
@@ -118,52 +119,18 @@ _TRANSCRIPT_NOTE = (
 )
 
 
-def _format_word_judgments(evaluation: Optional[dict]) -> str:
-    """What the Speech Evaluation Result says about each word — the only
-    word-level pronunciation evidence the LLM may cite."""
-    words = (evaluation or {}).get("words") or []
-    level = ((evaluation or {}).get("evidenceStatus") or {}).get("word") or {}
-    if not words or level.get("status", "available") not in ("available", "partial"):
-        return (
-            "No word-level judgments are available for this recording. Do not name specific "
-            "words as mispronounced, omitted or inserted."
-        )
-    flagged = [w for w in words if w.get("status") in _FLAGGED_WORD_STATUSES]
-    not_judged = [w["word"] for w in words if w.get("status") == "not_scored"]
-    lines = ["Word-level judgments by the speech evaluator:"]
-    if flagged:
-        lines.append("Flagged words: " + ", ".join(f'"{w["word"]}" ({w["status"]})' for w in flagged))
-    else:
-        lines.append(f"All {len(words) - len(not_judged)} scored words were judged correct.")
-    if not_judged:
-        lines.append("Words not judged: " + ", ".join(f'"{w}"' for w in not_judged))
-    lines.append("Name a word as mispronounced, omitted or inserted only if it is flagged above.")
-    return "\n".join(lines)
-
-
 def _format_speech_context(task_type: str, evaluation: Optional[dict]) -> str:
     """Speech evaluation evidence for Task Types whose recordings are evaluated.
 
     The response of such a Task Type is a recognition transcript, so the LLM
-    is told which words the evaluator judged — and, without a result, that
-    there are none — instead of inferring mispronunciations from the
-    transcript's recognition errors.
+    is given what the evaluator found (`speech_explanation`) — and, without
+    a result, that there is nothing — instead of inferring mispronunciations
+    from the transcript's recognition errors.
     """
     if task_type not in SPEECH_EVALUATED and not evaluation:
         return ""
-    parts = []
-    if evaluation:
-        def score(key: str) -> str:
-            value = evaluation.get(key)
-            return "not available" if value is None else str(value)
-        scale = evaluation.get("scale", "0-100")
-        parts.append(
-            f"Speech evaluation scores ({scale} scale, a learning reference, not an official "
-            f"PTE score) — Pronunciation: {score('pronunciation')}, "
-            f"Oral fluency: {score('oralFluency')}, Content: {score('content')}"
-        )
-    parts += [_format_word_judgments(evaluation), _TRANSCRIPT_NOTE]
-    return "\n\n" + "\n\n".join(parts)
+    result = SpeechEvaluationResult.model_validate(evaluation) if evaluation else None
+    return "\n\n" + "\n\n".join([feedback_context(result), _TRANSCRIPT_NOTE])
 
 
 def _build_user_content(state: FeedbackState) -> str:
