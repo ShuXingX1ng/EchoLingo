@@ -26,6 +26,7 @@ from typing import Optional, Protocol
 from models.schemas import (
     EvidenceLevel,
     EvidenceStatus,
+    FluencyEvent,
     PhonemeEvidence,
     SpeechEvaluationComparison,
     SpeechEvaluationFailure,
@@ -192,6 +193,14 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
         content=content,
         recognizedText=result["recognized_text"],
         words=words,
+        fluencyEvents=[
+            FluencyEvent(
+                kind=event["kind"], startSec=event["start_sec"], endSec=event["end_sec"],
+                wordIndex=event["word_index"],
+                atSentenceBoundary=event.get("at_sentence_boundary", False),
+            )
+            for event in result.get("fluency_events", [])
+        ],
         evidenceStatus=evidence,
         modelId=result["bundle_id"],
         warnings=list(result.get("warnings", [])),

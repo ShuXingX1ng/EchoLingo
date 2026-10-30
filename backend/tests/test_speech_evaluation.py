@@ -305,6 +305,18 @@ def test_echolingo_words_keep_where_the_worker_aligned_them():
     ]
 
 
+def test_echolingo_fluency_events_are_carried_over():
+    pause = {"kind": "pause", "start_sec": 0.6, "end_sec": 1.4, "word_index": 0,
+             "at_sentence_boundary": False}
+    result = from_echolingo(_worker_result(fluency_events=[pause]))
+    assert [e.model_dump() for e in result.fluencyEvents] == [{
+        "kind": "pause", "startSec": 0.6, "endSec": 1.4, "wordIndex": 0,
+        "atSentenceBoundary": False,
+    }]
+    # A Worker from before M6 reports none.
+    assert from_echolingo(_worker_result()).fluencyEvents == []
+
+
 def test_azure_words_have_no_timing():
     assert all(w.startSec is None and w.endSec is None for w in from_azure(AZURE_RESULT).words)
 

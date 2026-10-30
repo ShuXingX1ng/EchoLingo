@@ -445,6 +445,30 @@ Read Aloud Content has no SpeechOcean label; it is FastAPI's policy on
 free ASR heard, in order, above what an unrelated text reaches by chance).
 The Worker's `reference_not_read` gate and the Content floor are both 0.10.
 
+## M6: Fluency events
+
+The Worker result lists `fluency_events` (empty without word evidence), read
+from the aligned word spans by `worker/fluency.py`: a `pause` is a gap of at
+least 0.4 s between two words of a sentence (1.5 s between sentences), a
+`slow_word` is a word of at least 0.5 s held for at least 0.25 s per phone.
+The recording's leading and trailing silence never counts. The
+within-sentence thresholds come from validation:
+
+```bash
+# Every validation recording aligned as is and with a pause of known length
+# inserted at a random word boundary (about 15 min on the Mac; its own MFA
+# cache, apart from a running Worker's)
+uv run python -m echolingo_speech.evaluation.fluency_events collect --config configs/speech.yaml \
+  --manifest $MANIFEST --corpus-root $CORPUS --out $SPEECH_HOME/reports/m6/fluency-rows-validation.jsonl
+# Event rates on fluent (>= 9) and disfluent (<= 6) readings, inserted-pause
+# detection, and the smallest thresholds that spare 95% of fluent readings
+uv run python -m echolingo_speech.evaluation.fluency_events report \
+  --rows $SPEECH_HOME/reports/m6/fluency-rows-validation.jsonl --out $SPEECH_HOME/reports/m6/fluency-report-validation.json
+```
+
+Every SpeechOcean recording is one sentence, so the 1.5 s between-sentence
+threshold has no benchmark.
+
 ## Notes
 
 MLflow >=3 disables its plain filesystem tracking backend by default; any

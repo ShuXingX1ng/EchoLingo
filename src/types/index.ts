@@ -227,6 +227,15 @@ export type WordEvidence = {
   endSec?: number | null
 }
 
+/** A `pause` follows word `wordIndex`; a `slow_word` is that word, held too long. */
+export type FluencyEvent = {
+  kind: "pause" | "slow_word"
+  startSec: number
+  endSec: number
+  wordIndex: number
+  atSentenceBoundary: boolean
+}
+
 export type EvidenceLevel = {
   status: "available" | "partial" | "degraded" | "unavailable"
   reason?: string | null
@@ -254,6 +263,8 @@ export type SpeechEvaluationResult = {
   content: number | null
   recognizedText?: string | null
   words: WordEvidence[]
+  /** Where the reading stalled (EchoLingo only); absent on older records. */
+  fluencyEvents?: FluencyEvent[]
   evidenceStatus: EvidenceStatus
   /** The Evaluator Checkpoint Bundle behind the result, if any. */
   modelId?: string | null

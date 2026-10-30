@@ -223,6 +223,23 @@ def test_without_a_usable_alignment_only_degraded_sentence_scores_remain(
     assert result.evidence_status.word.model_dump() == {"status": "unavailable", "reason": reason}
     assert result.evidence_status.phoneme.status == "unavailable"
     assert result.words == []
+    assert result.fluency_events == []
+
+
+def test_a_pause_in_the_alignment_is_a_fluency_event(make_pipeline):
+    paused = Alignment(
+        words=[_span(0.2, 0.5, "we"), _span(1.2, 1.6, "call"), _span(1.6, 1.8, "it"),
+               _span(1.8, 2.3, "bear")],
+        phones=[_span(0.2, 0.3, "W"), _span(0.3, 0.5, "IY1"), _span(1.2, 1.3, "K"),
+                _span(1.3, 1.5, "AO1"), _span(1.5, 1.6, "L"), _span(1.6, 1.7, "IH1"),
+                _span(1.7, 1.8, "T"), _span(1.8, 2.0, "B"), _span(2.0, 2.3, "EH1")],
+    )
+    pipeline = make_pipeline(aligner=FakeAligner(paused))
+    result = pipeline.evaluate(_wav(seconds=3.0), "we call it bear")
+
+    assert [(e.kind, e.word_index, e.start_sec, e.end_sec) for e in result.fluency_events] == [
+        ("pause", 0, 0.5, 1.2),
+    ]
 
 
 def test_a_wrong_passage_withholds_word_and_phoneme_evidence(make_pipeline):

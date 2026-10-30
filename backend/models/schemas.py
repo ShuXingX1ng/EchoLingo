@@ -47,6 +47,22 @@ class EvidenceLevel(BaseModel):
     reason: Optional[str] = None
 
 
+FluencyEventKind = Literal["pause", "slow_word"]
+
+
+class FluencyEvent(BaseModel):
+    """Where the reading stalled, from the EchoLingo Worker's alignment.
+
+    A `pause` follows word `wordIndex` (between two reference sentences
+    when `atSentenceBoundary`); a `slow_word` is that word, held too long.
+    """
+    kind: FluencyEventKind
+    startSec: float
+    endSec: float
+    wordIndex: int
+    atSentenceBoundary: bool = False
+
+
 class EvidenceStatus(BaseModel):
     sentence: EvidenceLevel
     word: EvidenceLevel
@@ -73,6 +89,8 @@ class SpeechEvaluationResult(BaseModel):
     content: Optional[int] = None
     recognizedText: Optional[str] = None
     words: List[WordEvidence] = []
+    # Empty when the provider reports none or has no word evidence.
+    fluencyEvents: List[FluencyEvent] = []
     evidenceStatus: EvidenceStatus
     # The Evaluator Checkpoint Bundle that produced the result, if any.
     modelId: Optional[str] = None

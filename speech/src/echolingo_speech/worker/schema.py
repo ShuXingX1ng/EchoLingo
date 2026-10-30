@@ -69,6 +69,20 @@ class WordResult(BaseModel):
     phonemes: list[PhonemeResult] = []
 
 
+FluencyEventKind = Literal["pause", "slow_word"]
+
+
+class FluencyEvent(BaseModel):
+    """Where the reading stalled (`worker/fluency.py`)."""
+    kind: FluencyEventKind
+    start_sec: float
+    end_sec: float
+    # A pause follows this word; a slow word is this word.
+    word_index: int
+    # Pauses only: between two reference sentences rather than inside one.
+    at_sentence_boundary: bool = False
+
+
 class Timing(BaseModel):
     decode_ms: float
     encoder_ms: float
@@ -97,6 +111,8 @@ class EvaluationResult(BaseModel):
     sentence: SentenceScores
     # Empty unless word evidence is available or partial.
     words: list[WordResult]
+    # Empty unless word evidence is available or partial.
+    fluency_events: list[FluencyEvent] = []
     # How many reference sentences were scored separately (1: the whole
     # recording in one pass).
     segment_count: int = 1

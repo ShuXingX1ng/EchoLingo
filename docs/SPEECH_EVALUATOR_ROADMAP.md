@@ -729,7 +729,7 @@ Worker（`worker/`，ADR-0015）在本机 Mac CPU 上运行，环境为 torch 2.
 
 顺序（2026-10-30 确定）：
 1. 契约带上单词时间：`WordEvidence` 增加 `startSec`/`endSec`。— 完成（2026-10-30）：EchoLingo 单词带 Worker 对齐的起止时间（含未评分词）；Azure 的 SDK 单词结果没有时间偏移，保持为空（要拿到需解析原始 JSON，M6 的流利度事件只依赖 Worker）。backend `pytest` 420 passed、`ruff` 通过，前端 typecheck、lint、单元测试 190 passed。
-2. 流利度事件：Worker 由对齐结果给出句中长停顿与异常拖长的单词，阈值只在 Validation 上选，用插入已知静音的合成基准报告检测率与误报率。
+2. 流利度事件：Worker 由对齐结果给出句中长停顿与异常拖长的单词，阈值只在 Validation 上选，用插入已知静音的合成基准报告检测率与误报率。— 完成（2026-10-30）：`worker/fluency.py` 从对齐的单词区间给出 `pause`（两词间隙；句内 ≥ 0.4 秒，句间 ≥ 1.5 秒）与 `slow_word`（≥ 0.5 秒且每个音素 ≥ 0.25 秒），录音首尾静音不算；结果的 `fluency_events` 经 FastAPI 成为 `fluencyEvents`。阈值由 `evaluation/fluency_events.py` 在 Validation 260 条上选定（规则：流利读者——官方 Fluency ≥ 9，58 条——出现事件的比例不超过 5% 的最小候选）：句内停顿 0.4 秒时流利读者 1.7%、不流利读者（≤ 6，57 条）42%，对插入的 0.5 / 0.8 / 1.2 秒停顿（录音自身的底噪）检出 91% / 94% / 97%；拖长词流利读者 3.4%、不流利读者 65%，无合成基准。260 条全部对齐成功。句间阈值 1.5 秒没有基准（SpeechOcean 每条只有一句），是保守的先验。speech `pytest` 与 `ruff` 通过，backend 契约测试通过，前端 `tsc` 通过。行数据与报告在 `~/echolingo-speech/reports/m6/`，备份于本机 `~/echolingo-backup/2026-10-30-m6/`。本机运行的 Worker 需重启才会给出事件。
 3. 漏读、多读与重复：只在多个信号同时成立时判定（强制对齐时长接近下限且单词分很低且自由 ASR 未听到；对齐间隙中有语音能量且 ASR 听到额外的词），用对 Validation 录音删词、复制片段、插入别的词的合成基准评估；精确率优先，某一类达不到 0.9 就不上线并记为限制。只改 Worker 后处理，Bundle 不变。
 4. 确定性解释层（第 12 节）与重点练习摘要：FastAPI 把结果转成可核查的事实与少量优先练习项，Feedback LLM 只组织语言。
 5. 前端标注：单词状态分色、流利度事件就地标出、点击单词看分数与问题类别、页面顶部显示摘要。

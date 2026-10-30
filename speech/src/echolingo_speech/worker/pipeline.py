@@ -57,6 +57,7 @@ from echolingo_speech.worker.aligner import (
     Alignment,
     AlignmentError,
 )
+from echolingo_speech.worker.fluency import fluency_events
 from echolingo_speech.worker.schema import (
     EvaluationResult,
     EvidenceStatus,
@@ -413,6 +414,7 @@ class SpeechEvaluationPipeline:
             withheld = "reference_not_read"
 
         counts = sentence_word_counts or [len(reference_words)]
+        events = fluency_events(words, counts) if withheld is None else []
         if withheld is not None or len(counts) < 2 or sum(counts) != len(reference_words):
             # One pass over the whole recording. Pause and timing features
             # come from whatever word spans the aligner produced.
@@ -458,6 +460,7 @@ class SpeechEvaluationPipeline:
                 key: value * SENTENCE_SCALE for key, value in zip(SENTENCE_TARGET_KEYS, sentence)
             }),
             words=results,
+            fluency_events=events,
             segment_count=len(scored_durations),
             # The scorer saw each sentence cut, not the whole passage.
             warnings=(
