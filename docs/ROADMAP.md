@@ -12,7 +12,7 @@ EchoLingo 已完成 PTE 产品 MVP、前后端分离、反馈 Agent/RAG、Exempl
 
 ## 当前优先级
 
-1. 第一代收尾（2026-10-31 已对照 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 15 节核对，模型卡见 `speech/docs/first-generation-model-card.md`）：剩下待决定的是同源语言的原文译文可越过 Content 门槛（第 7.2 节非英语安全处理只部分满足），之后再决定是否进入第 16 节后续阶段。
+1. 第一代收尾（2026-10-31 已对照 [`SPEECH_EVALUATOR_ROADMAP.md`](SPEECH_EVALUATOR_ROADMAP.md) 第 15 节核对，模型卡见 `speech/docs/first-generation-model-card.md`）；同源语言译文越过门槛的问题已由 ADR-0018 处理。下一步是决定是否进入第 16 节后续阶段。
 
 ## 下一道阶段门槛
 

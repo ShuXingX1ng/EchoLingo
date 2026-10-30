@@ -73,6 +73,7 @@
   "speechEvaluation.error.not_configured": "Speech evaluation is not configured.",
   "speechEvaluation.error.other": "The speech evaluator returned an error.",
   "speechEvaluation.notice.referenceNotRead": "The recording does not seem to follow the passage, so it received the minimum score and no word-level analysis.",
+  "speechEvaluation.notice.referenceBarelyRead": "Too little of the passage was recognised, so only Content was scored: no pronunciation, fluency or word-level analysis.",
   "speechEvaluation.notice.sentenceDegraded": "The recording could not be aligned with the passage, so pronunciation and fluency were not scored.",
   "speechEvaluation.notice.wordsPartial": "Some words could not be judged and are shown in grey.",
   "speechEvaluation.notice.transcript": "Automatic speech recognition, which can mishear words. Pronunciation is judged by the speech evaluation, not from this text.",

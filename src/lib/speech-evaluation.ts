@@ -106,12 +106,13 @@ export function scoreShare(score: number, scale: SpeechScoreScale): number {
 
 /**
  * The i18n key explaining missing or partial evidence, if any: a passage
- * that was not read, sentence scores that could not be supported, or words
- * that could not be judged.
+ * that was not read or barely read, sentence scores that could not be
+ * supported, or words that could not be judged.
  */
 export function evidenceNoticeKey(evaluation: SpeechEvaluationResult): string | undefined {
   const { sentence, word } = evaluation.evidenceStatus
   if (sentence.reason === "reference_not_read") return "speechEvaluation.notice.referenceNotRead"
+  if (sentence.reason === "reference_barely_read") return "speechEvaluation.notice.referenceBarelyRead"
   if (sentence.status !== "available") return "speechEvaluation.notice.sentenceDegraded"
   if (word.status === "partial") return "speechEvaluation.notice.wordsPartial"
   return undefined

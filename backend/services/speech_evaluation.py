@@ -41,6 +41,7 @@ from services.speech_explanation import with_practice_summary
 from services.speech_normalization import (
     CONTENT_FLOOR_COVERAGE,
     DISPLAY_MIN,
+    SCORED_READING_COVERAGE,
     CalibrationMissing,
     content_score,
     display_share,
@@ -147,8 +148,9 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
     Scores go through the bundle's Provisional Score Normalization; Read
     Aloud Content and the task score follow the reference policy in
     `speech_normalization`. A level the Worker could not support stays
-    unscored: a passage that was not read gets the minimum everywhere, and
-    sentence scores degraded by a failed alignment are not shown.
+    unscored: a passage that was not read gets the minimum everywhere,
+    sentence scores degraded by a failed alignment are not shown, and a
+    passage barely read (below `SCORED_READING_COVERAGE`) gets Content only.
 
     Raises CalibrationMissing when the bundle has no normalization.
     """
@@ -186,15 +188,33 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
             ],
         ))
 
+    fluency_events = [
+        FluencyEvent(
+            kind=event["kind"], startSec=event["start_sec"], endSec=event["end_sec"],
+            wordIndex=event["word_index"],
+            atSentenceBoundary=event.get("at_sentence_boundary", False),
+        )
+        for event in result.get("fluency_events", [])
+    ]
     pronunciation = oral_fluency = task = None
+    coverage = result["reference_character_coverage_corrected"]
     if evidence.sentence.reason == "reference_not_read":
         pronunciation = oral_fluency = content = task = DISPLAY_MIN
     else:
         content = content_score(
-            result["reference_character_coverage_corrected"],
-            result.get("reference_not_read_below", CONTENT_FLOOR_COVERAGE),
+            coverage, result.get("reference_not_read_below", CONTENT_FLOOR_COVERAGE)
         )
-        if evidence.sentence.status == "available":
+        if coverage < SCORED_READING_COVERAGE:
+            # Scores and diagnostics of a passage barely read are not about
+            # reading it: a translation into a language close to English
+            # crosses the reading gate through cognates.
+            barely = EvidenceLevel(status="unavailable", reason="reference_barely_read")
+            evidence = EvidenceStatus(
+                sentence=EvidenceLevel(status="degraded", reason="reference_barely_read"),
+                word=barely, phoneme=barely,
+            )
+            words, fluency_events, reading_errors = [], [], []
+        elif evidence.sentence.status == "available":
             pronunciation = calibration.pronunciation_score(sentence["accuracy"])
             oral_fluency = calibration.oral_fluency_score(sentence["fluency"])
             task = task_score(pronunciation, oral_fluency, content)
@@ -208,14 +228,7 @@ def from_echolingo(result: dict) -> SpeechEvaluationResult:
         content=content,
         recognizedText=result["recognized_text"],
         words=words,
-        fluencyEvents=[
-            FluencyEvent(
-                kind=event["kind"], startSec=event["start_sec"], endSec=event["end_sec"],
-                wordIndex=event["word_index"],
-                atSentenceBoundary=event.get("at_sentence_boundary", False),
-            )
-            for event in result.get("fluency_events", [])
-        ],
+        fluencyEvents=fluency_events,
         readingErrors=reading_errors,
         evidenceStatus=evidence,
         modelId=result["bundle_id"],

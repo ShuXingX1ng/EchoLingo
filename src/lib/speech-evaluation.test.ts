@@ -156,6 +156,15 @@ describe("evidenceNoticeKey", () => {
     expect(evidenceNoticeKey(notRead)).toBe("speechEvaluation.notice.referenceNotRead")
   })
 
+  it("explains why a passage barely read has Content only", () => {
+    const barely = { ...ECHOLINGO, evidenceStatus: {
+      sentence: { status: "degraded", reason: "reference_barely_read" },
+      word: { status: "unavailable", reason: "reference_barely_read" },
+      phoneme: { status: "unavailable", reason: "reference_barely_read" },
+    } } as SpeechEvaluationResult
+    expect(evidenceNoticeKey(barely)).toBe("speechEvaluation.notice.referenceBarelyRead")
+  })
+
   it("explains degraded sentences and partially judged words", () => {
     const degraded = { ...ECHOLINGO, evidenceStatus: { ...AVAILABLE, sentence: { status: "degraded", reason: "alignment_failed" } } } as SpeechEvaluationResult
     const partial = { ...ECHOLINGO, evidenceStatus: { ...AVAILABLE, word: { status: "partial", reason: "out_of_vocabulary" } } } as SpeechEvaluationResult

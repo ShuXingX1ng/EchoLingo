@@ -73,6 +73,7 @@
   "speechEvaluation.error.not_configured": "语音评估未配置。",
   "speechEvaluation.error.other": "语音评估返回了错误。",
   "speechEvaluation.notice.referenceNotRead": "录音似乎没有朗读这段文字，因此给出最低分，并且不提供单词级分析。",
+  "speechEvaluation.notice.referenceBarelyRead": "识别出的原文内容太少，因此只给出内容分，不提供发音、流利度和单词级分析。",
   "speechEvaluation.notice.sentenceDegraded": "录音无法与原文对齐，因此没有给出发音和流利度分数。",
   "speechEvaluation.notice.wordsPartial": "部分单词无法判断，以灰色显示。",
   "speechEvaluation.notice.transcript": "这是自动语音识别的结果，可能听错个别词。发音以语音评估为准，不根据这段文字判断。",

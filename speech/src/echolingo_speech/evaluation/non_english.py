@@ -12,9 +12,14 @@ macOS text-to-speech (`say`). Each non-English voice reads a translation
 of one English passage; each English voice reads every English passage.
 Every recording is evaluated against every passage, which gives three kinds:
 
-- `non_english`: must all fall below the gate;
-- `english_own`: an English reading of its own passage, must all pass;
+- `non_english`: must never get English-looking scores, i.e. Pronunciation,
+  Oral Fluency and the task score must be the minimum or left out;
+- `english_own`: an English reading of its own passage, must all be scored;
 - `english_other`: an English reading of another passage.
+
+Content can still give a translation some credit: below FastAPI's
+`SCORED_READING_COVERAGE` only Content is shown, rising from the minimum at
+the reading gate.
 
 Synthetic speech is clean and evenly paced, so this checks the gate, not
 how a real learner's mixed or accented speech fares.
@@ -119,6 +124,10 @@ NON_ENGLISH = {
 
 ENGLISH_VOICES = {"en_US": "Samantha", "en_GB": "Daniel", "en_IN": "Rishi", "en_AU": "Karen"}
 
+# FastAPI's `speech_normalization.SCORED_READING_COVERAGE`: below it only
+# Content is shown.
+SCORED_READING_COVERAGE = 0.28
+
 
 # --- synthesis (macOS only) -------------------------------------------------------
 
@@ -193,15 +202,14 @@ def collect(pipeline, clips_dir: Path, out: Path) -> None:
 # --- report -----------------------------------------------------------------------
 
 
-def below_gate(row: dict) -> bool:
-    """FastAPI shows no score above the minimum (`speech_evaluation.from_echolingo`):
-    the Worker refused the recording, withheld it as `reference_not_read`
-    (every score the minimum), or could not align it (Pronunciation, Oral
-    Fluency and the task score left out) with coverage below the gate
-    (Content the minimum)."""
-    if "error" in row or row["word_reason"] == "reference_not_read":
+def unscored(row: dict, scored_coverage: float = SCORED_READING_COVERAGE) -> bool:
+    """FastAPI shows no Pronunciation, Oral Fluency or task score above the
+    minimum (`speech_evaluation.from_echolingo`): the Worker refused the
+    recording, withheld it as `reference_not_read` (every score the minimum)
+    or could not align it, or too little of the passage was heard."""
+    if "error" in row or row["word_reason"] in ("reference_not_read", "alignment_failed"):
         return True
-    return row["word_reason"] == "alignment_failed" and row["coverage_corrected"] < row["gate"]
+    return row["coverage_corrected"] < scored_coverage
 
 
 def report(rows: list[dict]) -> dict:
@@ -211,7 +219,7 @@ def report(rows: list[dict]) -> dict:
         coverage = [r["coverage_corrected"] for r in group if "coverage_corrected" in r]
         kinds[name] = {
             "pairs": len(group),
-            "below_gate": sum(below_gate(r) for r in group),
+            "unscored": sum(unscored(r) for r in group),
             "by_reason": {reason: sum(r.get("word_reason", r.get("error")) == reason
                                       for r in group)
                           for reason in sorted({str(r.get("word_reason", r.get("error")))
@@ -223,22 +231,24 @@ def report(rows: list[dict]) -> dict:
     by_language = {}
     for row in rows:
         if row["kind"] == "non_english":
-            entry = by_language.setdefault(row["language"], {"pairs": 0, "below_gate": 0,
+            entry = by_language.setdefault(row["language"], {"pairs": 0, "unscored": 0,
                                                              "max_coverage_corrected": 0.0})
             entry["pairs"] += 1
-            entry["below_gate"] += below_gate(row)
+            entry["unscored"] += unscored(row)
             entry["max_coverage_corrected"] = max(entry["max_coverage_corrected"],
                                                   row.get("coverage_corrected", 0.0))
-    passes = (kinds["non_english"]["below_gate"] == kinds["non_english"]["pairs"]
-              and kinds["english_own"]["below_gate"] == 0)
+    passes = (kinds["non_english"]["unscored"] == kinds["non_english"]["pairs"]
+              and kinds["english_own"]["unscored"] == 0)
     return {
         "created_at": datetime.now(UTC).isoformat(),
-        "rule": "every non-English pair below the gate, every English own-passage pair above it",
+        "rule": ("no non-English pair gets Pronunciation, Oral Fluency or a task score above "
+                 "the minimum; every English own-passage pair does"),
+        "scored_reading_coverage": SCORED_READING_COVERAGE,
         "passes": passes,
         "kinds": kinds,
         "non_english_by_language": by_language,
-        "missed_non_english": [r for r in rows if r["kind"] == "non_english" and not below_gate(r)],
-        "refused_english_own": [r for r in rows if r["kind"] == "english_own" and below_gate(r)],
+        "scored_non_english": [r for r in rows if r["kind"] == "non_english" and not unscored(r)],
+        "unscored_english_own": [r for r in rows if r["kind"] == "english_own" and unscored(r)],
     }
 
 

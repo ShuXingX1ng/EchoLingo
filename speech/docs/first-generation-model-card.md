@@ -136,7 +136,7 @@ so macOS text-to-speech stood in for it:
 
 The rule was fixed before the run: every non-English pair must produce
 nothing above the minimum, and every English reading of its own passage must
-pass the gate. **The check fails on 4 of 44 non-English pairs.**
+pass the gate. **The first run failed on 4 of 44 non-English pairs.**
 
 - **Below the gate (40 pairs).** 31 were withheld as `reference_not_read`. 9
   failed alignment, with Content at the minimum.
@@ -149,16 +149,30 @@ pass the gate. **The check fails on 4 of 44 non-English pairs.**
 - **The 4 failing pairs.** French, German, Spanish and Italian translations,
   scored against the English passage they translate, cross the gate (coverage
   0.10–0.24). Shared cognates such as "participants", "cognitive" and
-  "minutes" supply the letters. The page then shows English-looking scores:
+  "minutes" supply the letters. The page showed English-looking scores:
   - Pronunciation and Oral Fluency 62–66;
   - Content 11–38;
   - task score 41–59, compared with 84 for the US English reading and 10 for
     Mandarin.
 
-  Raising the gate does not fix this: German reaches 0.24, and 3.1% of real
-  readings already fall below 0.10. Telling these readings apart needs a
-  different signal, such as language identification or a Content-gated
-  Pronunciation and Oral Fluency score. That is an open decision.
+  Raising the gate would not fix this: German reaches 0.24, and 3.1% of real
+  readings already fall below 0.10.
+
+**Fix (ADR-0018).** Below a corrected coverage of 0.28, FastAPI shows Content
+only. Pronunciation, Oral Fluency, the task score, and the word and fluency
+diagnostics are left out, with a notice.
+
+- **Where 0.28 comes from.** It lies between the highest translation (0.24)
+  and the lowest of the 39 real validation passages (0.33; weak adults score
+  0.39–0.63).
+- **Rerun with the rule restated.** The rule is now "no Pronunciation, Oral
+  Fluency or task score above the minimum". All 44 non-English pairs pass it,
+  and all 16 English own-passage readings are still scored.
+- **What remains.**
+  - Content still gives the four translations 11–38.
+  - Most half-read passages fall below 0.28 and lose their Pronunciation and
+    Oral Fluency too.
+  - The margin rests on 39 passages from Mandarin-L1 readers.
 
 Synthetic speech is clean and evenly paced. This check covers the gate, not
 mixed-language or heavily accented learner speech.
@@ -183,9 +197,10 @@ mixed-language or heavily accented learner speech.
   - real pauses and drawn-out words are lost on badly recognised recordings.
 - **Free ASR.** Both kinds of diagnostic depend on it. A different encoder
   must be re-benchmarked (ADR-0017).
-- **Non-English speech.** A translation of the passage into a language
-  close to English (French, German, Spanish, Italian) can cross the
-  reading gate and receive English-looking scores (SS6).
+- **Non-English speech and partial readings.** A translation of the passage
+  into a language close to English still gets some Content (11–38). Below a
+  corrected coverage of 0.28, Pronunciation and Oral Fluency are left out,
+  which also hides them for most half-read passages (SS6, ADR-0018).
 - **Product.** The stats page and historical weaknesses still use the Feedback
   LLM's dimension scores. Saved records from before M6 keep the full Azure
   baseline.

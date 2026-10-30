@@ -42,6 +42,17 @@ DISPLAY_MAX = 90
 CONTENT_FLOOR_COVERAGE = 0.10
 CONTENT_FULL_COVERAGE = 0.50
 
+# Below this corrected coverage too little of the passage was heard for its
+# Pronunciation and Oral Fluency to be about reading it: they and the task
+# score are left out, with the word and fluency diagnostics, and only Content
+# is given. Set on 2026-10-31 between the 39 SpeechOcean validation readings
+# joined into passages (lowest 0.33; weak adults 0.39-0.63) and macOS
+# text-to-speech translations of a passage that cross the reading gate
+# through cognates (French, German, Spanish, Italian: 0.10-0.24, which were
+# shown Pronunciation and Oral Fluency of 62-66). Most half-read passages
+# fall below it too (`speech/docs/first-generation-model-card.md` SS6).
+SCORED_READING_COVERAGE = 0.28
+
 TASK_WEIGHTS = {"pronunciation": 0.4, "oralFluency": 0.4, "content": 0.2}
 CONTENT_CAP_MARGIN = 30
 

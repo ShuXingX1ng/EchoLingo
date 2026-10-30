@@ -551,17 +551,15 @@ uv run python -m echolingo_speech.evaluation.non_english report \
   --rows $SPEECH_HOME/reports/m6/non-english-rows.jsonl --out $SPEECH_HOME/reports/m6/non-english-report.json
 ```
 
-Results (2026-10-31). The check fails on 4 of 44 non-English pairs.
+Results (2026-10-31): 44 of 44 non-English pairs pass, and every English
+reading of its own passage is still scored.
 
-- **Below the gate.** Every non-English clip scored against a passage it does
-  not translate falls below the gate. So do Mandarin, Japanese, Korean,
-  Portuguese, Russian, Hindi and Arabic against their own passage.
-- **The failing pairs.** French, German, Spanish and Italian translations,
-  scored against the English passage they translate, cross the gate.
-  Cognates raise the corrected coverage to 0.10–0.24, and the task score
-  reaches 41–59.
-- **English controls.** Every English reading passes against its own passage
-  (coverage at least 0.95) and falls below the gate against the others.
+- **First run.** French, German, Spanish and Italian translations, scored
+  against the passage they translate, crossed the reading gate through
+  cognates (corrected coverage 0.10–0.24) and got Pronunciation and Oral
+  Fluency of 62–66.
+- **Fix.** FastAPI now shows Content only below 0.28 (`SCORED_READING_COVERAGE`,
+  ADR-0018), and `non_english.py` mirrors that value.
 
 See `docs/first-generation-model-card.md` SS6.
 

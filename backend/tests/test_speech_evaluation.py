@@ -281,6 +281,34 @@ def test_degraded_sentence_scores_are_not_shown():
     assert result.evidenceStatus.sentence.status == "degraded"
 
 
+def test_a_passage_barely_read_gets_content_only():
+    # A translation into a language close to English: cognates carry it over
+    # the reading gate, and the scorer still scores the sound.
+    result = from_echolingo(_worker_result(
+        recognized_text="les participants cognitifs minutes",
+        reference_character_coverage_corrected=0.24,
+        fluency_events=[{"kind": "pause", "start_sec": 0.6, "end_sec": 1.2, "word_index": 0}],
+    ))
+
+    assert (result.pronunciation, result.oralFluency, result.taskScoreEstimate) == (
+        None, None, None,
+    )
+    assert result.content == 38              # 10 + 80 × (0.24 − 0.10)/0.40
+    assert result.evidenceStatus.sentence.model_dump() == {
+        "status": "degraded", "reason": "reference_barely_read",
+    }
+    assert result.evidenceStatus.word.reason == "reference_barely_read"
+    assert (result.words, result.fluencyEvents, result.readingErrors) == ([], [], [])
+
+
+def test_a_passage_read_just_above_the_line_is_scored():
+    coverage = speech_normalization.SCORED_READING_COVERAGE
+    result = from_echolingo(_worker_result(reference_character_coverage_corrected=coverage))
+
+    assert result.pronunciation is not None and result.taskScoreEstimate is not None
+    assert len(result.words) == 3
+
+
 def test_an_out_of_vocabulary_word_is_not_scored():
     oov = {"index": 3, "text": "zorblax", "start_sec": 1.1, "end_sec": 1.5,
            "status": "out_of_vocabulary", "accuracy": None, "is_error": None,

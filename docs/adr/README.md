@@ -29,6 +29,7 @@ ADR 记录决策产生时的背景和理由。阶段完成不代表 ADR 失效�
 | [0015](0015-run-the-speech-evaluation-worker-on-the-development-mac.md) | Accepted | Implemented | 开发阶段 Worker 在本机 Mac CPU 上运行 |
 | [0016](0016-normalize-read-aloud-scores-in-fastapi-per-bundle.md) | Accepted | Implemented | 10–90 归一化在 FastAPI 按 Bundle 区分；Content 策略；段落按句评分 |
 | [0017](0017-report-reading-diagnostics-only-where-alignment-and-asr-agree.md) | Accepted | Implemented | 漏读、多读、重复与流利度事件只在强制对齐与自由 ASR 一致时报告 |
+| [0018](0018-show-content-only-when-little-of-the-passage-was-heard.md) | Accepted | Implemented | 校正覆盖率低于 0.28 时只给 Content，不给发音、流利度与总分（补充 ADR-0016） |
 
 ## 维护约定
 
