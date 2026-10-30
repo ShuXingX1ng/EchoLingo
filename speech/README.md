@@ -531,6 +531,40 @@ Held-out results (2026-10-31):
 - 94% of the planted pauses and 89% of the planted slow words were kept;
 - the event rate for fluent readers did not change.
 
+## Non-English speech
+
+A learner who reads in another language must get the minimum result, not an
+English score. No labelled non-English learner speech is available, so this
+check uses macOS text-to-speech.
+
+- 11 non-English voices each read a translation of one English passage.
+- 4 English voices read all four passages.
+- Every clip is scored against every passage.
+
+```bash
+# macOS only: `say` and `afconvert`
+uv run python -m echolingo_speech.evaluation.non_english synthesize \
+  --out-dir $SPEECH_HOME/data/synthetic/non-english-say
+uv run python -m echolingo_speech.evaluation.non_english collect --config configs/speech.yaml \
+  --clips-dir $SPEECH_HOME/data/synthetic/non-english-say --out $SPEECH_HOME/reports/m6/non-english-rows.jsonl
+uv run python -m echolingo_speech.evaluation.non_english report \
+  --rows $SPEECH_HOME/reports/m6/non-english-rows.jsonl --out $SPEECH_HOME/reports/m6/non-english-report.json
+```
+
+Results (2026-10-31). The check fails on 4 of 44 non-English pairs.
+
+- **Below the gate.** Every non-English clip scored against a passage it does
+  not translate falls below the gate. So do Mandarin, Japanese, Korean,
+  Portuguese, Russian, Hindi and Arabic against their own passage.
+- **The failing pairs.** French, German, Spanish and Italian translations,
+  scored against the English passage they translate, cross the gate.
+  Cognates raise the corrected coverage to 0.10–0.24, and the task score
+  reaches 41–59.
+- **English controls.** Every English reading passes against its own passage
+  (coverage at least 0.95) and falls below the gate against the others.
+
+See `docs/first-generation-model-card.md` SS6.
+
 ## Notes
 
 MLflow >=3 disables its plain filesystem tracking backend by default; any
