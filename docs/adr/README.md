@@ -28,6 +28,7 @@ ADR 记录决策产生时的背景和理由。阶段完成不代表 ADR 失效�
 | [0014](0014-train-speech-evaluator-on-rented-linux-gpu.md) | Accepted | In progress | 在租用的 Linux 云 GPU 上训练 Speech Evaluator |
 | [0015](0015-run-the-speech-evaluation-worker-on-the-development-mac.md) | Accepted | Implemented | 开发阶段 Worker 在本机 Mac CPU 上运行 |
 | [0016](0016-normalize-read-aloud-scores-in-fastapi-per-bundle.md) | Accepted | Implemented | 10–90 归一化在 FastAPI 按 Bundle 区分；Content 策略；段落按句评分 |
+| [0017](0017-report-reading-diagnostics-only-where-alignment-and-asr-agree.md) | Accepted | Implemented | 漏读、多读、重复与流利度事件只在强制对齐与自由 ASR 一致时报告 |
 
 ## 维护约定
 

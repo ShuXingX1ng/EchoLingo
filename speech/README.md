@@ -498,6 +498,39 @@ and no report in any unchanged recording, so it is reported; `omitted`
 (0.75) and `repeated` (0.81) are not. The planted words have at least three
 phones, and an inserted word under 0.3 s is never reported.
 
+## M6: Confirming fluency events
+
+Where the reading departs from the reference, the aligner invents pauses
+and long words around the departure. `confirmed` in `worker/fluency.py`
+keeps only the events that the free ASR bears out (ADR-0017):
+
+- a pause is kept only if nothing was heard in it;
+- a slow word is kept only if, when it was heard at all, it was heard inside
+  its span, with no other reference word heard there and at most 4 extra
+  letters.
+
+The thresholds come from a validation benchmark that reuses the reading
+error rows above:
+
+```bash
+# Every validation recording as is, with the same planted pause as above,
+# and with one word drawn out 2.5x (about 45 min on the Mac; its own MFA cache)
+uv run python -m echolingo_speech.evaluation.fluency_confirmation collect --config configs/speech.yaml \
+  --manifest $MANIFEST --corpus-root $CORPUS --out $SPEECH_HOME/reports/m6/fluency-confirmation-rows-validation.jsonl
+# Events invented beside the cut, repeated and inserted words, and planted
+# events kept; chosen on half the speakers, measured on the other half
+uv run python -m echolingo_speech.evaluation.fluency_confirmation report \
+  --rows $SPEECH_HOME/reports/m6/fluency-confirmation-rows-validation.jsonl \
+  --reading-error-rows $SPEECH_HOME/reports/m6/reading-error-rows-validation.jsonl \
+  --out $SPEECH_HOME/reports/m6/fluency-confirmation-report-validation.json
+```
+
+Held-out results (2026-10-31):
+
+- events invented beside the cut, repeated and inserted words fell from 118 to 41;
+- 94% of the planted pauses and 89% of the planted slow words were kept;
+- the event rate for fluent readers did not change.
+
 ## Notes
 
 MLflow >=3 disables its plain filesystem tracking backend by default; any

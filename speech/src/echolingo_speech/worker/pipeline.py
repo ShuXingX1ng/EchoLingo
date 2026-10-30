@@ -57,7 +57,7 @@ from echolingo_speech.worker.aligner import (
     Alignment,
     AlignmentError,
 )
-from echolingo_speech.worker.fluency import fluency_events
+from echolingo_speech.worker.fluency import confirmed, fluency_events
 from echolingo_speech.worker.reading_errors import (
     DEFAULT_THRESHOLDS as READING_ERROR_THRESHOLDS,
 )
@@ -429,7 +429,10 @@ class SpeechEvaluationPipeline:
             withheld = "reference_not_read"
 
         counts = sentence_word_counts or [len(reference_words)]
-        events = fluency_events(words, counts) if withheld is None else []
+        events = (
+            confirmed(fluency_events(words, counts), words, encoded.recognized_words)
+            if withheld is None else []
+        )
         # From the free ASR of the whole recording, even when its sentences
         # are scored apart.
         errors = (

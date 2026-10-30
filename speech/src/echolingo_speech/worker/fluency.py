@@ -18,6 +18,12 @@ within-sentence thresholds were chosen on validation
 (`evaluation/fluency_events.py`); SpeechOcean recordings are single
 sentences, so the between-sentence threshold has no benchmark (see
 `FluencyThresholds`).
+
+Where the reading departs from the reference (an extra word, a word read
+as another), the aligner still fits every reference word in, stretching
+some and squeezing others, and its gaps and long words there are not where
+the reader paused or lingered. `confirmed` keeps only the events the free
+ASR's word times bear out (`evaluation/fluency_confirmation.py`).
 """
 from __future__ import annotations
 
@@ -25,10 +31,12 @@ from dataclasses import dataclass
 from itertools import accumulate
 from typing import TYPE_CHECKING
 
+from echolingo_speech.worker.reading_errors import anchors
 from echolingo_speech.worker.schema import FluencyEvent
 
 if TYPE_CHECKING:
     from echolingo_speech.worker.pipeline import AlignedWord
+    from echolingo_speech.worker.reading_errors import RecognizedWord
 
 
 @dataclass(frozen=True)
@@ -87,3 +95,77 @@ def fluency_events(
                 at_sentence_boundary=boundary,
             ))
     return events
+
+
+@dataclass(frozen=True)
+class ConfirmationThresholds:
+    # Chosen on 2026-10-31 on the tuning half of validation as the candidate
+    # with the fewest events invented beside a cut, repeated or inserted
+    # word that keeps 90% of the planted pauses and slow words; measured once
+    # on the held-out half (6 speakers): invented events 118 -> 41 in 350
+    # changed copies, planted pauses of 0.5 s and longer kept 94%, slow words
+    # 89% (adults: 49 -> 21, 90%, 85%); fluent readers unchanged. Report:
+    # `<reports>/m6/fluency-confirmation-report-validation.json`.
+    # A recognized word this similar to a reference word anchors it, as in
+    # `reading_errors`.
+    match_similarity: float = 0.7
+    # A slow word, if heard, is heard within its aligned span, give or take this.
+    anchor_tolerance_sec: float = 0.0
+    # A pause may hold recognized words of at most this many letters.
+    pause_max_letters: int = 0
+    # A slow word may hold at most this many recognized letters beyond its own.
+    slow_word_extra_letters: int = 4
+
+
+DEFAULT_CONFIRMATION = ConfirmationThresholds()
+
+
+def confirmed(
+    events: list[FluencyEvent],
+    words: list[AlignedWord],
+    heard: list[RecognizedWord] | tuple[RecognizedWord, ...],
+    thresholds: ConfirmationThresholds = DEFAULT_CONFIRMATION,
+) -> list[FluencyEvent]:
+    """The events the free ASR, which does not know the reference, bears
+    out:
+    - a pause, when the ASR heard nothing in it: no reference word and
+      nothing longer than `pause_max_letters`. A reference word heard in
+      the gap is a word the aligner placed too early or too late; an extra
+      word heard there is speech the aligner did not account for.
+    - a slow word, when the ASR, if it heard the word, heard it inside the
+      aligned span, and heard no other reference word and at most
+      `slow_word_extra_letters` letters beyond the word's own there.
+    Where the alignment has drifted but the ASR heard nothing in the gap,
+    the pause stays: the reader did pause after that word, only its time is
+    uncertain. A word is placed by the middle of its recognized span."""
+    pairs = anchors([w.text for w in words], [h.text for h in heard],
+                    thresholds.match_similarity)
+    heard_as = dict(pairs)
+    reference_of = {j: i for i, j in pairs}
+    middle = [(h.start_sec + h.end_sec) / 2 for h in heard]
+
+    def heard_in_place(index: int) -> bool:
+        if index not in heard_as:
+            return True
+        span = words[index].span
+        return (span.start - thresholds.anchor_tolerance_sec <= middle[heard_as[index]]
+                <= span.end + thresholds.anchor_tolerance_sec)
+
+    kept = []
+    for event in events:
+        index = event.word_index
+        within = [j for j, m in enumerate(middle) if event.start_sec < m < event.end_sec]
+        if event.kind == "pause":
+            bears_out = not any(j in reference_of
+                                or len(heard[j].text) > thresholds.pause_max_letters
+                                for j in within)
+        else:
+            bears_out = (
+                heard_in_place(index)
+                and all(reference_of.get(j, index) == index for j in within)
+                and sum(len(heard[j].text) for j in within)
+                <= len(words[index].text) + thresholds.slow_word_extra_letters
+            )
+        if bears_out:
+            kept.append(event)
+    return kept
